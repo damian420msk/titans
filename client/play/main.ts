@@ -4,6 +4,7 @@ import { Controls } from './controls';
 import { Battle, kindForHold, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
+import { initMenu } from './menu';
 
 const sfx = new Sfx();
 const haptic = (ms: number | number[]) => { try { if (matchMedia('(pointer: coarse)').matches) navigator.vibrate?.(ms); } catch { /* optional */ } };
@@ -16,25 +17,22 @@ const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', h
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
 let seenAimHint = (() => { try { return localStorage.getItem('titans.aimhint') === '1'; } catch { return false; } })();
 let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1, userPause = false, anchorCell: Cell | null = null;
-const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell
+const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
 
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
-  $('help').textContent = touchDevice
-    ? 'Левый палец: ходьба. Правый: нажми, и прицел встанет на врага; тяни, чтобы сдвинуть; отпусти для броска, дольше держишь, сильнее бросок. Палец на ✕: отмена.'
-    : 'WASD — ходьба · ЛКМ — бросок (держи — сильнее) · ПКМ или Esc — отмена · Пробел — ремонт';
   $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел ремонт';
-  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-level]')) b.onclick = () => { level = b.dataset.level as Difficulty; document.querySelectorAll('[data-level]').forEach(x => x.classList.toggle('sel', x === b)); };
+  const menu = initMenu({ sfx, touch: touchDevice, onStartBot: l => { level = l; startMatch(); } });
   const startMatch = () => {
     sfx.unlock(); sfx.startMusic(); sfx.click();
     world.resetPoses(); battle = new Battle(); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
-    $('foe-name').textContent = NAMES[level]; $('menu').hidden = true; $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
+    $('foe-name').textContent = NAMES[level]; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
   const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
-  $('start').onclick = startMatch; $('again').onclick = startMatch;
-  $('to-menu').onclick = () => { $('end').hidden = true; $('hud').hidden = true; $('menu').hidden = false; mode = 'menu'; };
+  $('again').onclick = startMatch;
+  $('to-menu').onclick = () => { $('end').hidden = true; $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
   $('loading').hidden = true;
   const toast = (t: string) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); toastTimer = 1.4; };
   const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
@@ -42,7 +40,7 @@ async function boot() {
 
   const setPause = (on: boolean) => { if (on && mode !== 'playing') return; userPause = on; $('pause').hidden = !on; if (on) { controls.reset(); charging = false; battle.cancelCharge(0); battle.cancelRepair(0); } };
   $('pause-btn').onclick = () => setPause(true); $('resume').onclick = () => setPause(false);
-  $('pause-menu').onclick = () => { setPause(false); $('hud').hidden = true; $('menu').hidden = false; mode = 'menu'; };
+  $('pause-menu').onclick = () => { setPause(false); $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
   window.addEventListener('blur', () => setPause(true));
   const fsBtn = $('fs-btn');
   fsBtn.hidden = !touchDevice && !document.fullscreenEnabled;
@@ -67,8 +65,8 @@ async function boot() {
       // Touch aiming is relative and works in cells, not screen pixels: perspective squeezes depth, so a pixel gain would be too twitchy.
       const unit = Math.max(.8, Math.min(1.6, innerHeight / 390));
       const touchCell = (): Cell => ({
-        x: Math.max(0, Math.min(rules.arena.width_cells - 1, Math.round(anchorCell!.x - controls.touchDelta.x / (TOUCH_PX_X * unit)))),
-        z: Math.max(0, Math.min(rules.arena.depth_cells - 1, Math.round(anchorCell!.z + controls.touchDelta.y / (TOUCH_PX_Z * unit)))),
+        x: Math.max(0, Math.min(rules.arena.width_cells - 1, Math.round(anchorCell!.x - controls.touchDelta.x / (TOUCH_PX_X / menu.sens() * unit)))),
+        z: Math.max(0, Math.min(rules.arena.depth_cells - 1, Math.round(anchorCell!.z + controls.touchDelta.y / (TOUCH_PX_Z / menu.sens() * unit)))),
       });
       const pick = () => controls.touch && anchorCell ? touchCell() : world.pick(controls.aim.x, controls.aim.y);
       if (!charging && b.charges[0]) b.cancelCharge(0);
@@ -124,7 +122,7 @@ async function boot() {
       $('cancel').hidden = !(charging && controls.touch);
       if ((toastTimer -= dt) <= 0) $('toast').classList.remove('on');
     }
-    world.scene.render();
+    if (mode !== 'menu') world.scene.render();
   });
   function showEnd(winner: 0 | 1 | null) {
     mode = 'over'; charging = false; controls.reset();

@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Титаны</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/client/play/hud.css">
+<link rel="stylesheet" href="/client/play/hud.css"><link rel="stylesheet" href="/client/play/menu.css">
 </head><body>
 <canvas id="game"></canvas>
 <div id="hud" hidden>
@@ -19,16 +19,108 @@
   <div id="cancel" hidden>✕</div>
   <div id="hint"></div>
 </div>
-<div id="menu" class="overlay">
-  <div class="panel">
-    <h1>ТИТАНЫ<small>БРОСКИ С НЕБЕСНЫХ ОСТРОВОВ</small></h1>
-    <p>Бросай небесные камни по острову врага. Разбей плиты под титаном, чтобы он упал.</p>
-    <div class="levels">
-      <button data-level="easy">Лёгкий</button><button data-level="normal" class="sel">Средний</button><button data-level="hard">Сложный</button>
-    </div>
-    <button id="start" class="big">В БОЙ</button>
-    <div class="help" id="help"></div>
+<div id="menu" class="sky">
+  <div class="sky-bg" aria-hidden="true">
+    <img class="cl c1" src="art/bg-v01/cloud_08.png" alt=""><img class="cl c2" src="art/bg-v01/cloud_01.png" alt=""><img class="cl c3" src="art/bg-v01/cloud_03.png" alt="">
+    <img class="isl i1" src="art/bg-v01/island_18.png" alt=""><img class="isl i2" src="art/bg-v01/island_05.png" alt=""><img class="isl i3" src="art/bg-v01/island_19.png" alt="">
   </div>
+
+  <section class="scr" data-scr="main">
+    <div class="main-left">
+      <h1 class="logo">ТИТАНЫ<small>БРОСКИ С НЕБЕСНЫХ ОСТРОВОВ</small></h1>
+      <p class="tag">Бросай небесные камни по острову врага. Разбей плиты под титаном, чтобы он упал.</p>
+      <button class="chip player" data-go="settings"><span class="avatar">Я</span><span><b id="nick-label">Игрок</b><i>Рейтинг <span id="rating-label">1000</span></i></span></button>
+    </div>
+    <nav class="main-right">
+      <button class="big" data-go="bot">БОЙ С БОТОМ</button>
+      <button class="mbtn online" data-go="online"><b>ОНЛАЙН</b><i>играть с друзьями</i></button>
+      <div class="row2">
+        <button class="mbtn" data-go="rating"><b>РЕЙТИНГ</b></button>
+        <button class="mbtn locked" data-go="shop"><b>МАГАЗИН</b><i>скоро</i></button>
+      </div>
+      <div class="row2">
+        <button class="mbtn" data-go="settings"><b>НАСТРОЙКИ</b></button>
+        <button class="mbtn" data-go="howto"><b>КАК ИГРАТЬ</b></button>
+      </div>
+    </nav>
+  </section>
+
+  <section class="scr" data-scr="bot" hidden>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Бой с ботом</h2><span></span></header>
+    <div class="levels">
+      <button class="lvl" data-level="easy"><span class="face teal">1</span><b>ГРОМ</b><i>Лёгкий</i><em>Редко попадает, ходит неспешно. Чтобы освоиться.</em></button>
+      <button class="lvl sel" data-level="normal"><span class="face teal">2</span><b>БОРГАР</b><i>Средний</i><em>Уворачивается, чинит остров, бросает кручёные.</em></button>
+      <button class="lvl" data-level="hard"><span class="face coral">3</span><b>ТОРВАЛЬД</b><i>Сложный</i><em>Точный и быстрый. Мощные броски, почти не промахивается.</em></button>
+    </div>
+    <button id="start" class="big wide">В БОЙ</button>
+  </section>
+
+  <section class="scr" data-scr="online" hidden>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Онлайн</h2><span class="pill" id="net-pill"><i></i><span>сервер не подключён</span></span></header>
+    <div class="glass list-wrap">
+      <div class="list-head"><span>Комната</span><span>Хозяин</span><span>Игроки</span><span></span></div>
+      <div id="rooms" class="rooms"></div>
+    </div>
+    <div class="actions"><button class="big" data-go="create">СОЗДАТЬ КОМНАТУ</button><button id="refresh" class="ghost">Обновить</button></div>
+  </section>
+
+  <section class="scr" data-scr="create" hidden>
+    <header class="top"><button class="back" data-go="online">‹ Назад</button><h2>Новая комната</h2><span></span></header>
+    <form id="create-form" class="glass form" autocomplete="off">
+      <label>Название<input id="room-name" maxlength="24" placeholder="Например, «Дуэль на облаках»"></label>
+      <label><span>Пароль <em>(необязательно)</em></span><input id="room-pass" maxlength="16" placeholder="Пусто — комната открытая"></label>
+      <button class="big" type="submit">СОЗДАТЬ</button>
+    </form>
+  </section>
+
+  <section class="scr" data-scr="room" hidden>
+    <header class="top"><button class="back" id="leave">‹ Выйти</button><h2 id="room-title">Комната</h2><span class="pill" id="room-lock"></span></header>
+    <div class="duel">
+      <div class="seat blue" id="seat0"><span class="face blue">1</span><b class="nm"></b><i class="st"></i></div>
+      <div class="mid"><div class="vs">VS</div><button id="ready" class="big" disabled>ГОТОВ</button><div id="count" class="count"></div></div>
+      <div class="seat red" id="seat1"><span class="face coral">2</span><b class="nm"></b><i class="st"></i></div>
+    </div>
+    <button id="demo-join" class="ghost demo">+ соперник (демо без сервера)</button>
+  </section>
+
+  <section class="scr" data-scr="rating" hidden>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Рейтинг</h2><span class="pill"><i></i><span>скоро</span></span></header>
+    <div class="glass table">
+      <div class="trow th"><span>#</span><span>Игрок</span><span>Победы</span><span>Очки</span></div>
+      <div class="trow me"><span>—</span><span id="rate-me">Игрок</span><span>0</span><span>1000</span></div>
+      <p class="empty">Таблица лучших появится вместе с онлайном. Победа даёт очки, поражение отнимает. Чем сильнее соперник, тем больше разница.</p>
+    </div>
+  </section>
+
+  <section class="scr" data-scr="shop" hidden>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Магазин</h2><span></span></header>
+    <div class="glass soon"><div class="lock">🔒</div><b>Скоро</b><p>Новые титаны, плиты острова, башни и облики. Монеты будут падать за победы и за налёты на чужие острова.</p></div>
+  </section>
+
+  <section class="scr" data-scr="settings" hidden>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Настройки</h2><span></span></header>
+    <div class="glass form settings">
+      <label>Ник<input id="nick" maxlength="14" placeholder="Игрок"></label>
+      <div class="setrow"><span>Звук и музыка</span><button id="set-sound" class="toggle"></button></div>
+      <label class="touch-only">Чувствительность прицела<input id="sens" type="range" min="0.6" max="1.8" step="0.1" value="1"><em id="sens-val">×1.0</em></label>
+    </div>
+  </section>
+
+  <section class="scr" data-scr="howto" hidden>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Как играть</h2><span></span></header>
+    <div class="glass howto">
+      <ol>
+        <li><b>Цель.</b> Сбрось титана врага с острова. У каждого 3 жизни, бой идёт 3 минуты.</li>
+        <li><b>Ходьба.</b> <span class="pc">WASD</span><span class="tc">Левый палец, плавающий джойстик.</span></li>
+        <li><b>Бросок.</b> <span class="pc">Зажми ЛКМ на острове врага, отпусти.</span><span class="tc">Нажми правой половиной, сдвинь прицел и отпусти.</span> Дольше держишь, сильнее камень: кручёный от 0,9 с, мощный от 2,6 с.</li>
+        <li><b>Отмена.</b> <span class="pc">ПКМ или Esc.</span><span class="tc">Отведи палец на ✕.</span></li>
+        <li><b>Камни.</b> Их берут у кучи на своём острове (3 в запасе). Плиты трескаются, потом проваливаются.</li>
+        <li><b>Ремонт.</b> <span class="pc">Пробел.</span><span class="tc">Кнопка РЕМОНТ.</span> Чинит плиту рядом, стоит 1 камень.</li>
+      </ol>
+    </div>
+  </section>
+
+  <div id="pwd" class="modal" hidden><form class="glass form"><h3 id="pwd-title">Пароль</h3><input id="pwd-in" maxlength="16" placeholder="Пароль комнаты" autocomplete="off"><div class="err" id="pwd-err"></div><div class="row2"><button type="button" class="ghost" id="pwd-cancel">Отмена</button><button class="big" type="submit">ВОЙТИ</button></div></form></div>
 </div>
 <div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>
 <div id="pause" class="overlay" hidden><div class="panel"><h1>ПАУЗА</h1><button id="resume" class="big">ПРОДОЛЖИТЬ</button><button id="pause-menu">Выйти в меню</button></div></div>
