@@ -8,7 +8,7 @@
 <canvas id="game"></canvas>
 <div id="hud" hidden>
   <div class="badge l"><div class="face teal">ВЫ</div><div><div class="who">ВЫ</div><div class="hearts" id="hearts0"></div></div></div>
-  <div class="badge r"><div class="face coral">ИИ</div><div><div class="who" id="foe-name">БОРГАР</div><div class="hearts" id="hearts1"></div></div></div>
+  <div class="badge r"><div class="face coral" id="foe-face">ИИ</div><div><div class="who" id="foe-name">БОРГАР</div><div class="hearts" id="hearts1"></div></div></div>
   <div id="timer">3:00</div>
   <div id="tools"><button id="pause-btn" aria-label="Пауза">❚❚</button><button id="mute-btn" aria-label="Звук">🔊</button><button id="fs-btn" aria-label="Полный экран">⛶</button></div>
   <div id="toast"></div>
@@ -80,7 +80,6 @@
       <div class="mid"><div class="vs">VS</div><button id="ready" class="big" disabled>ГОТОВ</button><div id="count" class="count"></div></div>
       <div class="seat red" id="seat1"><span class="face coral">2</span><b class="nm"></b><i class="st"></i></div>
     </div>
-    <button id="demo-join" class="ghost demo">+ соперник (демо без сервера)</button>
   </section>
 
   <section class="scr" data-scr="rating" hidden>
@@ -120,6 +119,7 @@
     </div>
   </section>
 
+  <div id="menu-toast"></div>
   <div id="pwd" class="modal" hidden><form class="glass form"><h3 id="pwd-title">Пароль</h3><input id="pwd-in" maxlength="16" placeholder="Пароль комнаты" autocomplete="off"><div class="err" id="pwd-err"></div><div class="row2"><button type="button" class="ghost" id="pwd-cancel">Отмена</button><button class="big" type="submit">ВОЙТИ</button></div></form></div>
 </div>
 <div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>

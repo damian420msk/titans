@@ -7,15 +7,22 @@
         "dev": "vite",
         "build": "tsc --noEmit && vite build",
         "test": "node --experimental-strip-types --test tests/*.test.ts",
-        "check": "tsc --noEmit && npm test"
+        "check": "tsc --noEmit && npm test",
+        "server": "node --experimental-strip-types server/index.ts",
+        "start": "node --experimental-strip-types server/index.ts"
     },
     "dependencies": {
-        "@babylonjs/core": "^9.32.0",
-        "@babylonjs/loaders": "9.32.0"
+        "ws": "^8.22.0"
     },
     "devDependencies": {
+        "@babylonjs/core": "^9.32.0",
+        "@babylonjs/loaders": "9.32.0",
         "@types/node": "^26.6.5",
+        "@types/ws": "^8.18.2",
         "typescript": "^7.0.2",
         "vite": "^8.3.5"
+    },
+    "engines": {
+        "node": ">=22.6"
     }
 }

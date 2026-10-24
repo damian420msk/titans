@@ -140,3 +140,6 @@ body.touch .howto .pc,body:not(.touch) .howto .tc{display:none}
 @media (max-width:640px) and (orientation:portrait){
   .scr[data-scr=main]{flex-direction:column;gap:18px}.main-right{flex:none;width:min(360px,100%)}.main-left{flex:none;align-items:center;text-align:center}
 }
+
+#menu-toast{position:absolute;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translate(-50%,20px);z-index:4;padding:9px 18px;border-radius:16px;background:#f4b63c;color:#3a2600;font-weight:700;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;text-align:center}
+#menu-toast.on{opacity:1;transform:translate(-50%,0)}
