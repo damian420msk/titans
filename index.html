@@ -1,13 +1,36 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#222a42"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23248F8D' d='M2 2h28v28H2z'/%3E%3C/svg%3E"><title>Броски титанов · прототип</title></head>
-<body><main id="game-root"><canvas id="game" tabindex="0" aria-label="Трёхмерная площадка титанов"></canvas>
-<button id="open-modes">Тренировка ▾</button><div id="net-banner" role="status"></div>
-<dialog id="mode-panel"><h2>Режим игры</h2><button id="local-training">Локальная тренировка</button><button id="create-room">Создать комнату</button><label>Код комнаты <input id="join-code" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32"></label><button id="join-room">Подключиться по коду</button><div id="network-error" role="status"></div><section id="room-details" hidden><p>Код: <strong id="room-code"></strong></p><p id="ready-count"></p><button id="ready-room">Готов</button><button id="leave-room">Выйти из комнаты</button></section><button id="close-modes">Закрыть меню</button></dialog>
-<header><div class="side"><i></i><span>ВЫ<small id="ammo">Камни: 3 / 3</small></span></div><div class="stage"><span id="round">ТЕСТОВЫЙ РАУНД 1</span><small>Только обычный бросок</small></div><div class="side enemy"><span>ТЕСТОВАЯ ЦЕЛЬ<small>Неподвижна · это не бот</small></span><i></i></div></header>
-<details id="settings"><summary aria-label="Настройки">⚙</summary><section aria-label="Настройки игры"><label>Ввод <select id="input-mode"><option value="auto">Авто</option><option value="desktop">Мышь и клавиатура</option><option value="touch">Касания</option></select></label><label>Касания <select id="touch-layout"><option value="zones">Свободные зоны</option><option value="joysticks">Джойстики</option></select></label><label>Камера <select id="camera-mode"><option value="env">ENV · прицел 24%</option><option value="art35">ART · 35° вниз</option><option value="art42">Сравнение · 42°</option><option value="art48">Сравнение · 48°</option><option value="base">Базовая · 70°</option><option value="closer">Ближе · 62°</option></select></label><label>Качество <select id="quality"><option value="auto">Авто</option><option value="clear">Чётче</option><option value="fast">Быстрее</option></select></label><label>Чувствительность <input id="sensitivity" type="range" min="0.6" max="1.8" step="0.1" value="1"><output id="sensitivity-value">1.0</output></label><label><input id="show-diagnostics" type="checkbox"> Диагностика экрана и прицела</label><button id="fullscreen">На весь экран</button><small id="mode-status"></small><small id="fullscreen-status"></small></section></details>
-<div id="reticle">+</div><div id="target">Наведите прицел на поле соперника</div>
-<footer><span id="input-hint"></span><small id="status">Тестовый раунд</small><strong id="context"></strong></footer>
-<div id="entry"><button id="capture">Нажми, чтобы играть. WASD — движение, мышь — обзор, Esc — курсор</button><button id="fallback">Без захвата мыши</button></div>
-<div id="stick" class="joystick" aria-label="Джойстик движения"><div id="knob" class="knob"></div><span>Ход</span></div><div id="look-stick" class="joystick" aria-label="Джойстик обзора"><div id="look-knob" class="knob"></div><span>Обзор</span></div>
-<div id="touch-bounds" aria-hidden="true"></div><div id="zones-tip" hidden>Слева — движение · справа — обзор<br>Для броска — отдельная кнопка</div><div id="cancel-zone" aria-hidden="true">Вниз сюда<br>Отмена → обзор</div><button id="primary" aria-label="Основное действие"><span id="primary-label">Бросок</span></button><div id="gesture-hint" role="status"></div><pre id="diagnostics" hidden></pre>
-<div id="portrait" hidden><div><span class="rotate-icon">↻</span><h1>Поверните телефон горизонтально</h1><p>Раунд приостановлен. Продолжим после поворота.</p><button id="rotate-fullscreen">На весь экран</button></div></div></main><script type="module" src="/client/main.ts"></script></body></html>
+<html lang="ru"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Титаны</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/client/play/hud.css">
+</head><body>
+<canvas id="game"></canvas>
+<div id="hud" hidden>
+  <div class="badge l"><div class="face teal">ВЫ</div><div><div class="who">ВЫ</div><div class="hearts" id="hearts0"></div></div></div>
+  <div class="badge r"><div class="face coral">ИИ</div><div><div class="who" id="foe-name">БОРГАР</div><div class="hearts" id="hearts1"></div></div></div>
+  <div id="timer">3:00</div>
+  <div id="toast"></div>
+  <div id="charge"><i></i><span></span></div>
+  <div id="slots"></div>
+  <div id="stick"><i></i></div>
+  <button id="repair" hidden>РЕМОНТ</button>
+  <div id="cancel" hidden>✕</div>
+  <div id="hint"></div>
+</div>
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1>ТИТАНЫ<small>БРОСКИ С НЕБЕСНЫХ ОСТРОВОВ</small></h1>
+    <p>Бросай небесные камни по острову врага. Разбей плиты под титаном, чтобы он упал.</p>
+    <div class="levels">
+      <button data-level="easy">Лёгкий</button><button data-level="normal" class="sel">Средний</button><button data-level="hard">Сложный</button>
+    </div>
+    <button id="start" class="big">В БОЙ</button>
+    <div class="help" id="help"></div>
+  </div>
+</div>
+<div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>
+<div id="portrait" class="overlay" hidden><div class="panel"><h1>Поверните телефон</h1><p>Игра идёт в горизонтальном режиме. Бой на паузе.</p></div></div>
+<div id="loading" class="overlay"><div class="panel"><h1>Загрузка…</h1></div></div>
+<script type="module" src="/client/play/main.ts"></script>
+</body></html>

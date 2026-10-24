@@ -5,5 +5,5 @@
     "resolveJsonModule": true, "esModuleInterop": true, "skipLibCheck": true,
     "noEmit": true, "allowImportingTsExtensions": true, "types": ["node"]
   },
-  "include": ["client", "shared", "server", "tests", "playwright.config.ts", "vite.config.ts"]
+  "include": ["client", "shared", "tests", "tools/concept", "vite.config.ts"]
 }

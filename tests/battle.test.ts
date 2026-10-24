@@ -1,0 +1,89 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { Battle, kindForHold, cellsFor, LIVES, MATCH_SECONDS } from '../shared/battle.ts';
+import { Bot, mulberry32 } from '../shared/bot.ts';
+import { cellCentre, rules } from '../shared/world.ts';
+
+const run = (b: Battle, s: number, dt = 1 / 60) => { for (let i = 0; i < Math.round(s / dt); i++) b.step(dt); };
+const place = (b: Battle, side: 0 | 1, x: number, z: number) => { b.actors[side].pos = cellCentre({ x, z }, side); };
+const throwAt = (b: Battle, side: 0 | 1, c: { x: number; z: number }, hold = 0) => { assert.ok(b.beginCharge(side)); b.setTarget(side, c); run(b, hold || .05); assert.ok(b.releaseCharge(side)); };
+
+test('hold time decides the throw kind; spin and heavy hit two cells, mirrored at the right edge', () => {
+  assert.equal(kindForHold(0), 'normal'); assert.equal(kindForHold(.89), 'normal');
+  assert.equal(kindForHold(.9), 'spin'); assert.equal(kindForHold(2.59), 'spin'); assert.equal(kindForHold(2.6), 'heavy');
+  assert.deepEqual(cellsFor('normal', { x: 3, z: 5 }), [{ x: 3, z: 5 }]);
+  assert.deepEqual(cellsFor('spin', { x: 3, z: 5 }), [{ x: 3, z: 5 }, { x: 4, z: 5 }]);
+  assert.deepEqual(cellsFor('heavy', { x: 8, z: 5 }), [{ x: 8, z: 5 }, { x: 7, z: 5 }]);
+});
+
+test('normal throw: crack, then hole; stone spent; cooldown blocks the next charge', () => {
+  const b = new Battle(); place(b, 1, 0, 10);
+  throwAt(b, 0, { x: 2, z: 5 }); assert.equal(b.actors[0].stones, rules.inventory.capacity - 1);
+  assert.equal(b.beginCharge(0), false, 'cooldown');
+  run(b, 1.5); assert.equal(b.hp({ x: 2, z: 5 }, 1), 1);
+  run(b, 1.2); throwAt(b, 0, { x: 2, z: 5 }); run(b, 1.5); assert.equal(b.hp({ x: 2, z: 5 }, 1), 0);
+});
+
+test('heavy throw (hold 2.6 s) removes 2 hp from two cells at once', () => {
+  const b = new Battle(); place(b, 1, 0, 10);
+  throwAt(b, 0, { x: 3, z: 5 }, 2.7); run(b, 1.5);
+  assert.equal(b.hp({ x: 3, z: 5 }, 1), 0); assert.equal(b.hp({ x: 4, z: 5 }, 1), 0);
+});
+
+test('protected cells and arsenal cannot be damaged', () => {
+  const b = new Battle(); place(b, 1, 0, 10);
+  throwAt(b, 0, { x: 4, z: 0 }, 2.7); run(b, 1.5);
+  assert.equal(b.hp({ x: 4, z: 0 }, 1), Infinity);
+});
+
+test('standing on a destroyed cell makes the titan fall and lose a life; respawn on the protected cell', () => {
+  const b = new Battle(); place(b, 1, 4, 6);
+  throwAt(b, 0, { x: 4, z: 6 }, 2.7); run(b, 1.5);
+  assert.ok(b.actors[1].falling || b.actors[1].lives < LIVES);
+  run(b, 3);
+  assert.equal(b.actors[1].lives, LIVES - 1); assert.equal(b.actors[1].falling, false);
+  assert.deepEqual(b.cellOf(1), { x: 4, z: 0 }); assert.equal(b.actors[1].stones, rules.inventory.round_start);
+});
+
+test('three lost lives end the match', () => {
+  const b = new Battle();
+  for (let i = 0; i < LIVES; i++) { place(b, 1, 4, 6 + i % 2); b.floors[1].set(`${b.cellOf(1)!.x},${b.cellOf(1)!.z}`, 0); run(b, 3); }
+  assert.equal(b.phase, 'over'); assert.equal(b.winner, 0);
+});
+
+test('hit titan is knocked back and stunned; charge is cancelled', () => {
+  const b = new Battle(); place(b, 1, 4, 5); place(b, 0, 4, 6);
+  assert.ok(b.beginCharge(1)); b.setTarget(1, { x: 4, z: 6 });
+  throwAt(b, 0, { x: 4, z: 5 }); run(b, 1.45);
+  assert.ok(b.actors[1].stun > 0); assert.equal(b.charges[1], null);
+});
+
+test('repair: neighbour hole needs 2.2 s and a stone; moving cancels', () => {
+  const b = new Battle(); place(b, 0, 4, 5); b.floors[0].set('4,6', 0); b.floors[0].set('3,5', 1);
+  assert.ok(b.beginRepair(0)); assert.deepEqual(b.repairs[0]!.cell, { x: 3, z: 5 }, 'nearest damaged cell first');
+  run(b, 1.1); assert.equal(b.hp({ x: 3, z: 5 }, 0), 2); assert.equal(b.actors[0].stones, 2);
+  assert.ok(b.beginRepair(0)); assert.equal(b.repairs[0]!.need, rules.interaction.repair_hole_s);
+  b.setMove(0, 1, 0); run(b, .1); assert.equal(b.repairs[0], null);
+});
+
+test('auto refill at the arsenal, 0.7 s per stone', () => {
+  const b = new Battle(); b.actors[0].stones = 0; place(b, 0, 4, 0);
+  run(b, 1.5); assert.equal(b.actors[0].stones, 2);
+  place(b, 1, 0, 10); b.actors[1].stones = 0; place(b, 1, 0, 10); run(b, 2); assert.equal(b.actors[1].stones, 0);
+});
+
+test('match timer: lives, then island hp decide', () => {
+  const b = new Battle(); b.floors[1].set('1,1', 0); run(b, MATCH_SECONDS + .1);
+  assert.equal(b.phase, 'over'); assert.equal(b.winner, 0);
+});
+
+test('bot is deterministic per seed and plays a whole match without errors or NaN', () => {
+  const play = (seed: number, level: 'easy' | 'normal' | 'hard') => {
+    const b = new Battle(), bot = new Bot(b, 1, level, mulberry32(seed)), me = new Bot(b, 0, 'normal', mulberry32(seed + 1));
+    for (let i = 0; i < MATCH_SECONDS * 60 && b.phase === 'playing'; i++) { me.update(1 / 60); bot.update(1 / 60); b.step(1 / 60); b.events.length = 0;
+      for (const a of b.actors) assert.ok(Number.isFinite(a.pos.x + a.pos.z + a.y)); }
+    return [b.phase, b.winner, b.actors[0].lives, b.actors[1].lives, Math.round(b.time * 10)].join();
+  };
+  assert.equal(play(3, 'normal'), play(3, 'normal'));
+  for (const l of ['easy', 'normal', 'hard'] as const) assert.ok(play(5, l).length > 0);
+});
