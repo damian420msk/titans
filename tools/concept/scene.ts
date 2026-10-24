@@ -144,14 +144,16 @@ function building(b: Build, isl: Island, side: Side) {
 
 // ---------- titans ----------
 async function titan(color: 'teal' | 'coral', pos: Vector3, yaw: number, pose: 'idle' | 'aim' | 'throw') {
-  const c = await LoadAssetContainerAsync(`/art/titans-v02/titan_${color}_v02.glb`, scene, { pluginExtension: '.glb' });
+  const c = await LoadAssetContainerAsync(`/art/titans-v03/titan_${color}_v03.glb`, scene, { pluginExtension: '.glb' });
   for (const l of c.lights) l.setEnabled(false);
-  c.addAllToScene(); const root = c.meshes[0]; root.position.copyFrom(pos); root.rotationQuaternion = null; root.rotation.y = yaw;
+  c.addAllToScene(); const root = c.meshes[0];
+  // normalise: Meshy models are ~1.7 m tall; the game titan is 3.2 m
+  const holder = new TransformNode('titanHolder', scene); holder.position.copyFrom(pos); holder.rotation.y = yaw; root.parent = holder;
+  root.scaling.scaleInPlace(3.2 / 1.7);
   for (const m of c.meshes) { if (m.getTotalVertices()) { casters.push(m as Mesh); m.receiveShadows = true; } }
   for (const g of c.animationGroups) g.stop();
-  const clip = c.animationGroups.find(g => g.name.endsWith(pose === 'idle' ? 'idle' : 'throw'));
-  if (clip) { clip.start(false); clip.goToFrame(pose === 'aim' ? (clip.from + clip.to) * .5 : pose === 'throw' ? clip.from + (clip.to - clip.from) * .72 : clip.from + 5); clip.pause(); }
-  if (pose === 'aim') { const s = c.transformNodes.find(n => n.name === 'stone_socket_R'); if (s) { const st = skyStone(Vector3.Zero(), .32); st.parent = s; st.position.setAll(0); } }
+  const clip = c.animationGroups.find(g => /walking/i.test(g.name)) ?? c.animationGroups[0];
+  if (clip) { clip.start(false); clip.goToFrame(clip.from + (clip.to - clip.from) * (pose === 'aim' ? .35 : pose === 'throw' ? .6 : .1)); clip.pause(); }
 }
 
 // ---------- shots & aim ----------
