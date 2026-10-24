@@ -102,7 +102,7 @@ export class World {
     sky.setVerticesData('color', col);
     const cloud = s.getMaterialByName('soft cloud banks') as StandardMaterial; cloud.alpha = .9;
     for (let i = 0; i < 70; i++) { const a = i * 2.39996, r = 8 + (i % 10) * 9 + (i * 7 % 13); const m = MeshBuilder.CreatePlane('cloudsea', { width: 26 + (i % 4) * 8, height: 13 + (i % 3) * 4 }, s); m.position.set(Math.sin(a) * r, -9 - (i % 5) * 3.2, Math.cos(a) * r); m.billboardMode = Mesh.BILLBOARDMODE_ALL; m.material = cloud; m.isPickable = false; }
-    for (const m of s.meshes) if (m.name.startsWith('far rock')) m.position.y -= 20;
+    for (const m of s.meshes) if (m.name.startsWith('far rock') || m.name.startsWith('mountain template')) m.setEnabled(false);
   }
   private glow!: GlowLayer;
   private cast<T extends Mesh>(m: T) { this.casters.push(m); m.receiveShadows = true; return m; }
@@ -199,6 +199,15 @@ export class World {
     let best: Cell | null = null, bd = Infinity;
     for (const c of map.cells) { const q = cellCentre(c, 1), d = Math.hypot(q.x - px, q.z - pz); if (d < bd) { bd = d; best = c; } }
     return best && bd < size * 1.6 ? { x: best.x, z: best.z } : null;
+  }
+
+  /** Enemy-island cell centre -> screen position in CSS px relative to the canvas. */
+  project(c: Cell): { x: number; y: number } {
+    this.scene.updateTransformMatrix(true);
+    const q = cellCentre(c, 1), rw = this.engine.getRenderWidth(), rh = this.engine.getRenderHeight();
+    const v = Vector3.Project(new Vector3(q.x, 0, q.z), Matrix.Identity(), this.scene.getTransformMatrix(), this.camera.viewport.toGlobal(rw, rh));
+    const el = this.engine.getRenderingCanvas()!, k = el.clientWidth / rw;
+    return { x: v.x * k, y: v.y * k };
   }
 
   update(b: Battle, dt: number, input: { aiming: boolean; kind: Kind | null; aimCell: Cell | null; cancel: boolean }) {

@@ -3,11 +3,11 @@ import { rules, cellCentre, cellAt, type Cell, type Side } from './world.ts';
 import { Battle, cellKey, sideOther, RESPAWN_CELL, type Kind } from './battle.ts';
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
-type Profile = { think: number; aimError: number; heavy: number; spin: number; dodge: number; repair: number };
+type Profile = { think: number; aimError: number; onTarget: number; heavy: number; spin: number; dodge: number; repair: number; fireGap: number; speed: number };
 const PROFILES: Record<Difficulty, Profile> = {
-  easy:   { think: .55, aimError: 2.2, heavy: .05, spin: .15, dodge: .25, repair: .3 },
-  normal: { think: .35, aimError: 1.1, heavy: .15, spin: .30, dodge: .60, repair: .6 },
-  hard:   { think: .20, aimError: .4,  heavy: .30, spin: .35, dodge: .90, repair: .9 },
+  easy:   { think: .9,  aimError: 2.6, onTarget: .30, heavy: 0,   spin: .05, dodge: .08, repair: .15, fireGap: 3.4, speed: .55 },
+  normal: { think: .5,  aimError: 1.5, onTarget: .55, heavy: .08, spin: .20, dodge: .40, repair: .50, fireGap: 2.0, speed: .8 },
+  hard:   { think: .3,  aimError: .7,  onTarget: .80, heavy: .20, spin: .30, dodge: .75, repair: .80, fireGap: 1.2, speed: 1 },
 };
 export const mulberry32 = (seed: number) => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
@@ -15,6 +15,7 @@ export class Bot {
   private p: Profile;
   private timer = 0;
   private goal: Cell | null = null;
+  private sinceFire = 99;
   private holdFor = 0;
   private plan: { target: Cell; hold: number } | null = null;
   private battle: Battle; readonly side: Side; private rnd: () => number;
@@ -23,7 +24,7 @@ export class Bot {
   update(dt: number) {
     const b = this.battle, me = b.actors[this.side];
     if (b.phase !== 'playing' || me.falling) { b.setMove(this.side, 0, 0); this.plan = null; this.goal = null; return; }
-    this.timer -= dt;
+    this.timer -= dt; this.sinceFire += dt;
     if (this.plan && b.charges[this.side]) {
       const ch = b.charges[this.side]!;
       if (ch.t >= this.plan.hold) { b.setTarget(this.side, this.plan.target); b.releaseCharge(this.side); this.plan = null; }
@@ -47,12 +48,12 @@ export class Bot {
     if (me.stones >= 2 && b.canRepair(s) && this.rnd() < this.p.repair * .5 && !b.repairs[s]) { this.goal = null; b.setMove(s, 0, 0); b.beginRepair(s); return; }
     if (b.repairs[s]) return;
     // 4. attack
-    if (me.cooldown > 0 || me.stones < 1) return;
+    if (me.cooldown > 0 || me.stones < 1 || this.sinceFire < this.p.fireGap) return;
     const target = this.pickTarget();
     if (!target || !b.beginCharge(s)) return;
     const r = this.rnd(), kind: Kind = r < this.p.heavy ? 'heavy' : r < this.p.heavy + this.p.spin ? 'spin' : 'normal';
     const hold = kind === 'heavy' ? rules.shot.types.heavy.hold_from_s + .1 : kind === 'spin' ? rules.shot.types.spin.hold_from_s + .1 : .2;
-    this.plan = { target, hold };
+    this.plan = { target, hold }; this.sinceFire = 0;
     b.setTarget(s, target);
     // a little repositioning while charging keeps the bot alive but unpredictable
     if (this.rnd() < .4) this.goal = this.safeCell(danger);
@@ -84,7 +85,7 @@ export class Bot {
     const fc = cellAt(foe.pos, enemy);
     const jitter = () => Math.round((this.rnd() - .5) * 2 * this.p.aimError * (this.rnd() < .5 ? 1 : .5));
     let c: Cell;
-    if (fc && this.rnd() < .75) c = { x: fc.x + jitter(), z: fc.z + jitter() };
+    if (fc && this.rnd() < this.p.onTarget) c = { x: fc.x + jitter(), z: fc.z + jitter() };
     else c = { x: Math.floor(this.rnd() * rules.arena.width_cells), z: 4 + Math.floor(this.rnd() * (rules.arena.depth_cells - 4)) };
     c.x = Math.max(0, Math.min(rules.arena.width_cells - 1, c.x)); c.z = Math.max(0, Math.min(rules.arena.depth_cells - 1, c.z));
     if (b.hp(c, enemy) === 0) {
@@ -104,7 +105,7 @@ export class Bot {
     const next = this.nextStep(here, this.goal);
     if (!next) { this.goal = null; b.setMove(s, 0, 0); return; }
     const t = cellCentre(next, s), p = b.actors[s].pos, dx = t.x - p.x, dz = t.z - p.z, l = Math.hypot(dx, dz);
-    b.setMove(s, l < .05 ? 0 : dx / l, l < .05 ? 0 : dz / l);
+    const v = l < .05 ? 0 : this.p.speed; b.setMove(s, v ? dx / l * v : 0, v ? dz / l * v : 0);
   }
 
   private nextStep(from: Cell, goal: Cell): Cell | null {

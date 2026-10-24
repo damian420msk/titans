@@ -87,3 +87,14 @@ test('bot is deterministic per seed and plays a whole match without errors or Na
   assert.equal(play(3, 'normal'), play(3, 'normal'));
   for (const l of ['easy', 'normal', 'hard'] as const) assert.ok(play(5, l).length > 0);
 });
+
+test('difficulty ladder: against a motionless player easy is harmless, hard is dangerous', () => {
+  const hits = (level: 'easy' | 'normal' | 'hard') => { let n = 0; for (let seed = 1; seed <= 10; seed++) { const b = new Battle(), bot = new Bot(b, 1, level, mulberry32(seed)); for (let i = 0; i < 3600 && b.phase === 'playing'; i++) { bot.update(1 / 60); b.step(1 / 60); for (const e of b.events) if (e.type === 'hit' && e.side === 0) n++; b.events.length = 0; } } return n; };
+  const e = hits('easy'), n = hits('normal'), h = hits('hard');
+  assert.ok(e < n && n < h, `${e} < ${n} < ${h}`);
+});
+
+test('a press after a cancelled charge works again (no stuck charge)', () => {
+  const b = new Battle(); assert.ok(b.beginCharge(0)); b.cancelCharge(0);
+  assert.ok(b.beginCharge(0)); assert.equal(b.actors[0].stones, 3);
+});

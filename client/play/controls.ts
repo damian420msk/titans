@@ -18,7 +18,9 @@ export class Controls {
   private stickEl = document.getElementById('stick')!;
   private cancelEl = document.getElementById('cancel')!;
   private repairEl = document.getElementById('repair')!;
-  readonly fingerOffset = 70;
+  /** Touch aiming is relative: finger movement since the press, in px. The game maps it onto the enemy island. */
+  touchDelta = { x: 0, y: 0 };
+  private touchStart = { x: 0, y: 0 };
 
   constructor(private canvas: HTMLCanvasElement) {
     const opts = { passive: false } as AddEventListenerOptions;
@@ -57,7 +59,7 @@ export class Controls {
       this.stickEl.style.left = e.clientX + 'px'; this.stickEl.style.top = e.clientY + 'px'; this.stickEl.classList.add('on');
       (this.stickEl.firstElementChild as HTMLElement).style.transform = '';
     } else if (p.x >= p.w / 2 && this.aimId === null) {
-      this.aimId = e.pointerId; this.aim = { x: p.x, y: p.y - this.fingerOffset, seen: true }; this.begin();
+      this.aimId = e.pointerId; this.touchStart = { x: p.x, y: p.y }; this.touchDelta = { x: 0, y: 0 }; this.begin();
     }
   }
   private begin() { this.held = true; this.pressed = true; this.cancelled = false; this.overCancel = false; }
@@ -74,7 +76,7 @@ export class Controls {
     }
     if (e.pointerId === this.aimId) {
       e.preventDefault();
-      this.aim = { x: p.x, y: p.y - this.fingerOffset, seen: true };
+      this.touchDelta = { x: p.x - this.touchStart.x, y: p.y - this.touchStart.y };
       const r = this.cancelEl.getBoundingClientRect(), pad = 14;
       this.overCancel = !this.cancelEl.hidden && e.clientX > r.left - pad && e.clientX < r.right + pad && e.clientY > r.top - pad && e.clientY < r.bottom + pad;
       this.cancelEl.classList.toggle('over', this.overCancel);
@@ -93,6 +95,7 @@ export class Controls {
 
   private key(e: KeyboardEvent, down: boolean) {
     const code = e.code;
+    if (e.repeat && (code === 'Escape' || code === 'KeyQ')) return;
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyE'].includes(code)) { e.preventDefault(); if (down) this.keys.add(code); else this.keys.delete(code); this.touch = false; this.updateMove(); }
     if ((code === 'Space' || code === 'KeyE')) this.repairHeld = down;
     if (down && (code === 'Escape' || code === 'KeyQ')) { if (this.held) this.cancelHold(); else if (code === 'Escape') this.pauseRequested = true; }

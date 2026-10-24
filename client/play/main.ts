@@ -11,13 +11,15 @@ const KIND_LABEL: Record<Kind, string> = { normal: 'ОБЫЧНЫЙ', spin: 'КР
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
-let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1, userPause = false;
+let seenAimHint = (() => { try { return localStorage.getItem('titans.aimhint') === '1'; } catch { return false; } })();
+let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1, userPause = false, anchorCell: Cell | null = null;
+const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell
 
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
   $('help').textContent = touchDevice
-    ? 'Левый палец — ходьба · правый — прицел: отпусти для броска, держи для сильного · сдвинь на ✕ — отмена'
+    ? 'Левый палец: ходьба. Правый: нажми, и прицел встанет на врага; тяни, чтобы сдвинуть; отпусти для броска, дольше держишь, сильнее бросок. Палец на ✕: отмена.'
     : 'WASD — ходьба · ЛКМ — бросок (держи — сильнее) · ПКМ или Esc — отмена · Пробел — ремонт';
   $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел ремонт';
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-level]')) b.onclick = () => { level = b.dataset.level as Difficulty; document.querySelectorAll('[data-level]').forEach(x => x.classList.toggle('sel', x === b)); };
@@ -32,7 +34,7 @@ async function boot() {
   const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
   const slots = $('slots'); slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(rules.inventory.capacity);
 
-  const setPause = (on: boolean) => { if (on && mode !== 'playing') return; userPause = on; $('pause').hidden = !on; if (on) { controls.reset(); charging = false; } };
+  const setPause = (on: boolean) => { if (on && mode !== 'playing') return; userPause = on; $('pause').hidden = !on; if (on) { controls.reset(); charging = false; battle.cancelCharge(0); battle.cancelRepair(0); } };
   $('pause-btn').onclick = () => setPause(true); $('resume').onclick = () => setPause(false);
   $('pause-menu').onclick = () => { setPause(false); $('hud').hidden = true; $('menu').hidden = false; mode = 'menu'; };
   window.addEventListener('blur', () => setPause(true));
@@ -56,11 +58,24 @@ async function boot() {
     if (mode === 'playing' && !isPaused) {
       const b = battle, me = b.actors[0];
       b.setMove(0, b.canAct(0) ? controls.move.x : 0, b.canAct(0) ? controls.move.z : 0);
-      const rect = canvas.getBoundingClientRect(), pick = () => world.pick(controls.aim.x, controls.aim.y);
-      void rect;
+      // Touch aiming is relative and works in cells, not screen pixels: perspective squeezes depth, so a pixel gain would be too twitchy.
+      const unit = Math.max(.8, Math.min(1.6, innerHeight / 390));
+      const touchCell = (): Cell => ({
+        x: Math.max(0, Math.min(rules.arena.width_cells - 1, Math.round(anchorCell!.x - controls.touchDelta.x / (TOUCH_PX_X * unit)))),
+        z: Math.max(0, Math.min(rules.arena.depth_cells - 1, Math.round(anchorCell!.z + controls.touchDelta.y / (TOUCH_PX_Z * unit)))),
+      });
+      const pick = () => controls.touch && anchorCell ? touchCell() : world.pick(controls.aim.x, controls.aim.y);
+      if (!charging && b.charges[0]) b.cancelCharge(0);
       if (controls.pressed) {
         controls.pressed = false;
-        if (b.beginCharge(0)) charging = true;
+        if (b.beginCharge(0)) {
+          charging = true;
+          if (controls.touch) {
+            const foe = b.cellOf(1), ok = foe && b.hp(foe, 1) > 0;
+            anchorCell = ok ? foe : (anchorCell ?? { x: 4, z: 6 });
+            if (!seenAimHint) { seenAimHint = true; toast('Тяни палец, чтобы сдвинуть прицел'); try { localStorage.setItem('titans.aimhint', '1'); } catch { /* optional */ } }
+          }
+        }
         else if (me.stones < 1) toast('Нет камней — иди к арсеналу'); else if (me.cooldown > 0) toast('Рука отдыхает'); else if (!b.canAct(0)) { /* knocked down */ }
       }
       if (charging && !b.charges[0]) { charging = false; controls.held = false; controls.cancelled = false; controls.released = false; }
