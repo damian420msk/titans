@@ -6,7 +6,8 @@ import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
 import { initMenu } from './menu';
 import { Online } from './online';
-import { applySnap, type Snap } from '../../shared/net';
+import type { Snap } from '../../shared/net';
+import { Predictor } from '../../shared/predict';
 import type { GameEvent } from '../../shared/battle';
 
 const sfx = new Sfx();
@@ -17,9 +18,10 @@ const NAMES: Record<Difficulty, string> = { easy: 'ГРОМ', normal: 'БОРГ�
 const KIND_LABEL: Record<Kind, string> = { normal: 'ОБЫЧНЫЙ', spin: 'КРУЧЁНЫЙ', heavy: 'МОЩНЫЙ' };
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
-let online = false, lastEnd = -9, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
-const hist: { t: number; x: number; z: number }[] = [], srvEvents: GameEvent[] = [];
-let pendingSnap: Snap | null = null;
+const pred = new Predictor();
+let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
+const srvEvents: GameEvent[] = [];
+let pendingSnap: { s: Snap; at: number } | null = null;
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
 let seenAimHint = (() => { try { return localStorage.getItem('titans.aimhint') === '1'; } catch { return false; } })();
 let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1, userPause = false, anchorCell: Cell | null = null;
@@ -57,13 +59,13 @@ async function boot() {
         break;
       case 'err': if (!$('pwd').hidden && m.code === 'wrong_pass') menu.pwdError(m.text); else menu.notice(m.text); break;
       case 'start': startMatch(m.foe); break;
-      case 'snap': if (online) { pendingSnap = m.s; srvEvents.push(...m.ev); } break;
+      case 'snap': if (online) { pendingSnap = { s: m.s, at: performance.now() / 1000 }; srvEvents.push(...m.ev); } break;
       case 'end': if (online && mode === 'playing') showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); break;
     }
   };
   const startMatch = (foe?: string) => {
     sfx.unlock(); sfx.startMusic(); sfx.click();
-    online = typeof foe === 'string'; pendingSnap = null; srvEvents.length = 0; hist.length = 0; lastTarget = ''; setPause(false);
+    online = typeof foe === 'string'; try { (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}); } catch { /* needs fullscreen on most browsers */ } pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
     world.resetPoses(); battle = new Battle(); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     $('foe-name').textContent = online ? foe! : NAMES[level]; $('foe-face').textContent = online ? foe!.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
@@ -95,13 +97,14 @@ async function boot() {
   Object.assign(window, { titans: { battle, world, controls, setPause, state: () => ({ mode, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
 
   world.engine.runRenderLoop(() => {
-    const dt = Math.min(world.engine.getDeltaTime() / 1000, .05), isPaused = paused();
-    $('portrait').hidden = online || !(controls.touch && innerWidth < innerHeight && mode === 'playing');
+    const rawDt = world.engine.getDeltaTime() / 1000, dt = Math.min(rawDt, .05), isPaused = paused();
+    $('portrait').hidden = !(controls.touch && innerWidth < innerHeight && mode === 'playing'); $('portrait-text').textContent = online ? 'Бой идёт, соперник не ждёт. Переверни телефон набок.' : 'Игра идёт в горизонтальном режиме. Бой на паузе.';
     if (controls.pauseRequested) { controls.pauseRequested = false; setPause($('pause').hidden === true); }
     const nowS = performance.now() / 1000;
     if (online && mode !== 'menu') {
-      if (pendingSnap) { reconcile(battle, pendingSnap, nowS); pendingSnap = null; }
-      if (mode === 'playing') { hist.push({ t: nowS, x: battle.actors[0].pos.x, z: battle.actors[0].pos.z }); while (hist.length && hist[0].t < nowS - 2) hist.shift(); }
+      pred.rtt = net.rtt;
+      if (pendingSnap) { pred.reconcile(battle, pendingSnap.s, pendingSnap.at, nowS); pendingSnap = null; }
+      if (mode === 'playing') pred.record(nowS, battle.actors[0].pos.x, battle.actors[0].pos.z);
     }
     if (mode === 'playing' && !isPaused) {
       const b = battle, me = b.actors[0];
@@ -117,7 +120,7 @@ async function boot() {
         z: Math.max(0, Math.min(rules.arena.depth_cells - 1, Math.round(anchorCell!.z + controls.touchDelta.y / (TOUCH_PX_Z / menu.sens() * unit)))),
       });
       const pick = () => controls.touch && anchorCell ? touchCell() : world.pick(controls.aim.x, controls.aim.y);
-      if (!charging && b.charges[0]) { b.cancelCharge(0); if (online && nowS - lastEnd > .6) { net.send({ t: 'cancel' }); lastEnd = nowS; } }
+      if (!charging && b.charges[0]) { b.cancelCharge(0); if (online && nowS - pred.lastEnd > .6) { net.send({ t: 'cancel' }); pred.lastEnd = nowS; } }
       if (controls.pressed) {
         controls.pressed = false;
         if (b.beginCharge(0)) {
@@ -135,8 +138,8 @@ async function boot() {
       if (controls.released) {
         controls.released = false;
         if (charging) {
-          if (controls.cancelled || controls.overCancel) { b.cancelCharge(0); if (online) net.send({ t: 'cancel' }); lastEnd = nowS; }
-          else if (online) { const tg = b.charges[0]?.target; if (tg) { net.send({ t: 'release', x: tg.x, z: tg.z }); b.cancelCharge(0); lastEnd = nowS; } else toast('Цель вне острова'); }
+          if (controls.cancelled || controls.overCancel) { b.cancelCharge(0); if (online) net.send({ t: 'cancel' }); pred.lastEnd = nowS; }
+          else if (online) { const tg = b.charges[0]?.target; if (tg) { net.send({ t: 'release', x: tg.x, z: tg.z }); b.cancelCharge(0); pred.lastEnd = nowS; } else toast('Цель вне острова'); }
           else if (!b.releaseCharge(0)) toast('Цель вне острова');
           charging = false;
         }
@@ -145,7 +148,8 @@ async function boot() {
       if (controls.repairHeld && !b.repairs[0] && !b.charges[0]) { if (b.beginRepair(0) && online) net.send({ t: 'repair', on: true }); }
       if (!controls.repairHeld && b.repairs[0]) { b.cancelRepair(0); if (online) net.send({ t: 'repair', on: false }); }
       hover = !charging && controls.aim.seen && !controls.touch ? pick() : null;
-      acc += dt;
+      // Online the simulation must keep real time even on a slow phone, or the server (real time) outruns the local copy and pulls it back.
+      acc += online ? Math.min(rawDt, .25) : dt;
       while (acc >= 1 / 60) { acc -= 1 / 60; if (!online) bot.update(1 / 60); b.step(1 / 60); if (online) b.events.length = 0; if (b.phase !== 'playing') break; }
     }
     if (online && srvEvents.length) { battle.events.push(...srvEvents); srvEvents.length = 0; }
@@ -185,26 +189,6 @@ async function boot() {
     $('again').textContent = online ? 'В КОМНАТУ' : 'ЕЩЁ РАЗ';
     if (why === 'left') { sfx.win(); }
     setTimeout(() => { $('end').hidden = false; }, 900);
-  }
-  /** Take the server state, but keep what the player controls locally (own charge, movement input) and correct own position only when it really diverged. */
-  function reconcile(b: Battle, s: Snap, now: number) {
-    const me = b.actors[0], oldPos = { x: me.pos.x, z: me.pos.z }, busy = me.falling || me.stun > 0 || !!me.slide, oldCharge = b.charges[0], myInput = { ...b.input[0] };
-    applySnap(b, s);
-    b.input[0] = myInput;
-    const srv = b.charges[0], grace = Math.max(.35, net.rtt * 1.5 + .15);
-    if (oldCharge) b.charges[0] = srv || oldCharge.t <= grace ? oldCharge : null;
-    else if (srv && now - lastEnd < .6 + net.rtt) b.charges[0] = null;
-    const a = b.actors[0];
-    if (!busy && !(a.falling || a.stun > 0 || a.slide)) {
-      let then = hist[0]; for (const h of hist) { if (h.t <= now - net.rtt) then = h; else break; }
-      if (!then) a.pos = oldPos;
-      else {
-        const ex = a.pos.x - then.x, ez = a.pos.z - then.z, err = Math.hypot(ex, ez);
-        if (err > 1.2) a.pos = { x: a.pos.x + oldPos.x - then.x, z: a.pos.z + oldPos.z - then.z };
-        else if (err > .35) a.pos = { x: oldPos.x + ex * .3, z: oldPos.z + ez * .3 };
-        else a.pos = oldPos;
-      }
-    }
   }
 }
 boot().catch(e => { console.error(e); $('loading').querySelector('h1')!.textContent = 'Ошибка загрузки'; });

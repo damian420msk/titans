@@ -68,3 +68,15 @@ test('garbage input does not crash the lobby', () => {
   for (const m of [null, 5, 'x', {}, { t: 'create', name: 7, pass: {} }, { t: 'join', id: {}, pass: 1 }, { t: 'move', x: 'a' }, { t: 'release', x: 1e9, z: -1 }, { t: 'nope' }]) lobby.handle(a, m);
   lobby.tick(1); assert.ok(true);
 });
+
+test('the guest steers in its own view: stick right moves the guest titan to ITS right (mirrored on the server)', () => {
+  const { lobby, a, b } = setup();
+  lobby.handle(a, { t: 'create', name: 'R', pass: '' }); lobby.handle(b, { t: 'join', id: b.last('rooms')!.rooms[0].id, pass: '' });
+  lobby.handle(a, { t: 'ready', on: true }); lobby.handle(b, { t: 'ready', on: true }); lobby.tick(3.1);
+  lobby.handle(b, { t: 'move', x: 1, z: 0 }); for (let i = 0; i < 30; i++) lobby.tick(1 / 30);
+  const guestView = b.last('snap')!.s, hostView = a.last('snap')!.s;
+  assert.ok(guestView.a[0].x > 1, `guest sees itself moving right (${guestView.a[0].x})`);
+  assert.ok(hostView.a[1].x < -1, 'host sees the guest moving to the mirrored side');
+  lobby.handle(b, { t: 'move', x: 0, z: 1 }); for (let i = 0; i < 20; i++) lobby.tick(1 / 30);
+  assert.ok(b.last('snap')!.s.a[0].z > guestView.a[0].z, 'guest forward (+z in own view) is forward for the guest');
+});

@@ -16,7 +16,9 @@ const http = createServer((req, res) => {
 const wss = new WebSocketServer({ server: http, maxPayload: 2048 });
 
 wss.on('connection', (ws: WebSocket) => {
-  const conn: Conn = { send: m => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(m)); } };
+  const LAG = Number(process.env.FAKE_LAG_MS) || 0; // testing aid: simulate network latency in both directions
+  const later = (f: () => void) => LAG ? setTimeout(f, LAG) : f();
+  const conn: Conn = { send: m => { const t = JSON.stringify(m); later(() => { if (ws.readyState === ws.OPEN) ws.send(t); }); } };
   let alive = true, tokens = 200, last = Date.now();
   ws.on('pong', () => { alive = true; });
   (ws as any).isAliveCheck = () => { if (!alive) { ws.terminate(); return; } alive = false; ws.ping(); };
@@ -25,7 +27,7 @@ wss.on('connection', (ws: WebSocket) => {
     const now = Date.now(); tokens = Math.min(200, tokens + (now - last) * .1); last = now; // 100 messages per second sustained
     if (--tokens < 0) return;
     let m: unknown; try { m = JSON.parse(data.toString()); } catch { return; }
-    try { lobby.handle(conn, m); } catch (e) { console.error('handler error', e); }
+    later(() => { try { lobby.handle(conn, m); } catch (e) { console.error('handler error', e); } });
   });
   ws.on('close', () => lobby.disconnect(conn));
   ws.on('error', () => lobby.disconnect(conn));

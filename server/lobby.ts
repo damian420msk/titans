@@ -119,7 +119,8 @@ export class Lobby {
     const room = c.room, b = room?.battle; if (!room || !b || room.phase !== 'playing' || b.phase !== 'playing') return;
     const s = c.seat, num = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
     switch (m.t) {
-      case 'move': if (num(m.x) && num(m.z)) b.setMove(s, Math.max(-1, Math.min(1, m.x)), Math.max(-1, Math.min(1, m.z))); return;
+      // the guest's view is rotated by 180 degrees, so its stick direction is mirrored in server (world) coordinates
+      case 'move': if (num(m.x) && num(m.z)) { const g = s === 1 ? -1 : 1; b.setMove(s, g * Math.max(-1, Math.min(1, m.x)), g * Math.max(-1, Math.min(1, m.z))); } return;
       case 'begin': b.beginCharge(s); return;
       case 'target': if (cellsValid(m.x, m.z)) b.setTarget(s, { x: m.x, z: m.z }); return;
       case 'release': if (cellsValid(m.x, m.z)) b.setTarget(s, { x: m.x, z: m.z }); b.releaseCharge(s); return;
