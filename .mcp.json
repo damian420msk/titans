@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--headless", "--isolated"]
+    },
+    "babylon-nme": {
+      "command": "npx",
+      "args": ["-y", "@babylonjs/mcp-servers", "nme"]
+    },
+    "babylon-npe": {
+      "command": "npx",
+      "args": ["-y", "@babylonjs/mcp-servers", "npe"]
+    },
+    "babylon-gui": {
+      "command": "npx",
+      "args": ["-y", "@babylonjs/mcp-servers", "gui"]
+    }
+  }
+}

@@ -16,6 +16,7 @@
 - `public/art/`: `blocks-abc-v03` плиты, `titans-v03` титаны Meshy (rigged, webp), `bg-v01` спрайты неба/облаков/островов (пока не подключены).
 - `tools/concept/` сцена для концепт-скриншотов (`/tools/concept/concept.html?scene=mid`).
 - `docs/archive/` документы эпохи Codex, только для справки.
+- `.mcp.json` проектные MCP (Playwright, Babylon NME/NPE/GUI). Установка локальных (Meshy, Blender): `docs/MCP_SETUP.md`.
 
 ## Коммиты
 Короткие, по-русски или по-английски, в конце строки `Co-Authored-By` и `Claude-Session` из напоминания сессии.
