@@ -109,7 +109,7 @@ export class World {
 
   private async buildIslands() {
     const tiles = new Map<string, AssetContainer>();
-    for (const v of ['a', 'b', 'c']) for (const k of ['intact', 'cracked']) tiles.set(`${v}/${k}`, await LoadAssetContainerAsync(`/art/blocks-abc-v03/tile_${v}_${k}.glb`, this.scene, { pluginExtension: '.glb' }));
+    for (const v of ['a', 'b', 'c']) for (const k of ['intact', 'cracked']) tiles.set(`${v}/${k}`, await LoadAssetContainerAsync(`${import.meta.env.BASE_URL}art/blocks-abc-v03/tile_${v}_${k}.glb`, this.scene, { pluginExtension: '.glb' }));
     const S = size;
     const collar = MeshBuilder.CreateBox('collar', { width: S, height: .25, depth: S }, this.scene); collar.position.y = -.525;
     const rock = MeshBuilder.CreateCylinder('hang', { diameterTop: S, diameterBottom: 1.9, height: 1.0, tessellation: 8, subdivisions: 2 }, this.scene); rock.position.y = -1.15;
@@ -157,7 +157,7 @@ export class World {
 
   private async buildTitans() {
     for (const side of [0, 1] as Side[]) {
-      const c = await LoadAssetContainerAsync(`/art/titans-v03/titan_${side === 0 ? 'teal' : 'coral'}_v03.glb`, this.scene, { pluginExtension: '.glb' });
+      const c = await LoadAssetContainerAsync(`${import.meta.env.BASE_URL}art/titans-v03/titan_${side === 0 ? 'teal' : 'coral'}_v03.glb`, this.scene, { pluginExtension: '.glb' });
       for (const l of c.lights) l.setEnabled(false);
       c.addAllToScene();
       const holder = new TransformNode('titan' + side, this.scene), body = new TransformNode('body' + side, this.scene); body.parent = holder;
