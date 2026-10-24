@@ -30,7 +30,10 @@ export class Sfx {
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
-  setMuted(m: boolean) { this.muted = m; try { localStorage.setItem('titans.muted', m ? '1' : '0'); } catch { /* optional */ } if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : .8, this.ctx.currentTime, .03); }
+  private held = false;
+  /** Silence everything while an ad is on screen (Yandex requires it). */
+  hold(on: boolean) { this.held = on; if (this.ctx) this.master.gain.setTargetAtTime(on || this.muted ? 0 : .8, this.ctx.currentTime, .03); }
+  setMuted(m: boolean) { this.muted = m; try { localStorage.setItem('titans.muted', m ? '1' : '0'); } catch { /* optional */ } if (this.ctx) this.master.gain.setTargetAtTime(m || this.held ? 0 : .8, this.ctx.currentTime, .03); }
 
   // ---------- building blocks ----------
   private get t() { return this.ctx!.currentTime; }

@@ -32,6 +32,7 @@ export type C2S =
   | { t: 'cancel' }
   | { t: 'repair'; on: boolean }
   | { t: 'emote'; id: number }
+  | { t: 'bonus' }
   | { t: 'ping'; n: number };
 
 export type ErrCode = 'wrong_pass' | 'full' | 'gone' | 'busy' | 'bad';

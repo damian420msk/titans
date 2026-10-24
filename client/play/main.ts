@@ -6,6 +6,7 @@ import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
 import { initMenu } from './menu';
 import { Online } from './online';
+import { ya } from './yandex';
 import type { Snap, MyProfile, Look } from '../../shared/net';
 import { modsFor, newProfile, DEFAULT_EQUIP, type Profile } from '../../shared/progress';
 import type { Mods } from '../../shared/battle';
@@ -32,7 +33,7 @@ let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get(
 let pendingResult: { level: Difficulty; won: boolean } | null = null;
 // First bot match: a short guided start. Steps advance on what the player actually does.
 const tut = { on: false, step: 0, t: 0, x: 0, z: 0, throws: 0 };
-let endGain = '', reconnectAt = 0, lastQuick = false;
+let matchesPlayed = 0, endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 const pred = new Predictor();
@@ -53,7 +54,7 @@ async function boot() {
   const hello = () => net.send({ t: 'hello', nick: menu.nick(), token });
   const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
   menu = initMenu({
-    sfx, touch: touchDevice, onStartBot: l => { const first = store.get('tutorial') !== '1'; level = first ? 'easy' : l; startMatch(); if (first) { tut.on = true; tut.step = 0; tut.t = 0; tut.throws = 0; tut.x = battle.actors[0].pos.x; tut.z = battle.actors[0].pos.z; } },
+    sfx, touch: touchDevice, onStartBot: async l => { const first = store.get('tutorial') !== '1'; level = first ? 'easy' : l; if (!first && matchesPlayed > 0) await ya.interstitial(); startMatch(); if (first) { tut.on = true; tut.step = 0; tut.t = 0; tut.throws = 0; tut.x = battle.actors[0].pos.x; tut.z = battle.actors[0].pos.z; } },
     onScreen: sc => { if (sc === 'online') { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); } },
     onCreate: (name, pass, ranked) => { hello(); net.send({ t: 'create', name, pass, ranked }); },
     onQuick: on => { if (on) { if (!needNet()) { quickWanted = true; return; } hello(); net.send({ t: 'quick', on: true }); } else { quickWanted = false; net.send({ t: 'quick', on: false }); } },
@@ -89,17 +90,17 @@ async function boot() {
         break;
       }
       case 'top': menu.setTop(m.list, m.rank); break;
-      case 'shop': if (mode === 'over' && !online) $('end-gain').textContent = m.text; else menu.notice(m.text); if (m.ok) sfx.repaired(); break;
+      case 'shop': if (mode === 'over') { $('end-gain').textContent = m.text; if (m.ok && /^\+\d+ монет/.test(m.text)) offerDouble(); } else menu.notice(m.text); if (m.ok) sfx.repaired(); break;
       case 'queue': quickWanted = m.on; menu.setQueue(m.on); break;
       case 'emote': showBubble(1, m.id); break;
       case 'away': if (online) toast(m.on ? 'Соперник потерял связь. Ждём…' : 'Соперник вернулся'); break;
       case 'start': quickWanted = false; if (online && mode === 'playing') { reconnectAt = 0; $('reconn').hidden = true; toast('Связь восстановлена'); break; } lastQuick = !!m.quick; startMatch(m.foe, { mods: m.mods, look: m.look, rating: m.foeRating, ranked: m.ranked }); break;
       case 'snap': if (online) { pendingSnap = { s: m.s, at: performance.now() / 1000 }; srvEvents.push(...m.ev); } break;
-      case 'end': reconnectAt = 0; $('reconn').hidden = true; if (online && mode === 'playing') { endGain = m.gain ? `${m.gain.ranked ? (m.gain.rating >= 0 ? '+' : '') + m.gain.rating + ' рейтинг · ' : ''}+${m.gain.coins} 🪙` : ''; showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); } break;
+      case 'end': reconnectAt = 0; $('reconn').hidden = true; if (online && mode === 'playing') { endGain = m.gain ? `${m.gain.ranked ? (m.gain.rating >= 0 ? '+' : '') + m.gain.rating + ' рейтинг · ' : ''}+${m.gain.coins} 🪙` : ''; showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); if (m.gain && m.gain.coins > 0) setTimeout(offerDouble, 1000); } break;
     }
   };
   const startMatch = (foe?: string, info?: { mods: [Mods, Mods]; look: [Look, Look]; rating: number; ranked: boolean }) => {
-    sfx.unlock(); sfx.startMusic(); sfx.click();
+    sfx.unlock(); sfx.startMusic(); sfx.click(); ya.gameplay(true); $('double').hidden = true;
     online = typeof foe === 'string'; try { (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}); } catch { /* needs fullscreen on most browsers */ } pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
     world.resetPoses(); const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity);
@@ -108,10 +109,13 @@ async function boot() {
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
   const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
-  $('again').onclick = () => { if (online && lastQuick) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show('quick'); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else startMatch(); };
-  const toMenu = () => { if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
+  $('again').onclick = () => { if (online && lastQuick) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show('quick'); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else { void ya.interstitial().then(() => startMatch()); } };
+  const toMenu = () => { ya.gameplay(false); if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
   $('to-menu').onclick = toMenu;
+  $('double').onclick = async () => { $('double').hidden = true; if (await ya.rewarded()) net.send({ t: 'bonus' }); };
+  const offerDouble = () => { if (ya.available && net.state === 'on') $('double').hidden = false; };
   $('loading').hidden = true;
+  ya.init({ onAdStart: () => { sfx.hold(true); }, onAdEnd: () => { sfx.hold(false); } }).then(() => ya.ready());
   net.connect();
   const EMOTES = ['👍', '😎', '😮', '😡'], bubbleT = [0, 0];
   const showBubble = (who: 0 | 1, id: number) => { const el = $('bubble' + who); el.textContent = EMOTES[id] ?? '👍'; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; window.clearTimeout(bubbleT[who]); bubbleT[who] = window.setTimeout(() => { el.hidden = true; }, 2200); };
@@ -255,7 +259,7 @@ async function boot() {
     if (mode !== 'menu') world.scene.render();
   });
   function showEnd(winner: 0 | 1 | null, why?: 'left' | 'conn') {
-    mode = 'over'; endTutorial(); charging = false; controls.reset(); $('pause').hidden = true; userPause = false;
+    mode = 'over'; endTutorial(); ya.gameplay(false); matchesPlayed++; charging = false; controls.reset(); $('pause').hidden = true; userPause = false;
     $('end-title').textContent = winner === 0 ? 'ПОБЕДА' : winner === 1 ? 'ПОРАЖЕНИЕ' : 'НИЧЬЯ';
     $('end-text').textContent = why === 'left' ? 'Соперник вышел из боя. Победа твоя.' : why === 'conn' ? 'Связь с сервером потеряна.' : winner === 0 ? 'Враг рухнул вниз. Небесные камни твои.' : winner === 1 ? 'Тебя сбросили с острова. Попробуй ещё раз.' : 'Время вышло, силы равны.';
     $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'В КОМНАТУ') : 'ЕЩЁ РАЗ';

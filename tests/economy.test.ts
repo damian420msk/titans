@@ -115,3 +115,12 @@ test('quick match marks the start message so the client can offer "search again"
   lobby.handle(a, { t: 'quick', on: true }); lobby.handle(b, { t: 'quick', on: true }); lobby.tick(.1); lobby.tick(3.1);
   assert.equal(a.last('start')!.quick, true);
 });
+
+test('rewarded bonus repeats the last reward once, capped, and only for saved accounts', () => {
+  const lobby = new Lobby(new MemoryStore(), () => 1e9), a = player(lobby, 'Аня');
+  lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, 100, 'nothing to double yet');
+  lobby.handle(a, { t: 'result', level: 'hard', won: true }); const after = prof(a).coins; assert.equal(after, 100 + 60);
+  lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + 60); lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + 60, 'only once');
+  const g = fake(); lobby.connect(g); lobby.handle(g, { t: 'hello', nick: 'Гость' }); lobby.handle(g, { t: 'result', level: 'hard', won: true }); lobby.handle(g, { t: 'bonus' });
+  assert.equal(g.last('profile')!.p.coins, 100 + 60 , 'guest got only the plain reward');
+});

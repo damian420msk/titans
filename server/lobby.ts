@@ -10,7 +10,7 @@ import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayInd
 export interface Conn { send(m: S2C): void }
 type Client = {
   conn: Conn; id: string; nick: string; room: Room | null; seat: 0 | 1;
-  pid: string | null; profile: Profile | null; queuedAt: number | null; lastResult: number; away: number | null; lastEmote: number;
+  pid: string | null; profile: Profile | null; queuedAt: number | null; lastResult: number; away: number | null; lastEmote: number; lastGain: number;
 };
 type Phase = 'lobby' | 'count' | 'playing';
 type Room = {
@@ -41,7 +41,7 @@ export class Lobby {
 
   connect(conn: Conn) {
     const id = `p${(++this.seq).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-    this.clients.set(conn, { conn, id, nick: 'Игрок', room: null, seat: 0, pid: null, profile: null, queuedAt: null, lastResult: 0, away: null, lastEmote: 0 });
+    this.clients.set(conn, { conn, id, nick: 'Игрок', room: null, seat: 0, pid: null, profile: null, queuedAt: null, lastResult: 0, away: null, lastEmote: 0, lastGain: 0 });
     conn.send({ t: 'welcome', id }); conn.send({ t: 'rooms', rooms: this.list() });
   }
 
@@ -91,6 +91,7 @@ export class Lobby {
       case 'claim': return this.claim(c);
       case 'top': return this.sendTop(c);
       case 'result': return this.botResult(c, m.level, !!m.won);
+      case 'bonus': return this.bonus(c);
       case 'emote': {
         const room = c.room, id = Number(m.id);
         if (!room || room.phase !== 'playing' || !Number.isInteger(id) || id < 0 || id > 3 || this.now() - c.lastEmote < 1500) return;
@@ -132,7 +133,12 @@ export class Lobby {
   private botResult(c: Client, level: unknown, won: boolean) {
     const p = c.profile; if (!p || !['easy', 'normal', 'hard'].includes(level as string)) return;
     if (this.now() - c.lastResult < BOT_RESULT_GAP_MS) return this.shop(c, false, 'Награда за слишком быстрый бой не засчитана');
-    c.lastResult = this.now(); const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); this.shop(c, true, `+${r} монет` + (qc ? ` · задание +${qc}` : ''));
+    c.lastResult = this.now(); const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0; this.shop(c, true, `+${r} монет` + (qc ? ` · задание +${qc}` : ''));
+  }
+  /** Rewarded-ad bonus: repeats the last reward once. The server cannot see the ad, so it only trusts one claim per match. */
+  private bonus(c: Client) {
+    const p = c.profile; if (!p || c.lastGain <= 0) return;
+    const n = Math.min(c.lastGain, 150); c.lastGain = 0; p.coins += n; this.persist(p); this.sendProfile(c); this.shop(c, true, `Награда удвоена: +${n} монет`);
   }
   private async sendTop(c: Client) {
     try {
@@ -252,6 +258,7 @@ export class Lobby {
     }
     const day = dayIndex(this.now());
     g[0].coins += recordQuest(pa, day, { won: winner === 0, ranked }); g[1].coins += recordQuest(pb, day, { won: winner === 1, ranked });
+    if (a.pid) a.lastGain = g[0].coins; if (b.pid) b.lastGain = g[1].coins;
     this.persist(pa); this.persist(pb);
     return { ranked, g };
   }
