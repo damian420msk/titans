@@ -41,8 +41,8 @@ export function cellsFor(kind: Kind, target: Cell): Cell[] {
 }
 
 /** Per-player tuning that upgrades change. Everything else comes from rules_v01.json. */
-export type Mods = { capacity: number; cooldown: number; refill: number; walk: number; tileHp: number };
-export const DEFAULT_MODS: Mods = { capacity: rules.inventory.capacity, cooldown: rules.shot.min_release_interval_s, refill: rules.interaction.refill_per_stone_s, walk: 1, tileHp: rules.arena.start_normal_cell_hp };
+export type Mods = { capacity: number; cooldown: number; refill: number; walk: number; tileHp: number; repair: number };
+export const DEFAULT_MODS: Mods = { capacity: rules.inventory.capacity, cooldown: rules.shot.min_release_interval_s, refill: rules.interaction.refill_per_stone_s, walk: 1, tileHp: rules.arena.start_normal_cell_hp, repair: 1 };
 export const makeMods = (m?: Partial<Mods>): Mods => ({ ...DEFAULT_MODS, ...m });
 
 export class Battle {
@@ -123,7 +123,7 @@ export class Battle {
   beginRepair(side: Side) {
     if (!this.canRepair(side) || this.charges[side] || this.repairs[side]) return false;
     const cell = this.repairCandidates(side)[0];
-    this.repairs[side] = { cell, t: 0, need: this.hp(cell, side) === 0 ? rules.interaction.repair_hole_s : rules.interaction.repair_cracked_s }; return true;
+    this.repairs[side] = { cell, t: 0, need: (this.hp(cell, side) === 0 ? rules.interaction.repair_hole_s : rules.interaction.repair_cracked_s) * this.mods[side].repair }; return true;
   }
   cancelRepair(side: Side) { this.repairs[side] = null; }
 

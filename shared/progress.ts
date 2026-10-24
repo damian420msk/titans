@@ -2,7 +2,7 @@
 import { makeMods, type Mods } from './battle.ts';
 import type { Difficulty } from './bot.ts';
 
-export type UpgradeId = 'bag' | 'hands' | 'legs' | 'quarry' | 'plates';
+export type UpgradeId = 'bag' | 'hands' | 'legs' | 'quarry' | 'mender';
 export type CosmeticKind = 'skin' | 'tiles' | 'stone';
 export type Upgrade = { id: UpgradeId; name: string; desc: string; costs: number[]; icon: string };
 export type Cosmetic = { id: string; kind: CosmeticKind; name: string; cost: number; color: string | null };
@@ -12,7 +12,7 @@ export const UPGRADES: Upgrade[] = [
   { id: 'hands', name: 'Быстрые руки', desc: 'откат между бросками короче на 7% за уровень', costs: [150, 350, 700], icon: '✋' },
   { id: 'legs', name: 'Резвые ноги', desc: 'ходьба быстрее на 4% за уровень', costs: [120, 300, 600], icon: '👟' },
   { id: 'quarry', name: 'Добытчик', desc: 'камни у кучи набираются на 12% быстрее за уровень', costs: [100, 250, 550], icon: '⛏' },
-  { id: 'plates', name: 'Крепкие плиты', desc: 'каждая плита твоего острова выдерживает +1 удар', costs: [800], icon: '🧱' },
+  { id: 'mender', name: 'Мастер ремонта', desc: 'ремонт плит быстрее на 15% за уровень', costs: [200, 450, 800], icon: '🛠' },
 ];
 
 export const COSMETICS: Cosmetic[] = [
@@ -41,7 +41,7 @@ export type Profile = {
 export const START_RATING = 1000;
 export const newProfile = (id: string, nick = 'Игрок'): Profile => ({
   id, nick, rating: START_RATING, wins: 0, losses: 0, games: 0, coins: 100,
-  up: { bag: 0, hands: 0, legs: 0, quarry: 0, plates: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1,
+  up: { bag: 0, hands: 0, legs: 0, quarry: 0, mender: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1,
 });
 
 const num = (v: unknown, d: number, lo = 0, hi = 1e9) => typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : d;
@@ -51,6 +51,7 @@ export function sanitizeProfile(raw: any, id: string): Profile {
   p.nick = typeof r.nick === 'string' ? r.nick.slice(0, 14) || p.nick : p.nick;
   p.rating = num(r.rating, p.rating, 0, 9999); p.wins = num(r.wins, 0); p.losses = num(r.losses, 0); p.games = num(r.games, 0); p.coins = num(r.coins, p.coins); p.daily = num(r.daily, -1, -1);
   for (const u of UPGRADES) p.up[u.id] = num(r.up?.[u.id], 0, 0, u.costs.length);
+  if (num(r.up?.plates, 0) > 0) p.coins += 800; // the old 'plates' upgrade was removed (too strong): refund it
   const known = new Set(COSMETICS.map(c => c.id));
   p.own = [...new Set([...p.own, ...(Array.isArray(r.own) ? r.own.filter((x: unknown) => typeof x === 'string' && known.has(x)) : [])])];
   for (const k of ['skin', 'tiles', 'stone'] as CosmeticKind[]) { const e = r.eq?.[k]; p.eq[k] = typeof e === 'string' && p.own.includes(e) && COSMETICS.find(c => c.id === e)?.kind === k ? e : DEFAULT_EQUIP[k]; }
@@ -60,7 +61,7 @@ export function sanitizeProfile(raw: any, id: string): Profile {
 /** Battle tuning that a profile's upgrades give. */
 export function modsFor(p: Pick<Profile, 'up'>): Mods {
   const m = makeMods();
-  m.capacity += p.up.bag; m.cooldown *= 1 - .07 * p.up.hands; m.walk *= 1 + .04 * p.up.legs; m.refill *= 1 - .12 * p.up.quarry; m.tileHp += p.up.plates;
+  m.capacity += p.up.bag; m.cooldown *= 1 - .07 * p.up.hands; m.walk *= 1 + .04 * p.up.legs; m.refill *= 1 - .12 * p.up.quarry; m.repair *= 1 - .15 * p.up.mender;
   return m;
 }
 
