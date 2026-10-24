@@ -9,6 +9,7 @@ export class Controls {
   cancelled = false;     // current hold was cancelled (RMB, Esc, finger over ✕)
   overCancel = false;
   repairHeld = false;
+  pauseRequested = false;
   touch = false;
   private keys = new Set<string>();
   private stick: { id: number; ox: number; oy: number; x: number; y: number } | null = null;
@@ -94,7 +95,7 @@ export class Controls {
     const code = e.code;
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyE'].includes(code)) { e.preventDefault(); if (down) this.keys.add(code); else this.keys.delete(code); this.touch = false; this.updateMove(); }
     if ((code === 'Space' || code === 'KeyE')) this.repairHeld = down;
-    if (down && (code === 'Escape' || code === 'KeyQ') && this.held) this.cancelHold();
+    if (down && (code === 'Escape' || code === 'KeyQ')) { if (this.held) this.cancelHold(); else if (code === 'Escape') this.pauseRequested = true; }
   }
 
   private updateMove() {

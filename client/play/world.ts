@@ -24,6 +24,7 @@ import { Battle, cellKey, cellsFor, kindForHold, shotPosition, sideOther, type G
 
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 const TEAM = ['#2BB8AA', '#E8634E'];
+const STONE_COLOR: Record<Kind, string> = { normal: '#C9C3B6', spin: '#E3A862', heavy: '#8E80C4' };
 type CellView = { root: TransformNode[]; intact: TransformNode; cracked: TransformNode; foundation: Mesh; shown: 'intact' | 'cracked' | 'hole'; fall: number; base: Vector3[] };
 type TitanView = { holder: TransformNode; body: TransformNode; walk: AnimationGroup | null; stone: Mesh; yaw: number; lean: number; lie: number; moving: boolean };
 type Particle = { mesh: Mesh; v: Vector3; life: number; max: number; gravity: number };
@@ -79,12 +80,12 @@ export class World {
     for (const k of Object.keys(KIND_COLOR) as Kind[]) {
       m['aim_' + k] = this.mat('aim_' + k, KIND_COLOR[k], .8);
       m['fill_' + k] = this.mat('fill_' + k, KIND_COLOR[k], .9); m['fill_' + k].alpha = .28;
-      m['stone_' + k] = this.mat('stone_' + k, KIND_COLOR[k], .85, .3);
+      m['stone_' + k] = this.mat('rock_' + k, STONE_COLOR[k], .12);
     }
     m.warnEnemy = this.mat('warnE', '#FF7A45', .9); m.warnEnemy.alpha = .42;
     m.warnMine = this.mat('warnM', '#BDF3FF', .8); m.warnMine.alpha = .25;
     m.dust = this.mat('dust', '#E7DCCB', .2);
-    m.trail = this.mat('trailm', '#E6FBFF', 1); m.trail.alpha = .6;
+    m.trail = this.mat('trailm', '#F4EEE2', .35); m.trail.alpha = .5;
   }
   private buildLightsAndSky() {
     const s = this.scene;
@@ -138,14 +139,20 @@ export class World {
       const a = cellCentre({ x: rules.arena.arsenal_cell[0], z: rules.arena.arsenal_cell[1] }, side);
       const base = this.cast(MeshBuilder.CreateCylinder('arsenal base', { diameterTop: 2.2, diameterBottom: 2.6, height: .5, tessellation: 8 }, this.scene)); base.material = this.mats.stoneDark; base.position.set(a.x, .25, a.z);
       const ring = MeshBuilder.CreateTorus('arsenal ring', { diameter: 2.3, thickness: .08, tessellation: 32 }, this.scene); ring.material = this.mats['trim' + side]; ring.position.set(a.x, .52, a.z);
-      for (const [x, y, z, r] of [[0, .85, 0, .55], [.55, .7, .3, .42], [-.5, .7, .25, .45], [.1, .7, -.55, .44], [-.25, 1.3, -.1, .4], [.3, 1.25, .05, .36], [0, 1.75, 0, .32]]) this.skyStone(new Vector3(a.x + x, y, a.z + z), r);
+      this.stonePile(a);
     }
   }
 
-  private skyStone(p: Vector3, r: number, material = this.mats.sky) {
-    const s = this.cast(MeshBuilder.CreateIcoSphere('skystone', { radius: r, subdivisions: 1, flat: true }, this.scene)); s.material = material; s.position.copyFrom(p); s.rotation.set(p.x * 3, p.z * 2, p.y);
-    const c = MeshBuilder.CreateIcoSphere('core', { radius: r * .55, subdivisions: 1 }, this.scene); c.material = this.mats.skyCore; c.parent = s;
-    return s;
+  /** A chunky bevelled stone cube: three slightly shorter boxes intersected give chamfered edges. */
+  private stoneCube(size: number, material: StandardMaterial, name = 'stone') {
+    const k = .84, parts = [[1, k, k], [k, 1, k], [k, k, 1]].map(([w, h, d], i) => { const b = MeshBuilder.CreateBox(`${name}${i}`, { width: w * size, height: h * size, depth: d * size }, this.scene); return b; });
+    const m = Mesh.MergeMeshes(parts, true, true)!; m.name = name; m.convertToFlatShadedMesh(); m.material = material; return m;
+  }
+  private stonePile(a: Point) {
+    const cube = (x: number, y: number, z: number, yaw: number) => { const c = this.cast(this.stoneCube(.72, this.mats.stone_normal, 'pile')); c.position.set(a.x + x, y, a.z + z); c.rotation.y = yaw; };
+    for (const [x, z, r] of [[-.4, -.4, .1], [.4, -.4, -.08], [-.4, .4, -.12], [.4, .4, .07]]) cube(x, .86, z, r);
+    for (const [x, r] of [[-.36, .06], [.36, -.1]]) cube(x, 1.58, 0, r);
+    cube(0, 2.3, 0, .2);
   }
 
   private async buildTitans() {
@@ -158,16 +165,14 @@ export class World {
       for (const m of c.meshes) if (m.getTotalVertices()) this.cast(m as Mesh);
       for (const g of c.animationGroups) g.stop();
       const walk = c.animationGroups.find(g => /walking/i.test(g.name)) ?? c.animationGroups[0] ?? null;
-      const stone = MeshBuilder.CreateIcoSphere('held', { radius: .4, subdivisions: 1, flat: true }, this.scene); stone.parent = holder; stone.position.set(.8, 4.1, 0); stone.setEnabled(false); stone.material = this.mats.stone_normal;
-      const core = MeshBuilder.CreateIcoSphere('heldcore', { radius: .22, subdivisions: 1 }, this.scene); core.material = this.mats.skyCore; core.parent = stone;
+      const stone = this.stoneCube(.7, this.mats.stone_normal, 'held'); stone.parent = holder; stone.position.set(.8, 4.1, 0); stone.setEnabled(false); stone.material = this.mats.stone_normal;
       this.titans[side] = { holder, body, walk, stone, yaw: side === 0 ? 0 : Math.PI, lean: 0, lie: 0, moving: false };
     }
   }
 
   private buildPools() {
-    this.stoneTemplate = MeshBuilder.CreateIcoSphere('stoneT', { radius: .38, subdivisions: 1, flat: true }, this.scene); this.stoneTemplate.setEnabled(false);
+    this.stoneTemplate = this.stoneCube(.7, this.mats.stone_normal, 'stoneT'); this.stoneTemplate.setEnabled(false);
     this.trailTemplate = MeshBuilder.CreateSphere('trailT', { diameter: .5, segments: 6 }, this.scene); this.trailTemplate.material = this.mats.trail; this.trailTemplate.isVisible = false;
-    this.glow.addIncludedOnlyMesh(this.trailTemplate);
     const S = size;
     for (let i = 0; i < 2; i++) {
       const fill = MeshBuilder.CreateGround('aimfill', { width: S * .92, height: S * .92 }, this.scene); fill.isPickable = false; fill.setEnabled(false);
@@ -178,7 +183,7 @@ export class World {
     for (let i = 0; i < 26; i++) { const d = MeshBuilder.CreateSphere('aimdot', { diameter: .18, segments: 5 }, this.scene); d.material = this.mats.aim_normal; d.setEnabled(false); this.dots.push(d); }
     // glow only on light-emitting materials
     this.glow.customEmissiveColorSelector = (mesh, _sub, material, result) => {
-      const emits = material === this.mats.sky || material === this.mats.skyCore || material === this.mats.trim0 || material === this.mats.trim1 || (material && (material.name.startsWith('stone_') || material.name.startsWith('aim_') || material.name === 'trailm' || material.name === 'warnE'));
+      const emits = material === this.mats.sky || material === this.mats.skyCore || material === this.mats.trim0 || material === this.mats.trim1 || (material && (material.name.startsWith('aim_') || material.name === 'warnE'));
       if (emits && material instanceof StandardMaterial) result.set(material.emissiveColor.r, material.emissiveColor.g, material.emissiveColor.b, 1); else result.set(0, 0, 0, 0);
       void mesh;
     };
@@ -212,11 +217,17 @@ export class World {
     if (aiming) { this.aimHold = .3; this.aimBlend = Math.min(1, this.aimBlend + dt / .25); }
     else if ((this.aimHold -= dt) <= 0) this.aimBlend = Math.max(0, this.aimBlend - dt / .4);
     const e = this.aimBlend * this.aimBlend * (3 - 2 * this.aimBlend), me = b.actors[0].pos;
-    const px = me.x, pz = Math.max(me.z, -33), lerp = (a: number, c: number) => a + (c - a) * e;
+    const px = me.x, pz = Math.max(me.z, -33), lerp = (a: number, c: number) => a + (c - a) * e, lerp2 = (a: number, c: number, t: number) => a + (c - a) * t;
     const portrait = this.engine.getRenderWidth() < this.engine.getRenderHeight();
-    this.camera.fov = (portrait ? 70 : 55) * Math.PI / 180;
-    const pos = new Vector3(lerp(px * .75, px * .4), lerp(9.5, 19), lerp(pz - 14, pz - 21));
-    const target = new Vector3(lerp(px * .5, 0), lerp(.5, 0), lerp(pz + 14, 14));
+    // f: 0 at the own rear edge (arsenal), 1 at the front edge. Near the rear the camera looks further ahead so the enemy island stays readable;
+    // near the front it backs off and rises so the titan is not pressed against the enemy island.
+    const f = Math.max(0, Math.min(1, (pz + 32) / 28)), ease = f * f * (3 - 2 * f);
+    // telephoto at the rear (enemy island stays big), wider at the front
+    const fovDeg = lerp2(40, 56, ease) + (portrait ? 14 : 0) + e * 0;
+    this.camera.fov = fovDeg * Math.PI / 180;
+    const back = lerp2(17, 13, ease), height = lerp2(10.5, 10, ease), ahead = lerp2(-5, pz + 12, ease);
+    const pos = new Vector3(lerp(px * .75, px * .4), lerp(height, 19), lerp(pz - back, pz - 21));
+    const target = new Vector3(lerp(px * .5, 0), lerp(.5, 0), lerp(ahead, 14));
     this.camera.position.copyFrom(Vector3.Lerp(this.camera.position, pos, Math.min(1, dt * 10)));
     this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, Math.min(1, dt * 10)));
   }
@@ -276,7 +287,7 @@ export class World {
     for (const s of b.shots) {
       let m = this.shotMeshes.get(s.id);
       if (!m) { m = this.stoneTemplate.clone('shot' + s.id); m.setEnabled(true); m.material = this.mats['stone_' + s.kind]; m.scaling.setAll(s.kind === 'heavy' ? 1.5 : s.kind === 'spin' ? 1.2 : 1); this.shotMeshes.set(s.id, m); }
-      const p = shotPosition(s); m.position.set(p.x, p.y, p.z); m.rotation.x += dt * 8; m.rotation.z += dt * 5;
+      const p = shotPosition(s); m.position.set(p.x, p.y, p.z); m.rotation.x += dt * (s.kind === 'spin' ? 16 : 7); m.rotation.z += dt * 4; m.rotation.y += dt * (s.kind === 'spin' ? 14 : 3);
       this.particle(new Vector3(p.x, p.y, p.z), Vector3.Zero(), .3, 0, this.trailTemplate, .25 + (s.kind === 'heavy' ? .15 : 0));
       s.cells.forEach((c, i) => {
         const key = `${s.id}/${i}`, victim = sideOther(s.owner);

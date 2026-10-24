@@ -13,7 +13,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;outline:none;
 #toast.on{opacity:1}
 #slots{position:absolute;right:max(20px,env(safe-area-inset-right));bottom:max(150px,calc(env(safe-area-inset-bottom) + 130px));display:flex;gap:6px}
 .slot{width:34px;height:34px;border-radius:9px;background:rgba(32,30,58,.72);border:2px solid rgba(255,255,255,.35);display:grid;place-items:center}
-.slot b{width:16px;height:16px;transform:rotate(45deg);border-radius:3px;background:linear-gradient(135deg,#d9fbff,#5fd3f2 55%,#2e8fc7);box-shadow:0 0 10px #7fe8ff}
+.slot b{width:18px;height:18px;border-radius:4px;background:linear-gradient(135deg,#e4dfd2,#b9b2a2 60%,#8f8878);box-shadow:inset 0 -3px 0 rgba(0,0,0,.18),0 2px 0 rgba(0,0,0,.3)}
 .slot.e b{background:none;box-shadow:none}
 #charge{position:absolute;left:50%;bottom:max(22px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(320px,50vw);height:18px;border-radius:10px;background:rgba(32,30,58,.72);border:2px solid rgba(255,255,255,.4);overflow:hidden;opacity:0;transition:opacity .15s}
 #charge.on{opacity:1}#charge i{display:block;height:100%;width:0;background:#fff3b0}#charge span{position:absolute;inset:0;text-align:center;font-size:11px;font-weight:800;line-height:14px;color:#2a2440;mix-blend-mode:normal;text-shadow:0 0 3px #fff}
@@ -35,3 +35,7 @@ button.sel{background:#3fd0c2;color:#0b3a37;border-color:#fff}
 button.big{display:block;margin:12px auto 4px;padding:14px 46px;font-size:24px;font-weight:800;background:linear-gradient(#ffcf5a,#f08a1c);border:4px solid #fff3d2;color:#4a2300;box-shadow:0 5px 0 #8a4508}
 .help{margin-top:10px;font-size:12px;opacity:.8;line-height:1.5}
 [hidden]{display:none!important}
+
+#tools{position:absolute;top:max(62px,calc(env(safe-area-inset-top) + 50px));left:max(14px,env(safe-area-inset-left));display:flex;gap:8px;pointer-events:auto}
+#tools button{width:42px;height:42px;padding:0;margin:0;border-radius:12px;background:rgba(32,30,58,.72);font-size:16px;line-height:1}
+@media (max-height:480px){.face{width:34px;height:34px;font-size:11px}.hearts{font-size:16px}.badge{padding:4px 12px 4px 4px;gap:8px}#timer{font-size:15px;padding:4px 12px}#tools{top:max(54px,calc(env(safe-area-inset-top) + 44px))}#tools button{width:36px;height:36px}#slots{bottom:max(120px,calc(env(safe-area-inset-bottom) + 108px))}.slot{width:28px;height:28px}#cancel{width:70px;height:70px}#repair{width:64px;height:64px}h1{font-size:30px}.panel{padding:14px 22px}p{margin:4px 0 8px}button.big{padding:10px 36px;font-size:20px}}

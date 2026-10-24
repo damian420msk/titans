@@ -11,7 +11,7 @@ const KIND_LABEL: Record<Kind, string> = { normal: 'ОБЫЧНЫЙ', spin: 'КР
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
-let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1;
+let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1, userPause = false;
 
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
@@ -32,12 +32,27 @@ async function boot() {
   const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
   const slots = $('slots'); slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(rules.inventory.capacity);
 
-  const paused = () => document.hidden || (controls.touch && innerWidth < innerHeight);
-  Object.assign(window, { titans: { battle, world, controls, state: () => ({ mode, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
+  const setPause = (on: boolean) => { if (on && mode !== 'playing') return; userPause = on; $('pause').hidden = !on; if (on) { controls.reset(); charging = false; } };
+  $('pause-btn').onclick = () => setPause(true); $('resume').onclick = () => setPause(false);
+  $('pause-menu').onclick = () => { setPause(false); $('hud').hidden = true; $('menu').hidden = false; mode = 'menu'; };
+  window.addEventListener('blur', () => setPause(true));
+  const fsBtn = $('fs-btn');
+  fsBtn.hidden = !touchDevice && !document.fullscreenEnabled;
+  fsBtn.onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else { await document.documentElement.requestFullscreen(); await (screen.orientation as any)?.lock?.('landscape').catch(() => {}); }
+    } catch { toast('Полный экран недоступен'); }
+  };
+  const resize = () => world.engine.resize();
+  window.addEventListener('resize', resize); window.visualViewport?.addEventListener('resize', resize); window.addEventListener('orientationchange', () => setTimeout(resize, 250));
+  const paused = () => document.hidden || userPause || (controls.touch && innerWidth < innerHeight);
+  Object.assign(window, { titans: { battle, world, controls, setPause, state: () => ({ mode, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
 
   world.engine.runRenderLoop(() => {
     const dt = Math.min(world.engine.getDeltaTime() / 1000, .05), isPaused = paused();
     $('portrait').hidden = !(controls.touch && innerWidth < innerHeight && mode === 'playing');
+    if (controls.pauseRequested) { controls.pauseRequested = false; setPause(!userPause); }
     if (mode === 'playing' && !isPaused) {
       const b = battle, me = b.actors[0];
       b.setMove(0, b.canAct(0) ? controls.move.x : 0, b.canAct(0) ? controls.move.z : 0);
