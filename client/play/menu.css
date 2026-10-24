@@ -187,3 +187,38 @@ body.touch .howto .pc,body:not(.touch) .howto .tc{display:none}
 .seat .rt{font-style:normal;font-size:12px;font-weight:700;opacity:.9}
 .gain{font-size:16px;font-weight:800;color:#ffe08a;min-height:20px;margin:-4px 0 8px;text-shadow:0 2px 0 rgba(60,30,0,.5)}
 @media (max-height:480px){.item{padding:5px 10px}.item .tx em{display:none}.tabs button{padding:5px 12px;font-size:13px}.searching h2{font-size:22px}.shop{max-height:62vh}}
+
+/* settings */
+.cols{width:min(860px,100%);display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.card h3{margin:0 0 10px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#ffe08a}
+.who{display:flex;gap:12px;align-items:flex-end}.who .grow{flex:1;display:flex;flex-direction:column;gap:6px}
+.who label{font-size:12px;font-weight:700;letter-spacing:.06em;opacity:.8}
+.who input{height:44px;padding:0 14px;border-radius:14px;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.14);color:#fff;font:600 16px Rubik,system-ui;outline:none;user-select:text;-webkit-user-select:text;width:100%;box-sizing:border-box}
+.who input:focus{border-color:#ffd25a}
+.big-av{width:54px;height:54px;font-size:22px;flex:none}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 8px}
+.stats div{text-align:center;padding:8px 4px;border-radius:14px;background:rgba(255,255,255,.1)}
+.stats b{display:block;font-size:20px}.stats i{font-style:normal;font-size:11px;opacity:.75;letter-spacing:.06em}
+.note{margin:6px 0 0;font-size:12px;line-height:1.45;opacity:.75}
+.card .setrow{padding:10px 0;border-top:1px solid rgba(255,255,255,.14);gap:12px}.card .setrow:first-of-type{border-top:0;padding-top:2px}
+.setrow b{display:block;font-size:14px;letter-spacing:.02em}.setrow i{display:block;font-style:normal;font-size:11px;font-weight:500;opacity:.7;margin-top:2px;letter-spacing:0}
+.setrow.col{flex-direction:column;align-items:stretch}
+.slide{display:flex;align-items:center;gap:10px}.slide input{flex:1;accent-color:#ffd25a}.slide em{font-style:normal;font-weight:800;min-width:36px;text-align:right}
+body:not(.touch) .touch-only,body.touch .pc-only{display:none!important}
+body.touch .setrow.touch-only{display:flex}
+
+/* how to */
+.steps{width:min(900px,100%);display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.step{position:relative;padding:14px 14px 12px;border-radius:20px;background:rgba(36,28,78,.78);border:2px solid rgba(255,255,255,.26);box-shadow:0 5px 0 rgba(30,16,70,.35);display:flex;flex-direction:column;gap:4px}
+.step .n{position:absolute;top:10px;right:12px;font-weight:800;font-size:13px;opacity:.45}
+.step .ic{font-size:30px;line-height:1}.step b{font-size:16px;color:#fff2c4;letter-spacing:.03em}
+.step p{margin:0;font-size:13px;line-height:1.45;opacity:.92}
+.kinds{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.kinds span{font-size:11px;font-weight:800;padding:3px 9px;border-radius:12px;background:var(--c);color:#2a1a00}
+body.touch .step .pc,body:not(.touch) .step .tc{display:none}
+@media (max-height:480px){
+  .cols{gap:10px}.card h3{margin-bottom:6px}.stats{margin:8px 0 4px}.stats b{font-size:17px}.note{display:none}
+  .who input{height:38px}.big-av{width:44px;height:44px;font-size:18px}.card .setrow{padding:6px 0}
+  .steps{gap:8px}.step{padding:9px 11px 8px;gap:2px}.step .ic{font-size:22px}.step b{font-size:14px}.step p{font-size:11.5px;line-height:1.35}.kinds span{font-size:10px;padding:2px 7px}
+}
+@media (max-width:700px) and (orientation:portrait){.cols{grid-template-columns:1fr}.steps{grid-template-columns:1fr 1fr}}

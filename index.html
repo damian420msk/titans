@@ -106,24 +106,34 @@
 
   <section class="scr" data-scr="settings" hidden>
     <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Настройки</h2><span></span></header>
-    <div class="glass form settings">
-      <label>Ник<input id="nick" maxlength="14" placeholder="Игрок"></label>
-      <div class="setrow"><span>Звук и музыка</span><button id="set-sound" class="toggle"></button></div>
-      <label class="touch-only">Чувствительность прицела<input id="sens" type="range" min="0.6" max="1.8" step="0.1" value="1"><em id="sens-val">×1.0</em></label>
+    <div class="cols">
+      <div class="glass card">
+        <h3>Профиль</h3>
+        <div class="who"><span class="avatar big-av">Я</span>
+          <div class="grow"><label for="nick">Ник в игре</label><input id="nick" maxlength="14" placeholder="Игрок" autocomplete="off"></div></div>
+        <div class="stats"><div><b id="set-rating">1000</b><i>рейтинг</i></div><div><b id="set-wins">0</b><i>побед</i></div><div><b id="set-games">0</b><i>боёв</i></div></div>
+        <p class="note">Прогресс хранится на сервере и привязан к этому устройству. Не очищай данные браузера, иначе профиль потеряется.</p>
+      </div>
+      <div class="glass card">
+        <h3>Игра</h3>
+        <div class="setrow"><span><b>Звук и музыка</b><i>эффекты, музыка боя</i></span><button id="set-sound" class="toggle"></button></div>
+        <div class="setrow touch-only"><span><b>Вибрация</b><i>отдача при бросках и ударах</i></span><button id="set-haptic" class="toggle"></button></div>
+        <div class="setrow touch-only col"><span><b>Чувствительность прицела</b><i>как быстро палец двигает прицел</i></span><div class="slide"><input id="sens" type="range" min="0.6" max="1.8" step="0.1" value="1"><em id="sens-val">×1.0</em></div></div>
+        <div class="setrow pc-only"><span><b>Управление</b><i>WASD · ЛКМ бросок · ПКМ отмена · Пробел ремонт · C оглянуться</i></span></div>
+      </div>
     </div>
   </section>
 
   <section class="scr" data-scr="howto" hidden>
     <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Как играть</h2><span></span></header>
-    <div class="glass howto">
-      <ol>
-        <li><b>Цель.</b> Сбрось титана врага с острова. У каждого 3 жизни, бой идёт 3 минуты.</li>
-        <li><b>Ходьба.</b> <span class="pc">WASD</span><span class="tc">Левый палец, плавающий джойстик.</span></li>
-        <li><b>Бросок.</b> <span class="pc">Зажми ЛКМ на острове врага, отпусти.</span><span class="tc">Нажми правой половиной, сдвинь прицел и отпусти.</span> Дольше держишь, сильнее камень: кручёный от 0,9 с, мощный от 2,6 с.</li>
-        <li><b>Отмена.</b> <span class="pc">ПКМ или Esc.</span><span class="tc">Отведи палец на ✕.</span></li>
-        <li><b>Камни.</b> Их берут у кучи на своём острове (3 в запасе). Плиты трескаются, потом проваливаются.</li>
-        <li><b>Ремонт.</b> <span class="pc">Пробел.</span><span class="tc">Кнопка РЕМОНТ.</span> Чинит плиту рядом, стоит 1 камень.</li>
-      </ol>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><span class="ic">🏔</span><b>Цель</b><p>Сбрось титана врага с острова. У каждого 3 жизни, бой идёт 3 минуты. Кто упал, тот теряет жизнь.</p></div>
+      <div class="step"><span class="n">2</span><span class="ic">🚶</span><b>Ходьба</b><p><span class="pc">WASD или стрелки.</span><span class="tc">Левый палец: джойстик появляется там, где коснулся.</span></p></div>
+      <div class="step"><span class="n">3</span><span class="ic">🪨</span><b>Бросок</b><p><span class="pc">Зажми ЛКМ на острове врага и отпусти.</span><span class="tc">Нажми правой половиной, сдвинь палец, чтобы навести, и отпусти.</span> Отмена: <span class="pc">ПКМ или Esc.</span><span class="tc">отведи палец на ✕.</span></p></div>
+      <div class="step"><span class="n">4</span><span class="ic">⏱</span><b>Сила</b><p>Чем дольше держишь, тем сильнее камень.</p>
+        <div class="kinds"><span style="--c:#FFF3B0">обычный</span><span style="--c:#FFB050">кручёный 0,9 с</span><span style="--c:#C08CFF">мощный 2,6 с</span></div></div>
+      <div class="step"><span class="n">5</span><span class="ic">🧱</span><b>Камни и плиты</b><p>Камни берут у кучи на своём острове. Плиты трескаются, потом проваливаются. Если плита под титаном пропала, он падает.</p></div>
+      <div class="step"><span class="n">6</span><span class="ic">🛠</span><b>Ремонт и обзор</b><p><span class="pc">Пробел: починить плиту рядом (1 камень). C: оглянуться на свой остров.</span><span class="tc">Кнопка РЕМОНТ чинит плиту рядом (1 камень). Кнопка 👁 вверху: оглянуться на свой остров.</span></p></div>
     </div>
   </section>
 

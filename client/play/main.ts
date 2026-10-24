@@ -13,7 +13,7 @@ import { Predictor } from '../../shared/predict';
 import type { GameEvent } from '../../shared/battle';
 
 const sfx = new Sfx();
-const haptic = (ms: number | number[]) => { try { if (matchMedia('(pointer: coarse)').matches) navigator.vibrate?.(ms); } catch { /* optional */ } };
+const haptic = (ms: number | number[]) => { try { if (matchMedia('(pointer: coarse)').matches && localStorage.getItem('titans.haptic') !== '0') navigator.vibrate?.(ms); } catch { /* optional */ } };
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
 const NAMES: Record<Difficulty, string> = { easy: 'ГРОМ', normal: 'БОРГАР', hard: 'ТОРВАЛЬД' };

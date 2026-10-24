@@ -41,7 +41,7 @@ export function initMenu(h: MenuHooks) {
 
   const nick = () => (store.get('nick', '').trim() || 'Игрок');
   const sens = () => Math.max(.6, Math.min(1.8, parseFloat(store.get('sens', '1')) || 1));
-  const paintNick = () => { $('nick-label').textContent = nick(); $('rate-me').textContent = nick(); $<HTMLElement>('menu').querySelector('.avatar')!.textContent = nick().slice(0, 1).toUpperCase(); };
+  const paintNick = () => { $('nick-label').textContent = nick(); $('rate-me').textContent = nick(); document.querySelectorAll('#menu .avatar').forEach(a => { a.textContent = nick().slice(0, 1).toUpperCase(); }); };
 
   function open(s: Screen) {
     current = s;
@@ -52,7 +52,7 @@ export function initMenu(h: MenuHooks) {
     if (s === 'rating') { renderTop(); h.onTop(); }
     if (s === 'shop') renderShop();
     if (s === 'create') { $<HTMLInputElement>('room-name').value = `Комната ${nick()}`; $<HTMLInputElement>('room-pass').value = ''; }
-    if (s === 'settings') { $<HTMLInputElement>('nick').value = store.get('nick', ''); paintSound(); }
+    if (s === 'settings') { $<HTMLInputElement>('nick').value = store.get('nick', ''); paintSound(); paintHaptic(); $('set-rating').textContent = String(prof?.rating ?? 1000); $('set-wins').textContent = String(prof?.wins ?? 0); $('set-games').textContent = String(prof?.games ?? 0); }
   }
   let noticeT = 0;
   function notice(t: string) { const el = $('menu-toast'); el.textContent = t; el.classList.add('on'); window.clearTimeout(noticeT); noticeT = window.setTimeout(() => el.classList.remove('on'), 2800); }
@@ -160,11 +160,13 @@ export function initMenu(h: MenuHooks) {
 
   // settings
   function paintSound() { const b = $('set-sound'); b.textContent = sfx.muted ? 'Выкл' : 'Вкл'; b.classList.toggle('on', !sfx.muted); }
+  const paintHaptic = () => { const b = $('set-haptic'), on = store.get('haptic', '1') !== '0'; b.textContent = on ? 'Вкл' : 'Выкл'; b.classList.toggle('on', on); };
+  $('set-haptic').onclick = () => { store.set('haptic', store.get('haptic', '1') !== '0' ? '0' : '1'); paintHaptic(); };
   $('set-sound').onclick = () => { sfx.setMuted(!sfx.muted); paintSound(); document.getElementById('mute-btn')!.textContent = sfx.muted ? '🔇' : '🔊'; if (!sfx.muted) sfx.click(); };
   $<HTMLInputElement>('nick').addEventListener('input', e => { store.set('nick', (e.target as HTMLInputElement).value); paintNick(); });
   const sl = $<HTMLInputElement>('sens'); sl.value = String(sens()); $('sens-val').textContent = `×${sens().toFixed(1)}`;
   sl.addEventListener('input', () => { store.set('sens', sl.value); $('sens-val').textContent = `×${sens().toFixed(1)}`; });
-  paintNick(); paintSound(); setRooms([]); paintProfile();
+  paintNick(); paintSound(); paintHaptic(); setRooms([]); paintProfile();
 
   return { setProfile, setTop, setQueue, show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
 }
