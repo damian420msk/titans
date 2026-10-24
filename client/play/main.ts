@@ -30,6 +30,8 @@ const token = (() => {
 })();
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const p = newProfile('local', r.nick); Object.assign(p, r); return { ...(p as Omit<Profile, 'id'>), dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
 let pendingResult: { level: Difficulty; won: boolean } | null = null;
+// First bot match: a short guided start. Steps advance on what the player actually does.
+const tut = { on: false, step: 0, t: 0, x: 0, z: 0, throws: 0 };
 let endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
@@ -51,7 +53,7 @@ async function boot() {
   const hello = () => net.send({ t: 'hello', nick: menu.nick(), token });
   const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
   menu = initMenu({
-    sfx, touch: touchDevice, onStartBot: l => { level = l; startMatch(); },
+    sfx, touch: touchDevice, onStartBot: l => { const first = store.get('tutorial') !== '1'; level = first ? 'easy' : l; startMatch(); if (first) { tut.on = true; tut.step = 0; tut.t = 0; tut.throws = 0; tut.x = battle.actors[0].pos.x; tut.z = battle.actors[0].pos.z; } },
     onScreen: sc => { if (sc === 'online') { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); } },
     onCreate: (name, pass, ranked) => { hello(); net.send({ t: 'create', name, pass, ranked }); },
     onQuick: on => { if (on) { if (!needNet()) { quickWanted = true; return; } hello(); net.send({ t: 'quick', on: true }); } else { quickWanted = false; net.send({ t: 'quick', on: false }); } },
@@ -118,6 +120,25 @@ async function boot() {
   $('emote-btn').onclick = () => { $('emotes').hidden = !$('emotes').hidden; };
   $('emotes').addEventListener('click', e => { const b = (e.target as HTMLElement).closest('[data-e]') as HTMLElement | null; if (b) sendEmote(+b.dataset.e!); });
   window.addEventListener('keydown', e => { if (online && mode === 'playing' && /^Digit[1-4]$/.test(e.code)) sendEmote(+e.code.slice(5) - 1); });
+  const TIPS = [
+    () => touchDevice ? 'Двигайся: левым пальцем веди джойстик' : 'Двигайся: клавиши W A S D',
+    () => touchDevice ? 'Бросок: нажми правой половиной экрана, сдвинь прицел на остров врага и отпусти' : 'Бросок: зажми левую кнопку мыши на острове врага и отпусти',
+    () => 'Чем дольше держишь, тем сильнее камень. Камни кончились — иди к куче в углу своего острова',
+    () => 'Плита под титаном пропала — он падает. Разбивай плиты врага и чини свои кнопкой РЕМОНТ',
+  ];
+  const endTutorial = () => { if (!tut.on) return; tut.on = false; $('tip').hidden = true; store.set('tutorial', '1'); };
+  const tutorialTick = (dt: number, events: GameEvent[]) => {
+    if (!tut.on || online || mode !== 'playing') { if (tut.on && mode !== 'playing') endTutorial(); return; }
+    const tip = $('tip'), txt = TIPS[tut.step]!(); if (tip.textContent !== txt) { tip.textContent = txt; tip.hidden = false; }
+    tut.t += dt; const me = battle.actors[0];
+    for (const e of events) if (e.type === 'throw' && e.side === 0) tut.throws++;
+    const next = () => { tut.step++; tut.t = 0; if (tut.step >= TIPS.length) endTutorial(); };
+    if (tut.step === 0 && Math.hypot(me.pos.x - tut.x, me.pos.z - tut.z) > 2.5) next();
+    else if (tut.step === 1 && tut.throws >= 1) next();
+    else if (tut.step === 2 && (tut.throws >= 3 || tut.t > 14)) next();
+    else if (tut.step === 3 && tut.t > 7) next();
+    if (tut.t > 45 && tut.step < 2) next(); // a stuck player still sees the later tips
+  };
   const toast = (t: string) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); toastTimer = 1.4; };
   const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
   const slots = $('slots'); 
@@ -204,6 +225,7 @@ async function boot() {
     world.smoothFoe = online;
     world.lookBack = mode === 'playing' && controls.lookHeld && !charging;
     world.update(b, isPaused ? 0 : dt, { aiming: charging, kind, aimCell: ch ? ch.target : hover, cancel: controls.cancelled || controls.overCancel });
+    tutorialTick(isPaused ? 0 : dt, b.events);
     for (const e of b.events) {
       if (e.type === 'hit' && e.side === 0) toast('Сбили с ног!'); if (e.type === 'fall' && e.side === 0) toast('Падаешь!'); if (e.type === 'fall' && e.side === 1) toast('Враг упал!');
       if (e.type === 'over') { if (mode !== 'over') showEnd(e.winner); sfx.charge(false, 0); sfx.repair(false); if (e.winner === 0) { sfx.win(); haptic([40, 60, 40, 60, 120]); } else sfx.lose(); }
@@ -233,7 +255,7 @@ async function boot() {
     if (mode !== 'menu') world.scene.render();
   });
   function showEnd(winner: 0 | 1 | null, why?: 'left' | 'conn') {
-    mode = 'over'; charging = false; controls.reset(); $('pause').hidden = true; userPause = false;
+    mode = 'over'; endTutorial(); charging = false; controls.reset(); $('pause').hidden = true; userPause = false;
     $('end-title').textContent = winner === 0 ? 'ПОБЕДА' : winner === 1 ? 'ПОРАЖЕНИЕ' : 'НИЧЬЯ';
     $('end-text').textContent = why === 'left' ? 'Соперник вышел из боя. Победа твоя.' : why === 'conn' ? 'Связь с сервером потеряна.' : winner === 0 ? 'Враг рухнул вниз. Небесные камни твои.' : winner === 1 ? 'Тебя сбросили с острова. Попробуй ещё раз.' : 'Время вышло, силы равны.';
     $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'В КОМНАТУ') : 'ЕЩЁ РАЗ';

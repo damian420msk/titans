@@ -52,3 +52,7 @@ button.big{display:block;margin:12px auto 4px;padding:14px 46px;font-size:24px;f
 .bubble.r{left:auto;right:max(14px,env(safe-area-inset-right))}
 .bubble[hidden]{display:none}
 @keyframes pop{from{transform:scale(.4);opacity:0}}
+
+#tip{position:absolute;left:50%;top:max(54px,calc(env(safe-area-inset-top) + 48px));transform:translateX(-50%);max-width:min(86vw,520px);text-align:center;padding:9px 18px;border-radius:18px;background:rgba(255,210,90,.95);color:#3a2600;font-weight:700;font-size:15px;line-height:1.35;box-shadow:0 4px 0 rgba(90,50,0,.35);pointer-events:none;z-index:3;animation:pop .25s ease-out}
+#tip[hidden]{display:none}
+@media (max-height:480px){#tip{font-size:13px;padding:6px 14px;top:max(48px,calc(env(safe-area-inset-top) + 42px))}}
