@@ -6,7 +6,9 @@ import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
 import { initMenu } from './menu';
 import { Online } from './online';
-import type { Snap } from '../../shared/net';
+import type { Snap, MyProfile, Look } from '../../shared/net';
+import { modsFor, newProfile, DEFAULT_EQUIP, type Profile } from '../../shared/progress';
+import type { Mods } from '../../shared/battle';
 import { Predictor } from '../../shared/predict';
 import type { GameEvent } from '../../shared/battle';
 
@@ -16,6 +18,19 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const canvas = $<HTMLCanvasElement>('game');
 const NAMES: Record<Difficulty, string> = { easy: 'ГРОМ', normal: 'БОРГАР', hard: 'ТОРВАЛЬД' };
 const KIND_LABEL: Record<Kind, string> = { normal: 'ОБЫЧНЫЙ', spin: 'КРУЧЁНЫЙ', heavy: 'МОЩНЫЙ' };
+const store = {
+  get: (k: string) => { try { return localStorage.getItem('titans.' + k); } catch { return null; } },
+  set: (k: string, v: string) => { try { localStorage.setItem('titans.' + k, v); } catch { /* optional */ } },
+};
+/** Anonymous player key: stays on this device, the server stores only its hash. */
+const token = (() => {
+  let t = store.get('token');
+  if (!t || !/^[A-Za-z0-9_-]{16,64}$/.test(t)) { const a = new Uint8Array(24); crypto.getRandomValues(a); t = [...a].map(x => x.toString(16).padStart(2, '0')).join(''); store.set('token', t); }
+  return t;
+})();
+let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const p = newProfile('local', r.nick); Object.assign(p, r); return { ...(p as Omit<Profile, 'id'>), dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
+let pendingResult: { level: Difficulty; won: boolean } | null = null;
+let endGain = '';
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 const pred = new Predictor();
@@ -31,24 +46,31 @@ async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
   $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел ремонт';
-  const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick();
-  const hello = () => net.send({ t: 'hello', nick: menu.nick() });
+  const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
+  const hello = () => net.send({ t: 'hello', nick: menu.nick(), token });
+  const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
   menu = initMenu({
     sfx, touch: touchDevice, onStartBot: l => { level = l; startMatch(); },
     onScreen: sc => { if (sc === 'online') { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); } },
-    onCreate: (name, pass) => { hello(); net.send({ t: 'create', name, pass }); },
+    onCreate: (name, pass, ranked) => { hello(); net.send({ t: 'create', name, pass, ranked }); },
+    onQuick: on => { if (on) { if (!needNet()) { quickWanted = true; return; } hello(); net.send({ t: 'quick', on: true }); } else { quickWanted = false; net.send({ t: 'quick', on: false }); } },
+    onBuy: (kind, id) => { if (needNet()) net.send({ t: 'buy', kind, id }); },
+    onEquip: id => { if (needNet()) net.send({ t: 'equip', id }); },
+    onClaim: () => { if (needNet()) net.send({ t: 'claim' }); },
+    onTop: () => { if (net.state === 'on') net.send({ t: 'top' }); },
     onJoin: (id, pass) => { hello(); net.send({ t: 'join', id, pass }); },
     onReady: on => net.send({ t: 'ready', on }),
     onLeave: () => net.send({ t: 'leave' }),
     onRefresh: () => { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); },
   });
-  let retries = 0;
+  let retries = 0, quickWanted = false;
+  if (myProfile) menu.setProfile(myProfile);
   net.onState = st => {
     menu.setNet(st, net.slow);
-    if (st === 'on') retries = 0;
+    if (st === 'on') { retries = 0; if (quickWanted) { hello(); net.send({ t: 'quick', on: true }); } }
     if (st === 'off' && online && mode === 'playing') showEnd(1, 'conn');
     // a sleeping free server needs up to a minute: keep knocking while the player waits in the lobby
-    else if (st === 'off' && !menu.hidden && ['online', 'create', 'room'].includes(menu.screen) && retries++ < 15) window.setTimeout(() => { if (net.state === 'off' && !menu.hidden && ['online', 'create', 'room'].includes(menu.screen)) net.connect(); }, 4000);
+    else if (st === 'off' && !menu.hidden && retries++ < 30) window.setTimeout(() => { if (net.state === 'off' && !menu.hidden) net.connect(); }, retries < 5 ? 3000 : 8000);
   };
   net.onMsg = m => {
     switch (m.t) {
@@ -58,15 +80,24 @@ async function boot() {
         else { menu.clearRoom(); if (!menu.hidden && menu.screen === 'room') menu.open('online'); }
         break;
       case 'err': if (!$('pwd').hidden && m.code === 'wrong_pass') menu.pwdError(m.text); else menu.notice(m.text); break;
-      case 'start': startMatch(m.foe); break;
+      case 'profile': {
+        myProfile = m.p; store.set('profile', JSON.stringify(m.p)); menu.setProfile(m.p);
+        if (pendingResult) { net.send({ t: 'result', level: pendingResult.level, won: pendingResult.won }); pendingResult = null; }
+        break;
+      }
+      case 'top': menu.setTop(m.list, m.rank); break;
+      case 'shop': if (mode === 'over' && !online) $('end-gain').textContent = m.text; else menu.notice(m.text); if (m.ok) sfx.repaired(); break;
+      case 'queue': quickWanted = m.on; menu.setQueue(m.on); break;
+      case 'start': quickWanted = false; startMatch(m.foe, { mods: m.mods, look: m.look, rating: m.foeRating, ranked: m.ranked }); break;
       case 'snap': if (online) { pendingSnap = { s: m.s, at: performance.now() / 1000 }; srvEvents.push(...m.ev); } break;
-      case 'end': if (online && mode === 'playing') showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); break;
+      case 'end': if (online && mode === 'playing') { endGain = m.gain ? `${m.gain.ranked ? (m.gain.rating >= 0 ? '+' : '') + m.gain.rating + ' рейтинг · ' : ''}+${m.gain.coins} 🪙` : ''; showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); } break;
     }
   };
-  const startMatch = (foe?: string) => {
+  const startMatch = (foe?: string, info?: { mods: [Mods, Mods]; look: [Look, Look]; rating: number; ranked: boolean }) => {
     sfx.unlock(); sfx.startMusic(); sfx.click();
     online = typeof foe === 'string'; try { (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}); } catch { /* needs fullscreen on most browsers */ } pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
-    world.resetPoses(); battle = new Battle(); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
+    world.resetPoses(); const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
+    slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity);
     $('foe-name').textContent = online ? foe! : NAMES[level]; $('foe-face').textContent = online ? foe!.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
@@ -75,9 +106,10 @@ async function boot() {
   const toMenu = () => { if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
   $('to-menu').onclick = toMenu;
   $('loading').hidden = true;
+  net.connect();
   const toast = (t: string) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); toastTimer = 1.4; };
   const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
-  const slots = $('slots'); slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(rules.inventory.capacity);
+  const slots = $('slots'); 
 
   const setPause = (on: boolean) => { if (on && mode !== 'playing') return; userPause = on && !online; $('pause').hidden = !on; $('pause-menu').textContent = online ? 'Сдаться и выйти' : 'Выйти в меню'; if (on) { controls.reset(); charging = false; battle.cancelCharge(0); battle.cancelRepair(0); } };
   $('pause-btn').onclick = () => setPause(true); $('resume').onclick = () => setPause(false);
@@ -187,6 +219,11 @@ async function boot() {
     $('end-title').textContent = winner === 0 ? 'ПОБЕДА' : winner === 1 ? 'ПОРАЖЕНИЕ' : 'НИЧЬЯ';
     $('end-text').textContent = why === 'left' ? 'Соперник вышел из боя. Победа твоя.' : why === 'conn' ? 'Связь с сервером потеряна.' : winner === 0 ? 'Враг рухнул вниз. Небесные камни твои.' : winner === 1 ? 'Тебя сбросили с острова. Попробуй ещё раз.' : 'Время вышло, силы равны.';
     $('again').textContent = online ? 'В КОМНАТУ' : 'ЕЩЁ РАЗ';
+    $('end-gain').textContent = online ? endGain : '';
+    if (!online && why !== 'conn') {
+      pendingResult = { level, won: winner === 0 };
+      if (net.state === 'on') { hello(); net.send({ t: 'result', level, won: winner === 0 }); pendingResult = null; } else net.connect();
+    }
     if (why === 'left') { sfx.win(); }
     setTimeout(() => { $('end').hidden = false; }, 900);
   }

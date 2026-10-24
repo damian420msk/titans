@@ -29,14 +29,16 @@
     <div class="main-left">
       <h1 class="logo">ТИТАНЫ<small>БРОСКИ С НЕБЕСНЫХ ОСТРОВОВ</small></h1>
       <p class="tag">Бросай небесные камни по острову врага. Разбей плиты под титаном, чтобы он упал.</p>
-      <button class="chip player" data-go="settings"><span class="avatar">Я</span><span><b id="nick-label">Игрок</b><i>Рейтинг <span id="rating-label">1000</span></i></span></button>
+      <button class="chip player" data-go="settings"><span class="avatar">Я</span><span><b id="nick-label">Игрок</b><i><span id="league-label">Бронза</span> · <span id="rating-label">1000</span></i></span><em class="coins">🪙 <span id="coins-label">0</span></em></button>
+      <button id="daily" class="gift" hidden>🎁 Подарок дня: +50 монет</button>
     </div>
     <nav class="main-right">
       <button class="big" data-go="bot">БОЙ С БОТОМ</button>
-      <button class="mbtn online" data-go="online"><b>ОНЛАЙН</b><i>играть с друзьями</i></button>
+      <button id="quick-btn" class="mbtn online"><b>БЫСТРЫЙ БОЙ</b><i>с живым соперником, на рейтинг</i></button>
+      <button class="mbtn friends" data-go="online"><b>ИГРА С ДРУЗЬЯМИ</b><i>комнаты и пароли</i></button>
       <div class="row2">
         <button class="mbtn" data-go="rating"><b>РЕЙТИНГ</b></button>
-        <button class="mbtn locked" data-go="shop"><b>МАГАЗИН</b><i>скоро</i></button>
+        <button class="mbtn" data-go="shop"><b>МАГАЗИН</b></button>
       </div>
       <div class="row2">
         <button class="mbtn" data-go="settings"><b>НАСТРОЙКИ</b></button>
@@ -69,6 +71,7 @@
     <form id="create-form" class="glass form" autocomplete="off">
       <label>Название<input id="room-name" maxlength="24" placeholder="Например, «Дуэль на облаках»"></label>
       <label><span>Пароль <em>(необязательно)</em></span><input id="room-pass" maxlength="16" placeholder="Пусто — комната открытая"></label>
+      <label class="check"><input id="room-ranked" type="checkbox" checked><span>Рейтинговая игра <em>(рейтинг и монеты за бой)</em></span></label>
       <button class="big" type="submit">СОЗДАТЬ</button>
     </form>
   </section>
@@ -76,24 +79,29 @@
   <section class="scr" data-scr="room" hidden>
     <header class="top"><button class="back" id="leave">‹ Выйти</button><h2 id="room-title">Комната</h2><span class="pill" id="room-lock"></span></header>
     <div class="duel">
-      <div class="seat blue" id="seat0"><span class="face blue">1</span><b class="nm"></b><i class="st"></i></div>
+      <div class="seat blue" id="seat0"><span class="face blue">1</span><b class="nm"></b><em class="rt"></em><i class="st"></i></div>
       <div class="mid"><div class="vs">VS</div><button id="ready" class="big" disabled>ГОТОВ</button><div id="count" class="count"></div></div>
-      <div class="seat red" id="seat1"><span class="face coral">2</span><b class="nm"></b><i class="st"></i></div>
+      <div class="seat red" id="seat1"><span class="face coral">2</span><b class="nm"></b><em class="rt"></em><i class="st"></i></div>
     </div>
   </section>
 
+  <section class="scr" data-scr="quick" hidden>
+    <div class="searching"><div class="spinner"></div><h2>Ищем соперника…</h2><p id="quick-note">Подбираем игрока близкого к тебе по рейтингу. Чем дольше ждёшь, тем шире поиск.</p><button class="ghost" id="quick-cancel">Отмена</button></div>
+  </section>
+
   <section class="scr" data-scr="rating" hidden>
-    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Рейтинг</h2><span class="pill"><i></i><span>скоро</span></span></header>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Рейтинг</h2><span class="pill" id="rate-pill"><i></i><span>лучшие игроки</span></span></header>
     <div class="glass table">
       <div class="trow th"><span>#</span><span>Игрок</span><span>Победы</span><span>Очки</span></div>
-      <div class="trow me"><span>—</span><span id="rate-me">Игрок</span><span>0</span><span>1000</span></div>
-      <p class="empty">Таблица лучших появится вместе с онлайном. Победа даёт очки, поражение отнимает. Чем сильнее соперник, тем больше разница.</p>
+      <div id="top-list" class="top-list"></div>
+      <div class="trow me" id="top-me"><span>—</span><span id="rate-me">Игрок</span><span id="rate-wins">0</span><span id="rate-pts">1000</span></div>
     </div>
   </section>
 
   <section class="scr" data-scr="shop" hidden>
-    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Магазин</h2><span></span></header>
-    <div class="glass soon"><div class="lock">🔒</div><b>Скоро</b><p>Новые титаны, плиты острова, башни и облики. Монеты будут падать за победы и за налёты на чужие острова.</p></div>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Магазин</h2><span class="pill gold">🪙 <span id="shop-coins">0</span></span></header>
+    <div class="tabs" id="shop-tabs"><button data-tab="up" class="sel">Улучшения</button><button data-tab="skin">Титан</button><button data-tab="tiles">Плиты</button><button data-tab="stone">Камни</button></div>
+    <div class="glass shop" id="shop-list"></div>
   </section>
 
   <section class="scr" data-scr="settings" hidden>
@@ -122,7 +130,7 @@
   <div id="menu-toast"></div>
   <div id="pwd" class="modal" hidden><form class="glass form"><h3 id="pwd-title">Пароль</h3><input id="pwd-in" maxlength="16" placeholder="Пароль комнаты" autocomplete="off"><div class="err" id="pwd-err"></div><div class="row2"><button type="button" class="ghost" id="pwd-cancel">Отмена</button><button class="big" type="submit">ВОЙТИ</button></div></form></div>
 </div>
-<div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>
+<div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><div id="end-gain" class="gain"></div><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>
 <div id="pause" class="overlay" hidden><div class="panel"><h1>ПАУЗА</h1><button id="resume" class="big">ПРОДОЛЖИТЬ</button><button id="pause-menu">Выйти в меню</button></div></div>
 <div id="portrait" class="overlay" hidden><div class="panel"><h1>Поверните телефон</h1><p id="portrait-text">Игра идёт в горизонтальном режиме. Бой на паузе.</p></div></div>
 <div id="loading" class="overlay"><div class="panel"><h1>Загрузка…</h1></div></div>

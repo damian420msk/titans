@@ -20,6 +20,7 @@ export class Online {
   onState: (s: NetState) => void = () => {};
   onMsg: (m: S2C) => void = () => {};
   nick = () => 'Игрок';
+  token = () => '';
   private ws: WebSocket | null = null;
   private pings = new Map<number, number>();
   private pingTimer = 0;
@@ -35,7 +36,7 @@ export class Online {
     this.ws = ws;
     ws.onopen = () => {
       window.clearTimeout(this.slowTimer); this.slow = false; this.set('on');
-      this.send({ t: 'hello', nick: this.nick() });
+      const tk = this.token(); this.send(tk ? { t: 'hello', nick: this.nick(), token: tk } : { t: 'hello', nick: this.nick() });
       window.clearInterval(this.pingTimer); this.pingTimer = window.setInterval(() => this.ping(), 2500); this.ping();
     };
     ws.onmessage = e => {

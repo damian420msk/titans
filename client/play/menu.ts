@@ -4,9 +4,10 @@ import type { Difficulty } from '../../shared/bot';
 import type { Sfx } from './audio';
 import type { NetState } from './online';
 
-import type { RoomInfo, RoomView } from '../../shared/net';
+import type { RoomInfo, RoomView, MyProfile } from '../../shared/net';
+import { UPGRADES, COSMETICS, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
 export type { RoomInfo, RoomView };
-export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop';
+export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const store = {
@@ -20,7 +21,12 @@ export type MenuHooks = {
   touch: boolean;
   onStartBot: (level: Difficulty) => void;
   onScreen: (s: Screen) => void;
-  onCreate: (name: string, password: string) => void;
+  onCreate: (name: string, password: string, ranked: boolean) => void;
+  onQuick: (on: boolean) => void;
+  onBuy: (kind: 'up' | 'item', id: string) => void;
+  onEquip: (id: string) => void;
+  onClaim: () => void;
+  onTop: () => void;
   onJoin: (id: string, password: string) => void;
   onReady: (on: boolean) => void;
   onLeave: () => void;
@@ -30,6 +36,7 @@ export type MenuHooks = {
 export function initMenu(h: MenuHooks) {
   const root = $('menu'), { sfx } = h;
   let level: Difficulty = 'normal', current: Screen = 'main', view: RoomView | null = null, netState: NetState = 'off', slow = false;
+  let prof: MyProfile | null = null, top: PublicEntry[] = [], topRank: number | null = null, tab: 'up' | CosmeticKind = 'up';
   document.body.classList.toggle('touch', h.touch);
 
   const nick = () => (store.get('nick', '').trim() || 'Игрок');
@@ -42,6 +49,8 @@ export function initMenu(h: MenuHooks) {
     $('pwd').hidden = true;
     h.onScreen(s);
     if (s === 'online') setRooms(rooms);
+    if (s === 'rating') { renderTop(); h.onTop(); }
+    if (s === 'shop') renderShop();
     if (s === 'create') { $<HTMLInputElement>('room-name').value = `Комната ${nick()}`; $<HTMLInputElement>('room-pass').value = ''; }
     if (s === 'settings') { $<HTMLInputElement>('nick').value = store.get('nick', ''); paintSound(); }
   }
@@ -55,6 +64,12 @@ export function initMenu(h: MenuHooks) {
     const t = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null; if (!t) return;
     sfx.unlock(); sfx.click();
     if (t.dataset.go) open(t.dataset.go as Screen);
+    if (t.id === 'quick-btn') { h.onQuick(true); open('quick'); }
+    if (t.id === 'quick-cancel') { h.onQuick(false); open('main'); }
+    if (t.id === 'daily') h.onClaim();
+    if (t.dataset.tab) { tab = t.dataset.tab as typeof tab; renderShop(); }
+    if (t.dataset.buy) h.onBuy(t.dataset.kind as 'up' | 'item', t.dataset.buy);
+    if (t.dataset.eq) h.onEquip(t.dataset.eq);
     if (t.dataset.level) { level = t.dataset.level as Difficulty; root.querySelectorAll('[data-level]').forEach(x => x.classList.toggle('sel', x === t)); }
   });
   $('start').addEventListener('click', () => h.onStartBot(level));
@@ -70,7 +85,7 @@ export function initMenu(h: MenuHooks) {
   function setRooms(list: RoomInfo[]) {
     rooms = list; const el = $('rooms');
     if (!list.length) { el.innerHTML = `<div class="empty">${netState === 'on' ? 'Пока нет комнат. Создай первую и позови друга.' : netState === 'connecting' ? (slow ? 'Бесплатный сервер просыпается после простоя, это занимает до минуты. Подожди немного.' : 'Подключаемся к серверу…') : 'Не удалось подключиться к серверу. Проверь интернет и нажми «Обновить».'}</div>`; return; }
-    el.innerHTML = list.map(r => `<div class="room${r.players >= 2 ? ' full' : ''}"><b>${r.locked ? '🔒 ' : ''}${esc(r.name)}</b><span>${esc(r.host)}</span><span>${r.players}/2</span><button data-join="${esc(r.id)}" ${r.players >= 2 ? 'disabled' : ''}>${r.playing ? 'Идёт бой' : r.players >= 2 ? 'Занято' : 'Войти'}</button></div>`).join('');
+    el.innerHTML = list.map(r => `<div class="room${r.players >= 2 ? ' full' : ''}"><b>${r.locked ? '🔒 ' : ''}${r.ranked ? '🏆 ' : ''}${esc(r.name)}</b><span>${esc(r.host)}</span><span>${r.players}/2</span><button data-join="${esc(r.id)}" ${r.players >= 2 ? 'disabled' : ''}>${r.playing ? 'Идёт бой' : r.players >= 2 ? 'Занято' : 'Войти'}</button></div>`).join('');
   }
   let joining: RoomInfo | null = null;
   $('rooms').addEventListener('click', e => {
@@ -87,16 +102,17 @@ export function initMenu(h: MenuHooks) {
     e.preventDefault();
     const name = $<HTMLInputElement>('room-name').value.trim() || `Комната ${nick()}`, pass = $<HTMLInputElement>('room-pass').value.trim();
     sfx.click();
-    h.onCreate(name, pass);
+    h.onCreate(name, pass, $<HTMLInputElement>('room-ranked').checked);
   });
 
   // waiting room
   function renderRoom(v: RoomView) {
     view = v; $('room-title').textContent = v.name;
-    const lock = $('room-lock'); lock.textContent = v.locked ? '🔒 с паролем' : 'открытая'; lock.classList.add('pill');
+    const lock = $('room-lock'); lock.textContent = (v.locked ? '🔒 с паролем' : 'открытая') + (v.ranked ? ' · 🏆 на рейтинг' : ' · дружеская'); lock.classList.add('pill');
     v.seats.forEach((s, i) => {
       const el = $(`seat${i}`); el.classList.toggle('empty-seat', !s); el.classList.toggle('ready', !!s?.ready);
       el.querySelector('.nm')!.textContent = s ? s.nick + (i === v.me ? ' (ты)' : '') : '—';
+      el.querySelector('.rt')!.textContent = s ? `${league(s.rating).name} · ${s.rating}` : '';
       el.querySelector('.st')!.textContent = s ? (s.ready ? 'ГОТОВ' : 'не готов') : 'ждём соперника…';
     });
     const rb = $<HTMLButtonElement>('ready'), mine = v.seats[v.me], both = !!v.seats[0] && !!v.seats[1];
@@ -106,14 +122,50 @@ export function initMenu(h: MenuHooks) {
   $('ready').onclick = () => { if (view) h.onReady(!view.seats[view.me]?.ready); };
   $('leave').onclick = () => { view = null; h.onLeave(); open('online'); };
 
+  // profile, shop, rating
+  const paintProfile = () => {
+    const p = prof; const r = p?.rating ?? 1000, lg = league(r);
+    $('rating-label').textContent = String(r); $('league-label').textContent = lg.name; $('league-label').style.color = lg.color;
+    $('coins-label').textContent = String(p?.coins ?? 0); $('shop-coins').textContent = String(p?.coins ?? 0);
+    $('daily').hidden = !(p && p.dailyReady);
+    $('rate-pts').textContent = String(r); $('rate-wins').textContent = String(p?.wins ?? 0);
+  };
+  function setProfile(p: MyProfile) { prof = p; paintProfile(); if (current === 'shop') renderShop(); if (current === 'rating') renderTop(); }
+  function renderShop() {
+    root.querySelectorAll<HTMLElement>('#shop-tabs [data-tab]').forEach(b => b.classList.toggle('sel', b.dataset.tab === tab));
+    const el = $('shop-list'), p = prof, coins = p?.coins ?? 0;
+    if (!p) { el.innerHTML = '<div class="empty">Магазин работает с сервером. Подключаемся…</div>'; return; }
+    if (tab === 'up') {
+      el.innerHTML = UPGRADES.map(u => {
+        const lv = p.up[u.id], max = u.costs.length, cost = lv < max ? u.costs[lv] : null;
+        const pips = Array.from({ length: max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
+        return `<div class="item"><span class="ic">${u.icon}</span><div class="tx"><b>${esc(u.name)}</b><em>${esc(u.desc)}</em><span class="pips">${pips}</span></div>${cost === null ? '<span class="maxed">МАКС</span>' : `<button class="buy" data-kind="up" data-buy="${u.id}" ${coins < cost ? 'disabled' : ''}>🪙 ${cost}</button>`}</div>`;
+      }).join('');
+      return;
+    }
+    el.innerHTML = COSMETICS.filter(c => c.kind === tab).map(c => {
+      const own = p.own.includes(c.id), on = p.eq[c.kind] === c.id;
+      const btn = on ? '<span class="maxed">ВЫБРАНО</span>' : own ? `<button class="buy ok" data-eq="${c.id}">Выбрать</button>` : `<button class="buy" data-kind="item" data-buy="${c.id}" ${coins < c.cost ? 'disabled' : ''}>🪙 ${c.cost}</button>`;
+      return `<div class="item${on ? ' eq' : ''}"><span class="sw" style="background:${c.color ?? 'linear-gradient(135deg,#fff,#aab)'}"></span><div class="tx"><b>${esc(c.name)}</b></div>${btn}</div>`;
+    }).join('');
+  }
+  function setTop(list: PublicEntry[], rank: number | null) { top = list; topRank = rank; if (current === 'rating') renderTop(); }
+  function renderTop() {
+    const el = $('top-list');
+    el.innerHTML = top.length ? top.map((e, i) => `<div class="trow"><span>${i + 1}</span><span style="color:${league(e.rating).color}">${esc(e.nick)}</span><span>${e.wins}</span><span>${e.rating}</span></div>`).join('') : '<div class="empty">Рейтинг пока пуст. Сыграй рейтинговый бой.</div>';
+    $('top-me').children[0].textContent = topRank ? String(topRank) : '—';
+    $('rate-me').textContent = nick(); $('rate-pts').textContent = String(prof?.rating ?? 1000); $('rate-wins').textContent = String(prof?.wins ?? 0);
+  }
+  const setQueue = (on: boolean) => { if (!on && current === 'quick') open('main'); if (on && current !== 'quick') open('quick'); };
+
   // settings
   function paintSound() { const b = $('set-sound'); b.textContent = sfx.muted ? 'Выкл' : 'Вкл'; b.classList.toggle('on', !sfx.muted); }
   $('set-sound').onclick = () => { sfx.setMuted(!sfx.muted); paintSound(); document.getElementById('mute-btn')!.textContent = sfx.muted ? '🔇' : '🔊'; if (!sfx.muted) sfx.click(); };
   $<HTMLInputElement>('nick').addEventListener('input', e => { store.set('nick', (e.target as HTMLInputElement).value); paintNick(); });
   const sl = $<HTMLInputElement>('sens'); sl.value = String(sens()); $('sens-val').textContent = `×${sens().toFixed(1)}`;
   sl.addEventListener('input', () => { store.set('sens', sl.value); $('sens-val').textContent = `×${sens().toFixed(1)}`; });
-  paintNick(); paintSound(); setRooms([]);
+  paintNick(); paintSound(); setRooms([]); paintProfile();
 
-  return { show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
+  return { setProfile, setTop, setQueue, show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
 }
 export type Menu = ReturnType<typeof initMenu>;

@@ -16,6 +16,8 @@ import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 import type { AssetContainer } from '@babylonjs/core/assetContainer';
 import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
+import type { Material } from '@babylonjs/core/Materials/material';
+import { COSMETICS, type CosmeticKind } from '../../shared/progress';
 import '@babylonjs/core/Culling/ray';
 import '@babylonjs/loaders/glTF/2.0';
 import { createEnvironment } from '../environment';
@@ -27,7 +29,7 @@ const TEAM = ['#2BB8AA', '#E8634E'];
 const STONE_COLOR: Record<Kind, string> = { normal: '#C9C3B6', spin: '#E3A862', heavy: '#8E80C4' };
 type CellView = { root: TransformNode[]; intact: TransformNode; cracked: TransformNode; foundation: Mesh; shown: 'intact' | 'cracked' | 'hole'; fall: number; base: Vector3[] };
 type Bone = { node: TransformNode; rest: Quaternion };
-type TitanView = { holder: TransformNode; body: TransformNode; walk: AnimationGroup | null; stone: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
+type TitanView = { mats: Material[]; holder: TransformNode; body: TransformNode; walk: AnimationGroup | null; stone: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
   bones: Map<string, Bone>; off: Map<string, Quaternion>; windup: number; swing: number; cheer: number; flail: number; cheerTarget: boolean };
 /** Local rotation offset from Euler angles in degrees (x, y, z). */
 const rot = (x: number, y: number, z: number) => Quaternion.RotationYawPitchRoll(y * Math.PI / 180, x * Math.PI / 180, z * Math.PI / 180);
@@ -46,6 +48,7 @@ export class World {
   private dots: Mesh[] = [];
   private mats: Record<string, StandardMaterial> = {};
   private stoneTemplate!: Mesh;
+  private tileMats: [Material[], Material[]] = [[], []];
   private trailTemplate!: Mesh;
   private time = 0;
   /** 0 = walking camera, 1 = aiming camera (both titan and enemy island in view). */
@@ -89,6 +92,7 @@ export class World {
       m['fill_' + k] = this.mat('fill_' + k, KIND_COLOR[k], .9); m['fill_' + k].alpha = .28;
       m['stone_' + k] = this.mat('rock_' + k, STONE_COLOR[k], .12);
     }
+    for (const sd of [0, 1]) m['stone_normal' + sd] = this.mat('rock_normal' + sd, STONE_COLOR.normal, .12);
     m.warnEnemy = this.mat('warnE', '#FF7A45', .9); m.warnEnemy.alpha = .42;
     m.warnMine = this.mat('warnM', '#BDF3FF', .8); m.warnMine.alpha = .25;
     m.dust = this.mat('dust', '#E7DCCB', .2);
@@ -115,8 +119,9 @@ export class World {
   private cast<T extends Mesh>(m: T) { this.casters.push(m); m.receiveShadows = true; return m; }
 
   private async buildIslands() {
-    const tiles = new Map<string, AssetContainer>();
-    for (const v of ['a', 'b', 'c']) for (const k of ['intact', 'cracked']) tiles.set(`${v}/${k}`, await LoadAssetContainerAsync(`${import.meta.env.BASE_URL}art/blocks-abc-v03/tile_${v}_${k}.glb`, this.scene, { pluginExtension: '.glb' }));
+    // one set of tile containers per island: tinting a material then only changes that side's plates
+    const tilesBySide: [Map<string, AssetContainer>, Map<string, AssetContainer>] = [new Map(), new Map()];
+    for (const sd of [0, 1] as Side[]) for (const v of ['a', 'b', 'c']) for (const k of ['intact', 'cracked']) { const ct = await LoadAssetContainerAsync(`${import.meta.env.BASE_URL}art/blocks-abc-v03/tile_${v}_${k}.glb`, this.scene, { pluginExtension: '.glb' }); tilesBySide[sd].set(`${v}/${k}`, ct); this.tileMats[sd].push(...ct.materials); }
     const S = size;
     const collar = MeshBuilder.CreateBox('collar', { width: S, height: .25, depth: S }, this.scene); collar.position.y = -.525;
     const rock = MeshBuilder.CreateCylinder('hang', { diameterTop: S, diameterBottom: 1.9, height: 1.0, tessellation: 8, subdivisions: 2 }, this.scene); rock.position.y = -1.15;
@@ -127,7 +132,7 @@ export class World {
       for (const c of map.cells) {
         const key = cellKey(c), p = cellCentre(c, side), v = 'abc'[(c.x * 7 + c.z * 3 + side) % 3], rot = ((c.x + c.z * 3) % 4) * Math.PI / 2;
         const make = (kind: string) => {
-          const inst = tiles.get(`${v}/${kind}`)!.instantiateModelsToScene(n => `${side}/${key}/${kind}/${n}`, false);
+          const inst = tilesBySide[side].get(`${v}/${kind}`)!.instantiateModelsToScene(n => `${side}/${key}/${kind}/${n}`, false);
           const group = new TransformNode(`tile${side}/${key}/${kind}`, this.scene); group.position.set(p.x, 0, p.z); group.rotation.y = rot; group.parent = root;
           for (const n of inst.rootNodes) { const t = n as TransformNode; t.parent = group; for (const m of t.getChildMeshes()) { m.receiveShadows = true; } }
           return group;
@@ -146,7 +151,7 @@ export class World {
       const a = cellCentre({ x: rules.arena.arsenal_cell[0], z: rules.arena.arsenal_cell[1] }, side);
       const base = this.cast(MeshBuilder.CreateCylinder('arsenal base', { diameterTop: 2.2, diameterBottom: 2.6, height: .5, tessellation: 8 }, this.scene)); base.material = this.mats.stoneDark; base.position.set(a.x, .25, a.z);
       const ring = MeshBuilder.CreateTorus('arsenal ring', { diameter: 2.3, thickness: .08, tessellation: 32 }, this.scene); ring.material = this.mats['trim' + side]; ring.position.set(a.x, .52, a.z);
-      this.stonePile(a);
+      this.stonePile(a, side);
     }
   }
 
@@ -155,8 +160,8 @@ export class World {
     const k = .84, parts = [[1, k, k], [k, 1, k], [k, k, 1]].map(([w, h, d], i) => { const b = MeshBuilder.CreateBox(`${name}${i}`, { width: w * size, height: h * size, depth: d * size }, this.scene); return b; });
     const m = Mesh.MergeMeshes(parts, true, true)!; m.name = name; m.convertToFlatShadedMesh(); m.material = material; return m;
   }
-  private stonePile(a: Point) {
-    const cube = (x: number, y: number, z: number, yaw: number) => { const c = this.cast(this.stoneCube(.72, this.mats.stone_normal, 'pile')); c.position.set(a.x + x, y, a.z + z); c.rotation.y = yaw; };
+  private stonePile(a: Point, side: Side) {
+    const cube = (x: number, y: number, z: number, yaw: number) => { const c = this.cast(this.stoneCube(.72, this.mats['stone_normal' + side], 'pile')); c.position.set(a.x + x, y, a.z + z); c.rotation.y = yaw; };
     for (const [x, z, r] of [[-.4, -.4, .1], [.4, -.4, -.08], [-.4, .4, -.12], [.4, .4, .07]]) cube(x, .86, z, r);
     for (const [x, r] of [[-.36, .06], [.36, -.1]]) cube(x, 1.58, 0, r);
     cube(0, 2.3, 0, .2);
@@ -172,16 +177,27 @@ export class World {
       for (const m of c.meshes) if (m.getTotalVertices()) this.cast(m as Mesh);
       for (const g of c.animationGroups) g.stop();
       const walk = c.animationGroups.find(g => /walking/i.test(g.name)) ?? c.animationGroups[0] ?? null;
-      const stone = this.stoneCube(.7, this.mats.stone_normal, 'held'); stone.parent = holder; stone.position.set(.8, 4.1, 0); stone.setEnabled(false); stone.material = this.mats.stone_normal;
+      const stone = this.stoneCube(.7, this.mats['stone_normal' + side], 'held'); stone.parent = holder; stone.position.set(.8, 4.1, 0); stone.setEnabled(false);
       if (walk) { walk.start(false, 1, walk.from, walk.to); walk.goToFrame(walk.from + (walk.to - walk.from) * .25); walk.pause(); } // standing pose = a still frame of the walk cycle
       const bones = new Map<string, Bone>();
       for (const n of c.transformNodes) if (n.name.startsWith('mixamorig:') && n.rotationQuaternion) bones.set(n.name.slice(10), { node: n, rest: n.rotationQuaternion.clone() });
-      this.titans[side] = { holder, body, walk, stone, yaw: side === 0 ? 0 : Math.PI, lean: 0, lie: 0, moving: false, bones, off: new Map(), windup: 0, swing: 0, cheer: 0, flail: 0, cheerTarget: false };
+      this.titans[side] = { mats: [...c.materials], holder, body, walk, stone, yaw: side === 0 ? 0 : Math.PI, lean: 0, lie: 0, moving: false, bones, off: new Map(), windup: 0, swing: 0, cheer: 0, flail: 0, cheerTarget: false };
     }
   }
 
+  private stoneMat(kind: Kind, side: Side) { return kind === 'normal' ? this.mats['stone_normal' + side] : this.mats['stone_' + kind]; }
+
+  /** Cosmetics: tint the titan, the island plates and the plain stones of one side. A null colour restores the original look. */
+  setLook(side: Side, look: Record<CosmeticKind, string>) {
+    const color = (kind: CosmeticKind) => COSMETICS.find(c => c.id === look[kind])?.color ?? null;
+    const tint = (list: Material[], hex: string | null) => { for (const m of list) { const pbr = m as Material & { albedoColor?: Color3 }; if (pbr.albedoColor) pbr.albedoColor = hex ? Color3.FromHexString(hex).toLinearSpace() : new Color3(1, 1, 1); } };
+    tint(this.titans[side].mats, color('skin')); tint(this.tileMats[side], color('tiles'));
+    const sm = this.mats['stone_normal' + side], hex = color('stone') ?? STONE_COLOR.normal;
+    sm.diffuseColor = Color3.FromHexString(hex).toLinearSpace(); sm.emissiveColor = Color3.FromHexString(hex).scale(.12);
+  }
+
   private buildPools() {
-    this.stoneTemplate = this.stoneCube(.7, this.mats.stone_normal, 'stoneT'); this.stoneTemplate.setEnabled(false);
+    this.stoneTemplate = this.stoneCube(.7, this.mats.stone_normal0, 'stoneT'); this.stoneTemplate.setEnabled(false);
     this.trailTemplate = MeshBuilder.CreateSphere('trailT', { diameter: .5, segments: 6 }, this.scene); this.trailTemplate.material = this.mats.trail; this.trailTemplate.isVisible = false;
     const S = size;
     for (let i = 0; i < 2; i++) {
@@ -305,7 +321,7 @@ export class World {
       t.stone.setEnabled(!!ch && !a.falling);
       if (ch) {
         const k = kindForHold(ch.t);
-        t.stone.material = this.mats['stone_' + k];
+        t.stone.material = this.stoneMat(k, side);
         const grow = .8 + Math.min(1, ch.t / 2.6) * .8 + (k !== 'normal' ? Math.sin(this.time * 18) * .06 : 0);
         t.stone.scaling.setAll(grow); t.stone.rotation.y += dt * 3;
         t.stone.position.y = 4.0 + grow * .3;
@@ -340,7 +356,7 @@ export class World {
     for (const [k, w] of this.warns) { const id = Number(k.split('/')[0]); if (!b.shots.some(s => s.id === id)) { w.dispose(); this.warns.delete(k); } }
     for (const s of b.shots) {
       let m = this.shotMeshes.get(s.id);
-      if (!m) { m = this.stoneTemplate.clone('shot' + s.id); m.setEnabled(true); m.material = this.mats['stone_' + s.kind]; m.scaling.setAll(s.kind === 'heavy' ? 1.5 : s.kind === 'spin' ? 1.2 : 1); this.shotMeshes.set(s.id, m); }
+      if (!m) { m = this.stoneTemplate.clone('shot' + s.id); m.setEnabled(true); m.material = this.stoneMat(s.kind, s.owner); m.scaling.setAll(s.kind === 'heavy' ? 1.5 : s.kind === 'spin' ? 1.2 : 1); this.shotMeshes.set(s.id, m); }
       const p = shotPosition(s); m.position.set(p.x, p.y, p.z); m.rotation.x += dt * (s.kind === 'spin' ? 16 : 7); m.rotation.z += dt * 4; m.rotation.y += dt * (s.kind === 'spin' ? 14 : 3);
       this.particle(new Vector3(p.x, p.y, p.z), Vector3.Zero(), .3, 0, this.trailTemplate, .25 + (s.kind === 'heavy' ? .15 : 0));
       s.cells.forEach((c, i) => {
