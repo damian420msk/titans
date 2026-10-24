@@ -53,9 +53,13 @@ export class World {
   private time = 0;
   /** 0 = walking camera, 1 = aiming camera (both titan and enemy island in view). */
   aimBlend = 0;
+  /** Set by the game while the player holds the look-back control: the camera swings over to show the own island. */
+  lookBack = false; lookBlend = 0;
+  /** Online: ease the foe's drawn position between snapshots. */
+  smoothFoe = false; foeVis = { x: 0, z: 0, ok: false };
   private aimHold = 0;
   freezeCamera = false;
-  resetPoses() { for (const t of this.titans) { t.cheerTarget = false; t.cheer = t.windup = t.swing = t.flail = 0; } }
+  resetPoses() { this.foeVis.ok = false; for (const t of this.titans) { t.cheerTarget = false; t.cheer = t.windup = t.swing = t.flail = 0; } }
 
   private constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: true, preserveDrawingBuffer: false }, false);
@@ -263,7 +267,8 @@ export class World {
     // pull out while holding a throw, return smoothly after a short delay
     if (aiming) { this.aimHold = .3; this.aimBlend = Math.min(1, this.aimBlend + dt / .25); }
     else if ((this.aimHold -= dt) <= 0) this.aimBlend = Math.max(0, this.aimBlend - dt / .4);
-    const e = this.aimBlend * this.aimBlend * (3 - 2 * this.aimBlend), me = b.actors[0].pos;
+    this.lookBlend = this.lookBack ? Math.min(1, this.lookBlend + dt / .22) : Math.max(0, this.lookBlend - dt / .3);
+    const e = this.aimBlend * this.aimBlend * (3 - 2 * this.aimBlend), me = b.actors[0].pos, lk = this.lookBlend * this.lookBlend * (3 - 2 * this.lookBlend);
     const px = me.x, pz = Math.max(me.z, -33), lerp = (a: number, c: number) => a + (c - a) * e, lerp2 = (a: number, c: number, t: number) => a + (c - a) * t;
     const portrait = this.engine.getRenderWidth() < this.engine.getRenderHeight();
     // f: 0 at the own rear edge (arsenal), 1 at the front edge. Near the rear the camera looks further ahead so the enemy island stays readable;
@@ -275,6 +280,11 @@ export class World {
     const back = lerp2(17, 13, ease), height = lerp2(10.5, 10, ease), ahead = lerp2(-5, pz + 12, ease);
     const pos = new Vector3(lerp(px * .75, px * .4), lerp(height, 19), lerp(pz - back, pz - 21));
     const target = new Vector3(lerp(px * .5, 0), lerp(.5, 0), lerp(ahead, 14));
+    if (lk > 0) { // look back: high, in front of the titan, looking down at the own island
+      pos.x = lerp2(pos.x, px * .3, lk); pos.y = lerp2(pos.y, 23, lk); pos.z = lerp2(pos.z, Math.min(pz + 13, 7), lk);
+      target.x = lerp2(target.x, px * .3, lk); target.y = lerp2(target.y, 0, lk); target.z = lerp2(target.z, -18, lk);
+      this.camera.fov = lerp2(this.camera.fov, 54 * Math.PI / 180, lk);
+    }
     this.camera.position.copyFrom(Vector3.Lerp(this.camera.position, pos, Math.min(1, dt * 10)));
     this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, Math.min(1, dt * 10)));
   }
@@ -298,7 +308,13 @@ export class World {
   private updateTitans(b: Battle, dt: number) {
     for (const side of [0, 1] as Side[]) {
       const a = b.actors[side], t = this.titans[side], m = b.input[side];
-      t.holder.position.set(a.pos.x, a.y, a.pos.z);
+      if (side === 1 && this.smoothFoe) {
+        // online the foe jumps a little with every snapshot: draw it slightly behind its real position and glide
+        const v = this.foeVis, dx = a.pos.x - v.x, dz = a.pos.z - v.z;
+        if (!v.ok || Math.hypot(dx, dz) > 4 || a.falling) { v.x = a.pos.x; v.z = a.pos.z; v.ok = true; }
+        else { const k = Math.min(1, dt * 16); v.x += dx * k; v.z += dz * k; }
+        t.holder.position.set(v.x, a.y, v.z);
+      } else t.holder.position.set(a.pos.x, a.y, a.pos.z);
       const charging = !!b.charges[side], moving = !a.falling && a.stun <= 0 && Math.hypot(m.x, m.z) > .1 && !a.slide;
       const facing = side === 0 ? 0 : Math.PI;
       const yaw = moving && !charging ? Math.atan2(m.x, m.z) : facing;

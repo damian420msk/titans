@@ -45,7 +45,7 @@ const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
-  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел ремонт';
+  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел ремонт · C оглянуться';
   const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
   const hello = () => net.send({ t: 'hello', nick: menu.nick(), token });
   const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
@@ -140,7 +140,9 @@ async function boot() {
     }
     if (mode === 'playing' && !isPaused) {
       const b = battle, me = b.actors[0];
-      b.setMove(0, b.canAct(0) ? controls.move.x : 0, b.canAct(0) ? controls.move.z : 0);
+      // while looking back the view is turned around, so the stick is turned too
+      const flip = controls.lookHeld ? -1 : 1;
+      b.setMove(0, b.canAct(0) ? controls.move.x * flip : 0, b.canAct(0) ? controls.move.z * flip : 0);
       if (online) {
         const mx = Math.round(b.input[0].x * 100) / 100, mz = Math.round(b.input[0].z * 100) / 100;
         if ((mx !== lastMove.x || mz !== lastMove.z) && nowS - lastMove.t > .04 || nowS - lastMove.t > 1) { lastMove = { x: mx, z: mz, t: nowS }; net.send({ t: 'move', x: mx, z: mz }); }
@@ -155,7 +157,8 @@ async function boot() {
       if (!charging && b.charges[0]) { b.cancelCharge(0); if (online && nowS - pred.lastEnd > .6) { net.send({ t: 'cancel' }); pred.lastEnd = nowS; } }
       if (controls.pressed) {
         controls.pressed = false;
-        if (b.beginCharge(0)) {
+        if (controls.lookHeld) { /* the aim camera is off while looking back */ }
+        else if (b.beginCharge(0)) {
           charging = true; if (online) { net.send({ t: 'begin' }); lastTarget = ''; }
           if (controls.touch) {
             const foe = b.cellOf(1), ok = foe && b.hp(foe, 1) > 0;
@@ -186,6 +189,8 @@ async function boot() {
     }
     if (online && srvEvents.length) { battle.events.push(...srvEvents); srvEvents.length = 0; }
     const b = battle, ch = b.charges[0], kind: Kind | null = ch ? kindForHold(ch.t) : hover ? 'normal' : null;
+    world.smoothFoe = online;
+    world.lookBack = mode === 'playing' && controls.lookHeld && !charging;
     world.update(b, isPaused ? 0 : dt, { aiming: charging, kind, aimCell: ch ? ch.target : hover, cancel: controls.cancelled || controls.overCancel });
     for (const e of b.events) {
       if (e.type === 'hit' && e.side === 0) toast('Сбили с ног!'); if (e.type === 'fall' && e.side === 0) toast('Падаешь!'); if (e.type === 'fall' && e.side === 1) toast('Враг упал!');
