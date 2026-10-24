@@ -40,3 +40,7 @@ button.big{display:block;margin:12px auto 4px;padding:14px 46px;font-size:24px;f
 #tools{position:absolute;top:max(62px,calc(env(safe-area-inset-top) + 50px));left:max(14px,env(safe-area-inset-left));display:flex;gap:8px;pointer-events:auto}
 #tools button{width:42px;height:42px;padding:0;margin:0;border-radius:12px;background:rgba(32,30,58,.72);font-size:16px;line-height:1}
 @media (max-height:480px){.face{width:34px;height:34px;font-size:11px}.hearts{font-size:16px}.badge{padding:4px 12px 4px 4px;gap:8px}#timer{font-size:15px;padding:4px 12px}#tools{top:max(54px,calc(env(safe-area-inset-top) + 44px))}#tools button{width:36px;height:36px}#slots{bottom:max(120px,calc(env(safe-area-inset-bottom) + 108px))}.slot{width:28px;height:28px}#cancel{width:70px;height:70px}#repair{width:64px;height:64px}h1{font-size:30px}.panel{padding:14px 22px}p{margin:4px 0 8px}button.big{padding:10px 36px;font-size:20px}}
+
+#reconn{position:absolute;left:50%;top:max(70px,calc(env(safe-area-inset-top) + 60px));transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:20px;background:rgba(190,60,50,.92);font-weight:700;font-size:14px;z-index:4;pointer-events:none;box-shadow:0 4px 0 rgba(0,0,0,.25)}
+#reconn[hidden]{display:none}
+#reconn i{width:16px;height:16px;border-radius:50%;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;animation:spin 1s linear infinite}

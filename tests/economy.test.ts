@@ -14,7 +14,7 @@ const startRanked = (lobby: Lobby, a: Fake, b: Fake, ranked = true) => {
   lobby.handle(a, { t: 'create', name: 'R', pass: '', ranked }); lobby.handle(b, { t: 'join', id: roomId(b), pass: '' });
   lobby.handle(a, { t: 'ready', on: true }); lobby.handle(b, { t: 'ready', on: true }); lobby.tick(3.1);
 };
-const finish = (lobby: Lobby, loser: Fake) => { lobby.disconnect(loser); };
+const finish = (lobby: Lobby, loser: Fake) => { lobby.handle(loser, { t: 'leave' }); };
 
 test('a token gives a profile with defaults; without a valid token the profile is a throwaway guest', () => {
   const lobby = new Lobby(), a = player(lobby, 'Аня'); assert.equal(prof(a).rating, 1000); assert.equal(prof(a).coins, 100); assert.equal(prof(a).nick, 'Аня');
@@ -77,4 +77,26 @@ test('leaderboard lists played accounts by rating', async () => {
   const v = player(lobby, 'Вася'); lobby.handle(v, { t: 'top' }); await new Promise(r => setImmediate(r));
   const top = v.last('top')!; assert.deepEqual(top.list.map(e => e.nick), ['Аня', 'Боря']); assert.ok(top.list[0].rating > top.list[1].rating);
   lobby.handle(a, { t: 'top' }); await new Promise(r => setImmediate(r)); assert.equal(a.last('top')!.rank, 1);
+});
+
+test('a dropped saved player keeps the seat for 15 s and gets back into the running match', () => {
+  const clock = { t: 1e9 }, lobby = new Lobby(new MemoryStore(), () => clock.t), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
+  startRanked(lobby, a, b);
+  for (let i = 0; i < 60; i++) lobby.tick(1 / 60);
+  lobby.disconnect(b); assert.equal((a.last('away') as any).on, true); assert.equal(a.last('end'), undefined, 'match goes on');
+  clock.t += 5000; lobby.tick(1 / 60);
+  const b2 = player(lobby, 'Боря');
+  assert.equal(b2.last('start')!.foe, 'Аня'); assert.ok(b2.last('snap'), 'gets the state right away'); assert.equal((a.last('away') as any).on, false);
+  lobby.handle(b2, { t: 'move', x: 1, z: 0 }); for (let i = 0; i < 30; i++) lobby.tick(1 / 60); // the new connection controls the seat
+  assert.ok(b2.last('snap')!.s.a[0].x !== 0, 'b2 moves');
+  assert.equal(a.last('end'), undefined);
+});
+test('an away player who does not come back forfeits after the grace period; a guest forfeits at once', () => {
+  const clock = { t: 1e9 }, lobby = new Lobby(new MemoryStore(), () => clock.t), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
+  startRanked(lobby, a, b); lobby.tick(.5);
+  lobby.disconnect(b); clock.t += 14000; lobby.tick(.1); assert.equal(a.last('end'), undefined);
+  clock.t += 2000; lobby.tick(.1); assert.equal(a.last('end')!.reason, 'left'); assert.equal(a.last('end')!.winner, 0);
+  const g1 = fake(), g2 = fake(); lobby.connect(g1); lobby.connect(g2); lobby.handle(g1, { t: 'hello', nick: 'Г1' }); lobby.handle(g2, { t: 'hello', nick: 'Г2' });
+  lobby.handle(g1, { t: 'create', name: 'G', pass: '' }); lobby.handle(g2, { t: 'join', id: (g2.last('rooms')!.rooms as RoomInfo[]).find(r => r.name === 'G')!.id, pass: '' });
+  lobby.handle(g1, { t: 'ready', on: true }); lobby.handle(g2, { t: 'ready', on: true }); lobby.tick(3.1); lobby.disconnect(g2); assert.equal(g1.last('end')!.reason, 'left');
 });

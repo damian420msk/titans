@@ -10,7 +10,7 @@ import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayInd
 export interface Conn { send(m: S2C): void }
 type Client = {
   conn: Conn; id: string; nick: string; room: Room | null; seat: 0 | 1;
-  pid: string | null; profile: Profile | null; queuedAt: number | null; lastResult: number;
+  pid: string | null; profile: Profile | null; queuedAt: number | null; lastResult: number; away: number | null;
 };
 type Phase = 'lobby' | 'count' | 'playing';
 type Room = {
@@ -18,7 +18,7 @@ type Room = {
   phase: Phase; count: number; countLeft: number; battle: Battle | null; acc: number; sinceSnap: number; pending: GameEvent[];
 };
 
-const STEP = 1 / 60, SNAP_EVERY = 3, COUNT_FROM = 3, MAX_ROOMS = 60, BOT_RESULT_GAP_MS = 25000, FARM_LIMIT = 6, TOP_TTL_MS = 10000;
+const STEP = 1 / 60, SNAP_EVERY = 3, COUNT_FROM = 3, MAX_ROOMS = 60, BOT_RESULT_GAP_MS = 25000, FARM_LIMIT = 6, TOP_TTL_MS = 10000, GRACE_MS = 15000;
 const clean = (s: unknown, max: number) => (typeof s === 'string' ? s : '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, max);
 const FRIENDLY = { win: 30, loss: 10, draw: 15 };
 
@@ -41,13 +41,37 @@ export class Lobby {
 
   connect(conn: Conn) {
     const id = `p${(++this.seq).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-    this.clients.set(conn, { conn, id, nick: 'Игрок', room: null, seat: 0, pid: null, profile: null, queuedAt: null, lastResult: 0 });
+    this.clients.set(conn, { conn, id, nick: 'Игрок', room: null, seat: 0, pid: null, profile: null, queuedAt: null, lastResult: 0, away: null });
     conn.send({ t: 'welcome', id }); conn.send({ t: 'rooms', rooms: this.list() });
   }
 
   disconnect(conn: Conn) {
     const c = this.clients.get(conn); if (!c) return;
-    this.dequeue(c); this.leave(c); this.clients.delete(conn);
+    this.dequeue(c); this.clients.delete(conn);
+    const room = c.room, b = room?.battle;
+    // a saved account that drops in the middle of a match keeps its seat for a while: mobile networks blink
+    if (room && b && room.phase === 'playing' && b.phase === 'playing' && c.pid) {
+      c.away = this.now(); b.setMove(c.seat, 0, 0); b.cancelCharge(c.seat); b.cancelRepair(c.seat);
+      room.players[c.seat === 0 ? 1 : 0]?.conn.send({ t: 'away', on: true }); return;
+    }
+    this.leave(c);
+  }
+
+  /** A client that says hello with the token of an away player takes that seat back. */
+  private resume(c: Client) {
+    if (!c.pid || c.room) return;
+    for (const room of this.rooms.values()) for (const i of [0, 1] as const) {
+      const old = room.players[i];
+      if (!old || old.away === null || old.pid !== c.pid || room.phase !== 'playing' || !room.battle) continue;
+      old.away = null; c.room = room; c.seat = i; room.players[i] = c; c.profile = old.profile; c.nick = old.nick; c.lastResult = old.lastResult;
+      c.conn.send(this.startMsg(room, i)); const s = snapshot(room.battle); c.conn.send({ t: 'snap', s: i === 0 ? s : mirrorSnap(s), ev: [] });
+      room.players[i === 0 ? 1 : 0]?.conn.send({ t: 'away', on: false });
+      return;
+    }
+  }
+  private startMsg(room: Room, i: 0 | 1): S2C {
+    const b = room.battle!, me = room.players[i]!, foe = room.players[i === 0 ? 1 : 0]!, look = (p: Client) => (p.profile ?? newProfile('x')).eq;
+    return { t: 'start', foe: foe.nick, foeRating: foe.profile?.rating ?? 1000, mods: [b.mods[i], b.mods[i === 0 ? 1 : 0]], look: [look(me), look(foe)], ranked: room.ranked };
   }
 
   handle(conn: Conn, raw: unknown) {
@@ -83,7 +107,7 @@ export class Lobby {
       const known = this.profiles.get(pid); const prof = known ?? p ?? newProfile(pid, c.nick);
       this.profiles.set(pid, prof); c.profile = prof; if (!p && !known) this.persist(prof);
       if (prof.nick !== c.nick) { prof.nick = c.nick; this.persist(prof); }
-      this.sendProfile(c); if (c.room) this.pushRoom(c.room);
+      this.resume(c); this.sendProfile(c); if (c.room) this.pushRoom(c.room);
     };
     const cached = this.profiles.get(pid) ?? this.store.peek?.(pid);
     if (cached !== undefined) done(cached); else this.store.load(pid).then(done, e => { console.error('profile load failed', e); done(null); });
@@ -202,9 +226,7 @@ export class Lobby {
   private startMatch(room: Room) {
     const [p0, p1] = room.players as [Client, Client], m0 = modsFor(p0.profile ?? newProfile('x')), m1 = modsFor(p1.profile ?? newProfile('x'));
     room.phase = 'playing'; room.battle = new Battle([m0, m1]); room.acc = 0; room.sinceSnap = SNAP_EVERY; room.pending = [];
-    const look = (c: Client) => (c.profile ?? newProfile('x')).eq;
-    p0.conn.send({ t: 'start', foe: p1.nick, foeRating: p1.profile?.rating ?? 1000, mods: [m0, m1], look: [look(p0), look(p1)], ranked: room.ranked });
-    p1.conn.send({ t: 'start', foe: p0.nick, foeRating: p0.profile?.rating ?? 1000, mods: [m1, m0], look: [look(p1), look(p0)], ranked: room.ranked });
+    p0.conn.send(this.startMsg(room, 0)); p1.conn.send(this.startMsg(room, 1));
     this.broadcastList();
   }
 
@@ -251,6 +273,8 @@ export class Lobby {
         if (room.phase === 'count') continue;
       }
       if (room.phase !== 'playing' || !room.battle) continue;
+      const gone = room.players.find(p => p && p.away !== null && this.now() - p.away > GRACE_MS);
+      if (gone) { gone.away = null; this.leave(gone); continue; }
       const b = room.battle; room.acc += Math.min(dt, .25);
       while (room.acc >= STEP && b.phase === 'playing') {
         room.acc -= STEP; b.step(STEP); room.pending.push(...b.events); b.events.length = 0;
@@ -276,7 +300,7 @@ export class Lobby {
     this.sendProfile(p0); this.sendProfile(p1);
     room.phase = 'lobby'; room.battle = null; room.ready = [false, false]; room.pending = [];
     if (room.hidden) { for (const p of [p0, p1]) { p.room = null; p.conn.send({ t: 'room', room: null }); } this.rooms.delete(room.id); }
-    else this.pushRoom(room);
+    else { for (const p of [p0, p1]) if (p.away !== null) { p.away = null; this.leave(p); } if (this.rooms.has(room.id)) this.pushRoom(room); }
     this.broadcastList();
   }
 }

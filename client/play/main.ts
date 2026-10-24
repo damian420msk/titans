@@ -30,7 +30,7 @@ const token = (() => {
 })();
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const p = newProfile('local', r.nick); Object.assign(p, r); return { ...(p as Omit<Profile, 'id'>), dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
 let pendingResult: { level: Difficulty; won: boolean } | null = null;
-let endGain = '';
+let endGain = '', reconnectAt = 0;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 const pred = new Predictor();
@@ -68,7 +68,7 @@ async function boot() {
   net.onState = st => {
     menu.setNet(st, net.slow);
     if (st === 'on') { retries = 0; if (quickWanted) { hello(); net.send({ t: 'quick', on: true }); } }
-    if (st === 'off' && online && mode === 'playing') showEnd(1, 'conn');
+    if (st === 'off' && online && mode === 'playing') { if (!reconnectAt) { reconnectAt = performance.now(); $('reconn').hidden = false; } window.setTimeout(() => net.connect(), 700); }
     // a sleeping free server needs up to a minute: keep knocking while the player waits in the lobby
     else if (st === 'off' && !menu.hidden && retries++ < 30) window.setTimeout(() => { if (net.state === 'off' && !menu.hidden) net.connect(); }, retries < 5 ? 3000 : 8000);
   };
@@ -88,9 +88,10 @@ async function boot() {
       case 'top': menu.setTop(m.list, m.rank); break;
       case 'shop': if (mode === 'over' && !online) $('end-gain').textContent = m.text; else menu.notice(m.text); if (m.ok) sfx.repaired(); break;
       case 'queue': quickWanted = m.on; menu.setQueue(m.on); break;
-      case 'start': quickWanted = false; startMatch(m.foe, { mods: m.mods, look: m.look, rating: m.foeRating, ranked: m.ranked }); break;
+      case 'away': if (online) toast(m.on ? 'Соперник потерял связь. Ждём…' : 'Соперник вернулся'); break;
+      case 'start': quickWanted = false; if (online && mode === 'playing') { reconnectAt = 0; $('reconn').hidden = true; toast('Связь восстановлена'); break; } startMatch(m.foe, { mods: m.mods, look: m.look, rating: m.foeRating, ranked: m.ranked }); break;
       case 'snap': if (online) { pendingSnap = { s: m.s, at: performance.now() / 1000 }; srvEvents.push(...m.ev); } break;
-      case 'end': if (online && mode === 'playing') { endGain = m.gain ? `${m.gain.ranked ? (m.gain.rating >= 0 ? '+' : '') + m.gain.rating + ' рейтинг · ' : ''}+${m.gain.coins} 🪙` : ''; showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); } break;
+      case 'end': reconnectAt = 0; $('reconn').hidden = true; if (online && mode === 'playing') { endGain = m.gain ? `${m.gain.ranked ? (m.gain.rating >= 0 ? '+' : '') + m.gain.rating + ' рейтинг · ' : ''}+${m.gain.coins} 🪙` : ''; showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); } break;
     }
   };
   const startMatch = (foe?: string, info?: { mods: [Mods, Mods]; look: [Look, Look]; rating: number; ranked: boolean }) => {
@@ -126,11 +127,12 @@ async function boot() {
   const resize = () => world.engine.resize();
   window.addEventListener('resize', resize); window.visualViewport?.addEventListener('resize', resize); window.addEventListener('orientationchange', () => setTimeout(resize, 250));
   const paused = () => !online && (document.hidden || userPause || (controls.touch && innerWidth < innerHeight));
-  Object.assign(window, { titans: { battle, world, controls, setPause, state: () => ({ mode, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
+  Object.assign(window, { titans: { battle, world, net, controls, setPause, state: () => ({ mode, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
 
   world.engine.runRenderLoop(() => {
     const rawDt = world.engine.getDeltaTime() / 1000, dt = Math.min(rawDt, .05), isPaused = paused();
     $('portrait').hidden = !(controls.touch && innerWidth < innerHeight && mode === 'playing'); $('portrait-text').textContent = online ? 'Бой идёт, соперник не ждёт. Переверни телефон набок.' : 'Игра идёт в горизонтальном режиме. Бой на паузе.';
+    if (reconnectAt && performance.now() - reconnectAt > 15000) { reconnectAt = 0; $('reconn').hidden = true; if (online && mode === 'playing') showEnd(1, 'conn'); }
     if (controls.pauseRequested) { controls.pauseRequested = false; setPause($('pause').hidden === true); }
     const nowS = performance.now() / 1000;
     if (online && mode !== 'menu') {

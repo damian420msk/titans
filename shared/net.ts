@@ -46,6 +46,7 @@ export type S2C =
   | { t: 'start'; foe: string; foeRating: number; mods: [Mods, Mods]; look: [Look, Look]; ranked: boolean }
   | { t: 'snap'; s: Snap; ev: GameEvent[] }
   | { t: 'end'; winner: Side | null; reason: 'over' | 'left'; gain: { rating: number; coins: number; ranked: boolean } | null }
+  | { t: 'away'; on: boolean }
   | { t: 'pong'; n: number };
 
 type V2 = [number, number];
