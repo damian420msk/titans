@@ -1,9 +1,12 @@
 import { World } from './world';
+import { Sfx } from './audio';
 import { Controls } from './controls';
 import { Battle, kindForHold, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
 
+const sfx = new Sfx();
+const haptic = (ms: number | number[]) => { try { if (matchMedia('(pointer: coarse)').matches) navigator.vibrate?.(ms); } catch { /* optional */ } };
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('game');
 const NAMES: Record<Difficulty, string> = { easy: 'ГРОМ', normal: 'БОРГАР', hard: 'ТОРВАЛЬД' };
@@ -24,9 +27,12 @@ async function boot() {
   $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел ремонт';
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-level]')) b.onclick = () => { level = b.dataset.level as Difficulty; document.querySelectorAll('[data-level]').forEach(x => x.classList.toggle('sel', x === b)); };
   const startMatch = () => {
-    battle = new Battle(); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
+    sfx.unlock(); sfx.startMusic(); sfx.click();
+    world.resetPoses(); battle = new Battle(); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     $('foe-name').textContent = NAMES[level]; $('menu').hidden = true; $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
+  window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
+  const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
   $('start').onclick = startMatch; $('again').onclick = startMatch;
   $('to-menu').onclick = () => { $('end').hidden = true; $('hud').hidden = true; $('menu').hidden = false; mode = 'menu'; };
   $('loading').hidden = true;
@@ -95,8 +101,16 @@ async function boot() {
     world.update(b, isPaused ? 0 : dt, { aiming: charging, kind, aimCell: ch ? ch.target : hover, cancel: controls.cancelled || controls.overCancel });
     for (const e of b.events) {
       if (e.type === 'hit' && e.side === 0) toast('Сбили с ног!'); if (e.type === 'fall' && e.side === 0) toast('Падаешь!'); if (e.type === 'fall' && e.side === 1) toast('Враг упал!');
-      if (e.type === 'over') showEnd(e.winner);
+      if (e.type === 'over') { showEnd(e.winner); sfx.charge(false, 0); sfx.repair(false); if (e.winner === 0) { sfx.win(); haptic([40, 60, 40, 60, 120]); } else sfx.lose(); }
+      if (e.type === 'throw') { sfx.throwSfx(e.kind, e.side === 0); if (e.side === 0) haptic(e.kind === 'heavy' ? 40 : 18); }
+      if (e.type === 'impact') sfx.impact(e.kind, e.hpBefore, e.hpAfter, e.side === 0 ? 1 : .75);
+      if (e.type === 'hit') { sfx.hit(e.side === 0); if (e.side === 0) haptic(e.kind === 'heavy' ? [90, 40, 90] : 70); }
+      if (e.type === 'fall') { sfx.fall(e.side === 0); if (e.side === 0) haptic(200); }
+      if (e.type === 'respawn') sfx.respawn();
+      if (e.type === 'refill' && e.side === 0) sfx.refill();
+      if (e.type === 'repaired' && e.side === 0) { sfx.repaired(); haptic(30); }
     }
+    sfx.charge(mode === 'playing' && !isPaused && !!ch, ch?.t ?? 0); sfx.repair(mode === 'playing' && !isPaused && !!b.repairs[0]);
     world.handle(b.events); b.events.length = 0;
     // HUD
     if (mode !== 'menu') {

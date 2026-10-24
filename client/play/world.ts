@@ -2,7 +2,7 @@
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
-import { Vector3, Matrix } from '@babylonjs/core/Maths/math.vector';
+import { Vector3, Matrix, Quaternion } from '@babylonjs/core/Maths/math.vector';
 import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
 import { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight';
 import { DirectionalLight } from '@babylonjs/core/Lights/directionalLight';
@@ -26,7 +26,11 @@ const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', h
 const TEAM = ['#2BB8AA', '#E8634E'];
 const STONE_COLOR: Record<Kind, string> = { normal: '#C9C3B6', spin: '#E3A862', heavy: '#8E80C4' };
 type CellView = { root: TransformNode[]; intact: TransformNode; cracked: TransformNode; foundation: Mesh; shown: 'intact' | 'cracked' | 'hole'; fall: number; base: Vector3[] };
-type TitanView = { holder: TransformNode; body: TransformNode; walk: AnimationGroup | null; stone: Mesh; yaw: number; lean: number; lie: number; moving: boolean };
+type Bone = { node: TransformNode; rest: Quaternion };
+type TitanView = { holder: TransformNode; body: TransformNode; walk: AnimationGroup | null; stone: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
+  bones: Map<string, Bone>; off: Map<string, Quaternion>; windup: number; swing: number; cheer: number; flail: number; cheerTarget: boolean };
+/** Local rotation offset from Euler angles in degrees (x, y, z). */
+const rot = (x: number, y: number, z: number) => Quaternion.RotationYawPitchRoll(y * Math.PI / 180, x * Math.PI / 180, z * Math.PI / 180);
 type Particle = { mesh: Mesh; v: Vector3; life: number; max: number; gravity: number };
 
 export class World {
@@ -47,6 +51,8 @@ export class World {
   /** 0 = walking camera, 1 = aiming camera (both titan and enemy island in view). */
   aimBlend = 0;
   private aimHold = 0;
+  freezeCamera = false;
+  resetPoses() { for (const t of this.titans) { t.cheerTarget = false; t.cheer = t.windup = t.swing = t.flail = 0; } }
 
   private constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: true, preserveDrawingBuffer: false }, false);
@@ -63,6 +69,7 @@ export class World {
     w.buildMaterials();
     await w.buildIslands();
     await w.buildTitans();
+    w.scene.onAfterAnimationsObservable.add(() => w.applyBones());
     w.buildPools();
     return w;
   }
@@ -166,7 +173,10 @@ export class World {
       for (const g of c.animationGroups) g.stop();
       const walk = c.animationGroups.find(g => /walking/i.test(g.name)) ?? c.animationGroups[0] ?? null;
       const stone = this.stoneCube(.7, this.mats.stone_normal, 'held'); stone.parent = holder; stone.position.set(.8, 4.1, 0); stone.setEnabled(false); stone.material = this.mats.stone_normal;
-      this.titans[side] = { holder, body, walk, stone, yaw: side === 0 ? 0 : Math.PI, lean: 0, lie: 0, moving: false };
+      if (walk) { walk.start(false, 1, walk.from, walk.to); walk.goToFrame(walk.from + (walk.to - walk.from) * .25); walk.pause(); } // standing pose = a still frame of the walk cycle
+      const bones = new Map<string, Bone>();
+      for (const n of c.transformNodes) if (n.name.startsWith('mixamorig:') && n.rotationQuaternion) bones.set(n.name.slice(10), { node: n, rest: n.rotationQuaternion.clone() });
+      this.titans[side] = { holder, body, walk, stone, yaw: side === 0 ? 0 : Math.PI, lean: 0, lie: 0, moving: false, bones, off: new Map(), windup: 0, swing: 0, cheer: 0, flail: 0, cheerTarget: false };
     }
   }
 
@@ -221,7 +231,19 @@ export class World {
     this.shadows.getShadowMap()!.renderList = this.casters;
   }
 
+  /** Procedural posing on top of the Mixamo walk cycle (idle = rest pose). Runs after animations, before skinning. */
+  private applyBones() {
+    for (const t of this.titans) {
+      if (!t) continue;
+      for (const [name, bone] of t.bones) {
+        if (!t.moving) bone.node.rotationQuaternion!.copyFrom(bone.rest);
+        const o = t.off.get(name); if (o) bone.node.rotationQuaternion!.multiplyToRef(o, bone.node.rotationQuaternion!);
+      }
+    }
+  }
+
   private updateCamera(b: Battle, dt: number, aiming: boolean) {
+    if (this.freezeCamera) return;
     // pull out while holding a throw, return smoothly after a short delay
     if (aiming) { this.aimHold = .3; this.aimBlend = Math.min(1, this.aimBlend + dt / .25); }
     else if ((this.aimHold -= dt) <= 0) this.aimBlend = Math.max(0, this.aimBlend - dt / .4);
@@ -278,6 +300,7 @@ export class World {
         else if (!moving && t.moving) { t.walk.stop(); }
         t.walk.speedRatio = charging ? .6 : 1; t.moving = moving;
       }
+      this.poseTitan(t, side, a, !!b.charges[side], dt);
       const ch = b.charges[side];
       t.stone.setEnabled(!!ch && !a.falling);
       if (ch) {
@@ -288,6 +311,28 @@ export class World {
         t.stone.position.y = 4.0 + grow * .3;
       }
     }
+  }
+
+  /** Arm and torso posing: wind-up while charging, snap forward on release, cheer on victory, flail while falling. */
+  private poseTitan(t: TitanView, side: Side, a: { falling: boolean; stun: number }, charging: boolean, dt: number) {
+    const k = (rate: number) => Math.min(1, dt * rate);
+    t.windup += ((charging && !a.falling ? 1 : 0) - t.windup) * k(14);
+    t.swing = Math.max(0, t.swing - dt / .32);
+    const swing = t.swing > 0 ? Math.min(1, (1 - t.swing) * 3.2) : 0;       // 0 -> 1 quickly right after release, then relaxes
+    t.cheer += ((t.cheerTarget ? 1 : 0) - t.cheer) * k(6);
+    t.flail += ((a.falling ? 1 : 0) - t.flail) * k(10);
+    const f = t.flail, c = t.cheer, w = t.windup * (1 - swing), sw = t.swing > 0 ? 1 : 0;
+    const bob = Math.sin(this.time * 9 + side), flailS = Math.sin(this.time * 17 + side * 2);
+    // right (throwing) arm
+    const rx = -40 * w + 95 * swing * sw, rz = -110 * w - 25 * swing * sw - 150 * c - (100 + 45 * flailS) * f, rfx = -90 * w + 0 * swing;
+    t.off.set('RightArm', rot(rx, 0, rz));
+    t.off.set('RightForeArm', rot(rfx + 25 * f * flailS, 0, 0));
+    // left arm mirrors cheer / flail, otherwise hangs and counter-balances
+    t.off.set('LeftArm', rot(10 * w - 25 * swing, 0, 150 * c + (100 - 45 * flailS) * f + 18 * w));
+    // torso twists back while winding up and unwinds through the throw
+    const twist = 24 * w - 30 * swing * sw;
+    t.off.set('Spine', rot(0, twist * .6, 0)); t.off.set('Spine1', rot(0, twist * .4, 0));
+    t.off.set('Head', rot(c * -12 + f * 18, 0, c * bob * 4));
   }
 
   private updateShots(b: Battle, dt: number) {
@@ -334,7 +379,8 @@ export class World {
       }
       if (e.type === 'hit') { const t = this.titans[e.side].holder.position; for (let i = 0; i < 10; i++) this.burst({ x: t.x, z: t.z }, .9, this.mats.dust, 1.5); }
       if (e.type === 'repaired') { const c = cellCentre(e.cell, e.side); for (let i = 0; i < 10; i++) this.burst(c, .6, this.mats.sky, 2.2); }
-      if (e.type === 'throw') { this.titans[e.side].lean = .5; }
+      if (e.type === 'throw') { this.titans[e.side].lean = .5; this.titans[e.side].swing = 1; }
+      if (e.type === 'over') { this.titans[0].cheerTarget = e.winner === 0; this.titans[1].cheerTarget = e.winner === 1; }
     }
   }
   private burst(c: Point, power: number, material: StandardMaterial, y = .2) {
