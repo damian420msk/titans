@@ -1,0 +1,82 @@
+[
+  {
+    "file": "assets/01_battle_single_cell.png",
+    "caption": "Обычный бросок: задняя камера, одна выбранная клетка, лица и жизни.",
+    "kind": "gameplay",
+    "width_px": 1672,
+    "height_px": 941,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  },
+  {
+    "file": "assets/02_battle_two_cells.png",
+    "caption": "Зарядка: две отдельные клетки и кольцо силы.",
+    "kind": "gameplay",
+    "width_px": 1672,
+    "height_px": 941,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  },
+  {
+    "file": "assets/03_repair.png",
+    "caption": "Ремонт соседней клетки: собственный арсенал остаётся в тылу.",
+    "kind": "gameplay",
+    "width_px": 1672,
+    "height_px": 941,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  },
+  {
+    "file": "assets/04_incoming_stone.png",
+    "caption": "Входящий камень: чужой приватный прицел не отображается.",
+    "kind": "gameplay",
+    "width_px": 1672,
+    "height_px": 941,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  },
+  {
+    "file": "assets/05_rear_arsenal.png",
+    "caption": "Поворот назад к арсеналу; ранний вариант художественного окружения.",
+    "kind": "reference",
+    "width_px": 1672,
+    "height_px": 941,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  },
+  {
+    "file": "assets/06_modes_menu.png",
+    "caption": "Три режима: бот, подбор соперника, комната с другом. Название допустимо в меню.",
+    "kind": "menu",
+    "width_px": 1672,
+    "height_px": 941,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  },
+  {
+    "file": "assets/07_titan_teal_turnaround.png",
+    "caption": "Бирюзовый титан: перед, бок и спина.",
+    "kind": "character",
+    "width_px": 1536,
+    "height_px": 1024,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  },
+  {
+    "file": "assets/08_titan_coral_turnaround.png",
+    "caption": "Коралловый соперник: перед, бок и спина.",
+    "kind": "character",
+    "width_px": 1536,
+    "height_px": 1024,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  },
+  {
+    "file": "assets/09_environment_kit.png",
+    "caption": "Модульное окружение: состояния пола, арсенал, граница и постоянная площадка.",
+    "kind": "environment",
+    "width_px": 1536,
+    "height_px": 1024,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  },
+  {
+    "file": "assets/10_protected_supply_zone.png",
+    "caption": "За арсеналом три защищённые клетки у открытого обрыва, без стены.",
+    "kind": "environment",
+    "width_px": 1672,
+    "height_px": 941,
+    "status": "AI-generated concept; not shipped gameplay or production 3D asset"
+  }
+]

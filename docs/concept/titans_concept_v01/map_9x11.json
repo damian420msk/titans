@@ -1,0 +1,897 @@
+{
+  "arena_local": true,
+  "cell_size_m": 2.8,
+  "cells": [
+    {
+      "x": 0,
+      "z": 0,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 0,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 0,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 0,
+      "role": "protected",
+      "walkable": true,
+      "destructible": false,
+      "hp": null,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 0,
+      "role": "protected",
+      "walkable": true,
+      "destructible": false,
+      "hp": null,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 0,
+      "role": "protected",
+      "walkable": true,
+      "destructible": false,
+      "hp": null,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 0,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 0,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 0,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 1,
+      "role": "arsenal",
+      "walkable": false,
+      "destructible": false,
+      "hp": null,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 4,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 4,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 4,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 4,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 4,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 4,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 4,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 4,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 4,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 5,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 5,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 5,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 5,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 5,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 5,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 5,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 5,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 5,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 6,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 6,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 6,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 6,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 6,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": true
+    },
+    {
+      "x": 5,
+      "z": 6,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 6,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 6,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 6,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 7,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 7,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 7,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 7,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 7,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 7,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 7,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 7,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 7,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 8,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 8,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 8,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 8,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 8,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 8,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 8,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 8,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 8,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 9,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 9,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 9,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 9,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 9,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 9,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 9,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 9,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 9,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 10,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 10,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 10,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 10,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 10,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 10,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 10,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 10,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 10,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    }
+  ]
+}

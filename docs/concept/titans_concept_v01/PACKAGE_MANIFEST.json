@@ -1,0 +1,115 @@
+{
+  "version": "0.1",
+  "files": [
+    {
+      "path": "DEVELOPMENT_HANDOFF_RU.md",
+      "bytes": 7134,
+      "sha256": "0e85b96c4c6232495b7dee64195595f703124a740aa9f5e3251df51074a635fd"
+    },
+    {
+      "path": "GAME_CONCEPT_RU.md",
+      "bytes": 64668,
+      "sha256": "7183000ea5b2d83c4d731320db5fe35ee7a27c49f4a5dce29e92245d8bc8c4a2"
+    },
+    {
+      "path": "PLAYTEST_CASES_RU.md",
+      "bytes": 7559,
+      "sha256": "2e62381ba19e2b6d47c37982dd6d502e939dff72c0f41f509844b8c7cbdf9c8c"
+    },
+    {
+      "path": "README_RU.md",
+      "bytes": 3120,
+      "sha256": "e9b8a84815fb9139e69a6d1a05b5493d12e223648d73e225b8cb2347c8aa89de"
+    },
+    {
+      "path": "TITANS_GAME_CONCEPT_v01_RU.docx",
+      "bytes": 19921727,
+      "sha256": "743d77722b007d00e9a3d14a19a6a65955ad91a025ed8f2dbb4de8e012c3f2e3"
+    },
+    {
+      "path": "assets/01_battle_single_cell.png",
+      "bytes": 2203265,
+      "sha256": "4788291c14eb0a93f3e0bb70dc864f1eb5fd485ee1fc08f52570459d9bd7552a"
+    },
+    {
+      "path": "assets/02_battle_two_cells.png",
+      "bytes": 2276635,
+      "sha256": "82f74d0821bfa2f4797ef734a3d05dbd800c554fc4ec8470a58d662babc82de9"
+    },
+    {
+      "path": "assets/03_repair.png",
+      "bytes": 2221187,
+      "sha256": "c6c32aa25780c586c8d04e56e2a14de6d8f093941a109098dc5716972bee99df"
+    },
+    {
+      "path": "assets/04_incoming_stone.png",
+      "bytes": 2173874,
+      "sha256": "6fb602a371607396d0fe7450d41c7e45ec766b479b077c2055920a19ba4a2f88"
+    },
+    {
+      "path": "assets/05_rear_arsenal.png",
+      "bytes": 2297506,
+      "sha256": "64b50efa87cc3fa133f6339a2c0dab28cfd41a5fac993af3f80d6390457831fd"
+    },
+    {
+      "path": "assets/06_modes_menu.png",
+      "bytes": 1932723,
+      "sha256": "faf0e04af3413e13940a7bd5119c10b6376ba46415cb434c7744d2f7e2da36b3"
+    },
+    {
+      "path": "assets/07_titan_teal_turnaround.png",
+      "bytes": 1714769,
+      "sha256": "b9b3e2e26b4a5d204f487702beb6fe0c3f94278ec2225758bc5f603cf5978767"
+    },
+    {
+      "path": "assets/08_titan_coral_turnaround.png",
+      "bytes": 1680335,
+      "sha256": "f2338415e769bb57daab6c04a4c30ef47a0b80453827781f82ced6a29a669fb3"
+    },
+    {
+      "path": "assets/09_environment_kit.png",
+      "bytes": 1825222,
+      "sha256": "0bb7ffa58c50d92bfd173aba30a927f02b3f191c58ee0597b99e98e4f9c8026f"
+    },
+    {
+      "path": "assets/10_protected_supply_zone.png",
+      "bytes": 2304598,
+      "sha256": "c64ecc7796e6a73176c95d8e37257d76b972d55b8cc8d40adffc193637b02367"
+    },
+    {
+      "path": "assets_manifest.json",
+      "bytes": 3324,
+      "sha256": "4011945c8d630d5b089a796db41c25fa170ca382ac214fc8ec20d10bba7bb6fe"
+    },
+    {
+      "path": "map_9x11.csv",
+      "bytes": 3030,
+      "sha256": "006a26e735e521e50f72974e0d34ffcf37ba0b52283a78c05cdaea6e47e1e1a8"
+    },
+    {
+      "path": "map_9x11.json",
+      "bytes": 15247,
+      "sha256": "43133582863ccbfd81fdd5668fd89834f6c35441a23f33e3d9fc8279a35a80c7"
+    },
+    {
+      "path": "map_9x11.png",
+      "bytes": 197270,
+      "sha256": "d21d80f0c7527e5dfa077ad72e16f354f1aeb84a0d07342476c247ece223cbff"
+    },
+    {
+      "path": "map_9x11.svg",
+      "bytes": 119517,
+      "sha256": "df637473a46dfd2141f5fbcf08d0bf9e7d69106a9a5ed431faf4137190a6f32e"
+    },
+    {
+      "path": "rules_v01.json",
+      "bytes": 5438,
+      "sha256": "d60b926af2a3b67e712d185f36172aa751acb3f831b8788077d548b0ee803117"
+    },
+    {
+      "path": "scale_and_arc.png",
+      "bytes": 92607,
+      "sha256": "0365422674aadb2fdb55145c3d361bdab392ae5dc6f7e4888edf4f1849820e77"
+    }
+  ]
+}

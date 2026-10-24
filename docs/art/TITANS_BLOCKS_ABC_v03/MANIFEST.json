@@ -1,0 +1,154 @@
+{
+  "A/models/tile_a_cracked.glb": {
+    "bytes": 106844,
+    "sha256": "4fc162c6d2672313eef04ad6712382d3b045cc033b82afd336afaf14910c833b"
+  },
+  "A/models/tile_a_fragments.glb": {
+    "bytes": 90260,
+    "sha256": "a2a23cad13c51e240991431e35e0daee29adfccf4805d7ada2029b0fc86bcccf"
+  },
+  "A/models/tile_a_intact.glb": {
+    "bytes": 65660,
+    "sha256": "e98f7370fd7f9136355e813f6e25136ad5a6a9296fd47e3f63e5ec02b06f28b0"
+  },
+  "A/previews/block_a_overview.png": {
+    "bytes": 223252,
+    "sha256": "272ce43f8cc1ee43351fce995b520a44fccac40edee4bc37ca76244657b3019d"
+  },
+  "A/previews/tile_a_cracked.png": {
+    "bytes": 86855,
+    "sha256": "14028f0f7b1472f9f972d1691973b05e986a7c0eb87f2410fa2249e43940283f"
+  },
+  "A/previews/tile_a_fragments.png": {
+    "bytes": 85172,
+    "sha256": "035e4e71fc253fbb3f3bbeb7531ce9e09d3cab45774dc74d5d51f1a1e37b739e"
+  },
+  "A/previews/tile_a_intact.png": {
+    "bytes": 67144,
+    "sha256": "cb27a7645f11384a3a29e090a5f8870f5abad5b25f37825278f0061a3ee0bf78"
+  },
+  "A/textures/sandstone_a_basecolor.png": {
+    "bytes": 35017,
+    "sha256": "e4bd505f7e7f6e50981ff0d6af2024e55f7a50eafe90ab683e5f4728c8de1646"
+  },
+  "A/tools/build_block_a02.py": {
+    "bytes": 11494,
+    "sha256": "9418206efc3795b1cb42ffba4d0d121b3348d05dadaab05b15f27c079d028ca7"
+  },
+  "A/tools/create_blender_source.py": {
+    "bytes": 2069,
+    "sha256": "ea9bfa1905258835f7b4b7dafb16ce084c64fd3b4e9e592473d2cc03119f6594"
+  },
+  "A/tools/geometry.json": {
+    "bytes": 237461,
+    "sha256": "88116dac875347e9fe0a17b40c6e52981ac23d032e906502ad09f5716170225b"
+  },
+  "B/models/tile_b_cracked.glb": {
+    "bytes": 111260,
+    "sha256": "5125162a9b1eb96df4ff6cd4db5e802b4c46d94f865010d78974062aa8e47e15"
+  },
+  "B/models/tile_b_fragments.glb": {
+    "bytes": 98112,
+    "sha256": "bf37d7653ef3a9a268cb9ee0dcc813ac3389415b5fd082fdb56fc30452d64b28"
+  },
+  "B/models/tile_b_intact.glb": {
+    "bytes": 64676,
+    "sha256": "c5b2239d39ed3cbe6b3072b879ab4d10ef24145f9076e18142d3f3d55b3b25c8"
+  },
+  "B/previews/block_b_overview.png": {
+    "bytes": 231789,
+    "sha256": "7cb3a736865f5f396133cde7c78f0a146e0ea44ff23a4f30a813637b21922ba2"
+  },
+  "B/previews/tile_b_cracked.png": {
+    "bytes": 89892,
+    "sha256": "0b834af7623053436584c349ea897eb2b307daf52c973e992512188eea4015e6"
+  },
+  "B/previews/tile_b_fragments.png": {
+    "bytes": 91042,
+    "sha256": "1522f86cb32bd8ebe79cdc93893ff47466773a878cc39f72197362535c1f8001"
+  },
+  "B/previews/tile_b_intact.png": {
+    "bytes": 66585,
+    "sha256": "9f468dab4b774e8d99867083a02618434a0b7c96cddee6702ee9c82ca739fecb"
+  },
+  "B/textures/sandstone_b_basecolor.png": {
+    "bytes": 34004,
+    "sha256": "6212f2314566395c8ef44f5f2f5e5bb6c4d5d884b3e00a18910b7f642a63cb87"
+  },
+  "B/tools/build_block_b.py": {
+    "bytes": 11522,
+    "sha256": "f21b0a967518ddce395ed2e06d0c35ebf17e501a4fae49e59a7dbfeaa164ec11"
+  },
+  "B/tools/create_blender_source.py": {
+    "bytes": 2069,
+    "sha256": "0687a10b2854233f2d81326bc81bd0daf6bf4e6c3a1e1cb35ba20a148ecee2df"
+  },
+  "B/tools/geometry.json": {
+    "bytes": 256702,
+    "sha256": "382c23bc270b5ec4e5d426d152dcbcf42d101b8c08982cb1f439645a433a897c"
+  },
+  "C/models/tile_c_cracked.glb": {
+    "bytes": 118168,
+    "sha256": "813ff74e0e47f551bda4e186db9241ade0d312645fb489b796590354455e859c"
+  },
+  "C/models/tile_c_fragments.glb": {
+    "bytes": 108484,
+    "sha256": "679149d3162de73446009ef35a1cea2b057e73f695bb22b294376be038c32eaf"
+  },
+  "C/models/tile_c_intact.glb": {
+    "bytes": 66180,
+    "sha256": "63512908ba87dcb1ad010ad5841f0203ef23e6584a504fa1dbe484b37f031bb2"
+  },
+  "C/previews/block_c_overview.png": {
+    "bytes": 245104,
+    "sha256": "cc1549e8eb04a3b5aa5dd03285477f1e8393b50b3fa93deeec79d67194e917fc"
+  },
+  "C/previews/tile_c_cracked.png": {
+    "bytes": 95727,
+    "sha256": "422e940da102000d6495c082c1947f929d00392a78bfb94a6f2493f40e630c4d"
+  },
+  "C/previews/tile_c_fragments.png": {
+    "bytes": 98183,
+    "sha256": "ece1324354567d6326806e15b28b783ea2775f2c85da5fc67ed9e3152f463208"
+  },
+  "C/previews/tile_c_intact.png": {
+    "bytes": 67364,
+    "sha256": "fee804fce18796cbf68073ff418ed35b04f4a425b9f0c3861d88f202552d7b5e"
+  },
+  "C/textures/sandstone_c_basecolor.png": {
+    "bytes": 35505,
+    "sha256": "ec1b59aa8c8daabaa6b16dd424b6214c72f94b8fbe6cd50927f641d3decea9e6"
+  },
+  "C/tools/build_block_c.py": {
+    "bytes": 11525,
+    "sha256": "8cb92a9295452194a6df83373dba63baa6d72cd5d6022f5e46cb5b7eaff4ddc3"
+  },
+  "C/tools/create_blender_source.py": {
+    "bytes": 2069,
+    "sha256": "7b10ac08e241f1ea419f4f651ecc48447e8eeb59d571c30e6e6a705a06c5dd32"
+  },
+  "C/tools/geometry.json": {
+    "bytes": 277280,
+    "sha256": "19fd08d89730c113c5ff4fa72e858f617575c25767830baf36f2a05806db8572"
+  },
+  "CODEX_TASK_RU.md": {
+    "bytes": 5364,
+    "sha256": "a07ce7a863b470eabb2d3d58a55ab574ddfafa99a5a928039ba35a15d86d36a4"
+  },
+  "README_RU.md": {
+    "bytes": 3612,
+    "sha256": "b5108f87dbbcf5e6205edfd6ba4e6067f7996ef6c3675eaa1dc9038785666023"
+  },
+  "VALIDATION.json": {
+    "bytes": 3798,
+    "sha256": "03e95c42d8cbf0e32b7180105d85e6f0ec538d728bda6faf55f480bcf1574590"
+  },
+  "reference/abc_style_target.png": {
+    "bytes": 1789380,
+    "sha256": "76d3827d71491dde6ee34079eb92a881ddbc4eacdd15e2e834bf3f8eade2dbdb"
+  },
+  "reference/platform_style_target.png": {
+    "bytes": 1929459,
+    "sha256": "e4a986d92c00cdfc89cefa3b47d0f054c5ad5e95ccd61241ae68fd395e525476"
+  }
+}

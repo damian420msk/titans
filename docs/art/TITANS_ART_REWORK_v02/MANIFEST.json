@@ -1,0 +1,102 @@
+{
+  "ASSESSMENT_RU.md": {
+    "bytes": 6960,
+    "sha256": "d55fe422ee50c88cb5c6a492b00da672a2510b29071708d750d6b1644ce2580f"
+  },
+  "CODEX_TASK_RU.md": {
+    "bytes": 10889,
+    "sha256": "9b6c72cb4ed3c0d541ee5f643e96f4a5caf65f7dce94385304aa9b95a2a69cf8"
+  },
+  "README_RU.md": {
+    "bytes": 8107,
+    "sha256": "12143b2c7f50d6785661bef8eaaf08f09fd633a668fdcf3442071c783d97ac20"
+  },
+  "characters/VALIDATION.json": {
+    "bytes": 1058,
+    "sha256": "0e193f7da94b607167c97419d2765f14d53f8d0bcba125df16ef992d44a8d2df"
+  },
+  "characters/VALIDATION_VTK.json": {
+    "bytes": 1406,
+    "sha256": "85acdab744f3b5ede32f8b7ab5d47177cec79f1b1e9a374976ed7bff5228cd88"
+  },
+  "characters/models/titan_coral_v02.glb": {
+    "bytes": 646132,
+    "sha256": "b08dc3f6ef0159c740f564a53ed6af89c8911aa870d2ef2e6cc25a677eea961b"
+  },
+  "characters/models/titan_teal_v02.glb": {
+    "bytes": 676968,
+    "sha256": "df3149365a71c5c0537e631d311591a5e5c3cb0653412ae56d1267915bfe67f1"
+  },
+  "characters/previews/animation_preview.gif": {
+    "bytes": 724072,
+    "sha256": "87b9f836ad2286bfd96a2dfb02950865c1ac8111777d6c23e874d32fbf7ff3e6"
+  },
+  "characters/previews/characters_pair_v02.png": {
+    "bytes": 136274,
+    "sha256": "8ded02876e4cff85ce8d28374140ab3a9cc90d14ee1049e11f904273c502bd8f"
+  },
+  "characters/previews/characters_turnaround.png": {
+    "bytes": 381323,
+    "sha256": "c21a259abfba5c6b858acf8542df9bf2a69ad910cf156fa642976dc5eca8d7b8"
+  },
+  "characters/previews/coral_back.png": {
+    "bytes": 60988,
+    "sha256": "21ac8e337b87a1a134e110bc7718cbb214b79975b3841a077be761917f3fd30a"
+  },
+  "characters/previews/coral_front.png": {
+    "bytes": 78596,
+    "sha256": "dd900847c326dd1c54802135d512a41d5bbebb7b286f730198b3d34c50b484d9"
+  },
+  "characters/previews/coral_side.png": {
+    "bytes": 45985,
+    "sha256": "6c08086d3cea1fc94fb2cf364a5678dfe8b23d561c464eeeca6c24b4b73062f8"
+  },
+  "characters/previews/coral_threequarter.png": {
+    "bytes": 80066,
+    "sha256": "b25aa603608c8765d6074a36094ec417217a995905ba3302a454844ec75175d8"
+  },
+  "characters/previews/teal_back.png": {
+    "bytes": 67073,
+    "sha256": "5567a626a4a707dfd27049be181a5e6690a518c17a5db7069d9cc9983b925d6b"
+  },
+  "characters/previews/teal_front.png": {
+    "bytes": 77348,
+    "sha256": "7b71c3b878e36651b9dd0b946ac5a9e8f8ad6e14b35a29ede7c9d28c3f0ed5d0"
+  },
+  "characters/previews/teal_side.png": {
+    "bytes": 51100,
+    "sha256": "712ffff916244d60f057962e1519c45d5b8200512efe5474a71081ffb072f6e2"
+  },
+  "characters/previews/teal_threequarter.png": {
+    "bytes": 79178,
+    "sha256": "edd53f13ce4261629579e5b0c5bb84e372796d20d224542634b51d9ee20a3b83"
+  },
+  "characters/previews/throw_pose_v02.png": {
+    "bytes": 85475,
+    "sha256": "7f4a8230f0d3b2271eaf7eb1056a98ce4aabfed23e1f584c61ac7ee148f742ba"
+  },
+  "characters/tools/build_characters.py": {
+    "bytes": 23139,
+    "sha256": "73cbb3df94babef19ee2c0d7e0a0572650533f7e043ec058c1b27eaee47771ca"
+  },
+  "characters/tools/create_blender_source.py": {
+    "bytes": 685,
+    "sha256": "d0e12872dfb6cf7d5bf83517d289f84802378e18f3f2054aefcdef8210e119fd"
+  },
+  "characters/tools/requirements.txt": {
+    "bytes": 23,
+    "sha256": "135760c3c8c8eda1e570f62813203415325887e097768ff4e3885a800ea8101c"
+  },
+  "characters/tools/validate_preview.py": {
+    "bytes": 5380,
+    "sha256": "a7ad1c7ef871f2b2b14b2412d6cb5421f1323c0c432d3aafd69b0740c8ee1996"
+  },
+  "characters/tools/validate_vtk.py": {
+    "bytes": 1798,
+    "sha256": "0ebcb51323aada8ba4ae3032f0ddcfae3318976874da26c1fbe4c4a0e1803c9d"
+  },
+  "reference/approved_style.png": {
+    "bytes": 1585467,
+    "sha256": "75a8c3b6611b67e069c609e8d03014766450ac98e6cb88cba60cb7eb83fd9763"
+  }
+}

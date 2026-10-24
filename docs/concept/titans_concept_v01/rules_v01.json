@@ -1,0 +1,192 @@
+{
+  "version": "0.1",
+  "date": "2026-10-23",
+  "status": "proposed_playtest_baseline",
+  "units": {
+    "distance": "metres",
+    "duration": "seconds",
+    "coordinates": "arena-local [x,z], rear to front"
+  },
+  "arena": {
+    "width_cells": 9,
+    "depth_cells": 11,
+    "cell_size_m": 2.8,
+    "gap_between_front_edges_m": 6.0,
+    "arsenal_cell": [
+      4,
+      1
+    ],
+    "protected_cells": [
+      [
+        3,
+        0
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        5,
+        0
+      ]
+    ],
+    "spawn_cell": [
+      4,
+      6
+    ],
+    "opponent_rotation_degrees": 180,
+    "start_normal_cell_hp": 2,
+    "arsenal_walkable": false,
+    "protected_walkable": true,
+    "boundary_rails": false,
+    "initial_holes": []
+  },
+  "character": {
+    "height_m": 2.0,
+    "body_width_approx_m": 1.1,
+    "collision_radius_m": 0.45,
+    "walk_speed_mps": 5.0,
+    "charge_speed_mps": 3.0,
+    "support_test": "foot_centre_cell",
+    "jump_enabled": false,
+    "dash_enabled": false,
+    "support_sweep": "check travelled segment; diagonal corner between two missing orthogonal cells loses support"
+  },
+  "camera": {
+    "distance_m": 5.0,
+    "height_above_floor_m": 3.2,
+    "fov_normal_degrees": 70,
+    "fov_aim_degrees": 62,
+    "aim_transition_s": 0.2,
+    "zoom_can_be_disabled": true
+  },
+  "inventory": {
+    "capacity": 3,
+    "round_start": 3,
+    "shot_cost": 1,
+    "repair_cost": 1,
+    "catch_at_capacity": "consume_incoming_without_inventory_gain"
+  },
+  "shot": {
+    "min_release_interval_s": 1.1,
+    "flight_duration_s": 1.4,
+    "arc_height_above_chord_m": 6.0,
+    "target_locks_on_release": true,
+    "aim_preview_private": true,
+    "target_pair_rule": "target plus local x+1; at x=8 use x-1",
+    "damage_applied_to_pair_simultaneously": true,
+    "character_effect_once_per_shot": true,
+    "free_body_collision_changes_target": false,
+    "types": {
+      "normal": {
+        "rank": 1,
+        "hold_from_s": 0.0,
+        "hold_until_s": 0.9,
+        "cell_count": 1,
+        "damage_per_cell": 1,
+        "knockback_cells": 0.75,
+        "hand_catchable": true
+      },
+      "spin": {
+        "rank": 2,
+        "hold_from_s": 0.9,
+        "hold_until_s": 2.6,
+        "cell_count": 2,
+        "damage_per_cell": 1,
+        "knockback_cells": 0.75,
+        "hand_catchable": false
+      },
+      "heavy": {
+        "rank": 3,
+        "hold_from_s": 2.6,
+        "hold_until_s": null,
+        "cell_count": 2,
+        "damage_per_cell": 2,
+        "knockback_cells": 1.25,
+        "hand_catchable": false
+      }
+    },
+    "collision": {
+      "equal_rank": "destroy_both",
+      "unequal_rank": "stronger_continues_unchanged",
+      "requires_actual_intersection": true
+    },
+    "cooldown_blocks_new_charge": true,
+    "press_during_cooldown": "ignore_without_queue",
+    "knockdown_cancels_unreleased_charge": true,
+    "after_cancel_requires_fresh_press": true
+  },
+  "defense": {
+    "active_window_s": 0.35,
+    "cooldown_from_press_s": 1.0,
+    "max_catches_per_press": 1,
+    "front_sector_degrees": 120,
+    "reach_from_character_centre_m": 1.6,
+    "min_stone_height_m": 0.3,
+    "max_stone_height_m": 2.4,
+    "cancel_primary": true,
+    "auto_repeat_on_hold": false
+  },
+  "recovery": {
+    "knockdown_and_stand_s": 0.55,
+    "post_recovery_stability_s": 0.5,
+    "retrigger_extends_knockdown": false,
+    "floor_damage_during_stability": true
+  },
+  "interaction": {
+    "arsenal_range_m": 3.4,
+    "refill_per_stone_s": 0.7,
+    "repair_cracked_s": 1.0,
+    "repair_hole_s": 2.2,
+    "repair_reaches": "one orthogonal neighbour only",
+    "repair_result_hp": 2,
+    "resource_spent_at": "completion",
+    "cancel_on_move_hit_or_defense": true,
+    "emergency_stone_s": 5.0,
+    "emergency_requires_empty_inventory": true,
+    "primary_context_locked_on_press": true,
+    "arsenal_range_reference": "horizontal distance from character centre to nearest point of cell R square"
+  },
+  "storm": {
+    "starts_at_round_s": 180,
+    "warning_s": 1.2,
+    "initial_interval_s": 4,
+    "accelerates_after_s": 20,
+    "accelerated_interval_s": 2,
+    "same_cadence_both_sides": true,
+    "exclude_cells": [
+      "arsenal",
+      "protected"
+    ],
+    "selection": "existing destructible tile reachable from titan; prefer nearby",
+    "repairable_until_round_reset": false,
+    "rim_contact_damage": false
+  },
+  "match": {
+    "lives_per_player": 3,
+    "countdown_s": 3,
+    "round_limit_s": 240,
+    "active_match_limit_s": 480,
+    "simultaneous_deaths": "draw_round_no_life_loss",
+    "round_timeout": "draw_round_no_life_loss",
+    "match_timeout": "more_lives_wins_else_draw",
+    "round_reset": "restore_all_floor_and_inventory_remove_projectiles"
+  },
+  "online": {
+    "state_authority": "single_shared_source_of_results; provider TBD",
+    "disconnect_grace_s": 10,
+    "grace_uses_per_player": 1,
+    "resume_countdown_s": 3,
+    "second_disconnect_or_expiry": "technical_match_loss",
+    "both_disconnected": "unconfirmed_no_awarded_victory",
+    "matchmaking_bot_offer_after_s": 20,
+    "empty_private_room_expiry_s": 600,
+    "bot_disclosed": true
+  },
+  "design_notes": [
+    "Numbers are initial hypotheses, not validated balance.",
+    "No engine or transport is selected.",
+    "Projectile collision volume and network compensation require a technical test.",
+    "Artwork is illustrative; geometry and rules use this file and GAME_CONCEPT_RU.md."
+  ]
+}
