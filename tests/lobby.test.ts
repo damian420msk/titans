@@ -58,7 +58,7 @@ test('leaving mid-match gives the other player the win; host leaving moves the g
   const { lobby, a, b } = setup();
   lobby.handle(a, { t: 'create', name: 'R', pass: '' }); lobby.handle(b, { t: 'join', id: b.last('rooms')!.rooms[0].id, pass: '' });
   lobby.handle(a, { t: 'ready', on: true }); lobby.handle(b, { t: 'ready', on: true }); lobby.tick(3.1);
-  lobby.disconnect(a); assert.deepEqual(b.last('end'), { t: 'end', winner: 0, reason: 'left' });
+  lobby.disconnect(a); assert.equal(b.last('end')!.winner, 0); assert.equal(b.last('end')!.reason, 'left');
   assert.equal(roomOf(b)!.me, 0); assert.equal(roomOf(b)!.seats[1], null);
   lobby.handle(b, { t: 'leave' }); assert.equal(lobby.stats.rooms, 0);
 });

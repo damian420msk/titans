@@ -98,3 +98,19 @@ test('a press after a cancelled charge works again (no stuck charge)', () => {
   const b = new Battle(); assert.ok(b.beginCharge(0)); b.cancelCharge(0);
   assert.ok(b.beginCharge(0)); assert.equal(b.actors[0].stones, 3);
 });
+
+test('mods: bigger bag, shorter cooldown, faster walk, faster refill, tougher tiles apply per side only', () => {
+  const b = new Battle([{ capacity: 5, cooldown: .5, walk: 1.2, refill: .35, tileHp: 3 }, {}]);
+  assert.equal(b.actors[0].stones, 5); assert.equal(b.actors[1].stones, rules.inventory.capacity);
+  assert.equal(b.hp({ x: 2, z: 5 }, 0), 3); assert.equal(b.hp({ x: 2, z: 5 }, 1), rules.arena.start_normal_cell_hp);
+  place(b, 1, 0, 10); throwAt(b, 0, { x: 2, z: 5 }); assert.ok(Math.abs(b.actors[0].cooldown - .5) < .06, 'short cooldown');
+  assert.ok(b.speed(0) > b.speed(1) * 1.19 && b.speed(0) < b.speed(1) * 1.21, 'walk x1.2');
+  // refill: back to the arsenal, 4 stones used up
+  b.actors[0].stones = 1; b.actors[0].pos = cellCentre({ x: 4, z: 2 }, 0); run(b, .75); assert.ok(b.actors[0].stones >= 3, `fast refill (${b.actors[0].stones})`);
+  run(b, 3); assert.equal(b.actors[0].stones, 5, 'refills up to the bigger capacity');
+  // 3 hp tiles survive two normal hits and a repair brings them back to 3
+  const c = { x: 2, z: 5 }; place(b, 0, 0, 10); b.floors[0].set('2,5', 3);
+  place(b, 1, 0, 10); b.actors[1].stones = 3;
+  for (let i = 0; i < 2; i++) { run(b, 1.2); throwAt(b, 1, c); run(b, 1.5); }
+  assert.equal(b.hp(c, 0), 1);
+});

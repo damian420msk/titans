@@ -1,16 +1,27 @@
 // Wire protocol and state snapshots for online duels. No DOM, no Babylon: used by server/ and client/.
 // The server runs the only real Battle. Guests (seat 1) receive a mirrored snapshot, so every client sees itself as side 0.
 import { map, type Cell, type Side } from './world.ts';
-import { Battle, cellKey, type GameEvent, type Kind } from './battle.ts';
+import { Battle, cellKey, type GameEvent, type Kind, type Mods } from './battle.ts';
+import type { Profile, PublicEntry, CosmeticKind } from './progress.ts';
+import type { Difficulty } from './bot.ts';
 
-export type RoomInfo = { id: string; name: string; host: string; players: number; locked: boolean; playing: boolean };
-export type Seat = { nick: string; ready: boolean } | null;
-export type RoomView = { name: string; locked: boolean; seats: [Seat, Seat]; me: 0 | 1; count: number | null };
+export type RoomInfo = { id: string; name: string; host: string; players: number; locked: boolean; playing: boolean; ranked: boolean };
+export type Seat = { nick: string; ready: boolean; rating: number } | null;
+export type RoomView = { name: string; locked: boolean; ranked: boolean; seats: [Seat, Seat]; me: 0 | 1; count: number | null };
+export type Look = Record<CosmeticKind, string>;
+export type MyProfile = Omit<Profile, 'id'> & { dailyReady: boolean };
 
 export type C2S =
-  | { t: 'hello'; nick: string }
+  | { t: 'hello'; nick: string; token?: string }
+  | { t: 'nick'; nick: string }
+  | { t: 'buy'; kind: 'up' | 'item'; id: string }
+  | { t: 'equip'; id: string }
+  | { t: 'claim' }
+  | { t: 'top' }
+  | { t: 'result'; level: Difficulty; won: boolean }
+  | { t: 'quick'; on: boolean }
   | { t: 'list' }
-  | { t: 'create'; name: string; pass: string }
+  | { t: 'create'; name: string; pass: string; ranked?: boolean }
   | { t: 'join'; id: string; pass: string }
   | { t: 'leave' }
   | { t: 'ready'; on: boolean }
@@ -28,9 +39,13 @@ export type S2C =
   | { t: 'rooms'; rooms: RoomInfo[] }
   | { t: 'room'; room: RoomView | null }
   | { t: 'err'; code: ErrCode; text: string }
-  | { t: 'start'; foe: string }
+  | { t: 'profile'; p: MyProfile }
+  | { t: 'top'; list: PublicEntry[]; rank: number | null }
+  | { t: 'queue'; on: boolean }
+  | { t: 'shop'; ok: boolean; text: string }
+  | { t: 'start'; foe: string; foeRating: number; mods: [Mods, Mods]; look: [Look, Look]; ranked: boolean }
   | { t: 'snap'; s: Snap; ev: GameEvent[] }
-  | { t: 'end'; winner: Side | null; reason: 'over' | 'left' }
+  | { t: 'end'; winner: Side | null; reason: 'over' | 'left'; gain: { rating: number; coins: number; ranked: boolean } | null }
   | { t: 'pong'; n: number };
 
 type V2 = [number, number];

@@ -40,7 +40,13 @@ export function cellsFor(kind: Kind, target: Cell): Cell[] {
   return [{ ...target }, { x: x2, z: target.z }];
 }
 
+/** Per-player tuning that upgrades change. Everything else comes from rules_v01.json. */
+export type Mods = { capacity: number; cooldown: number; refill: number; walk: number; tileHp: number };
+export const DEFAULT_MODS: Mods = { capacity: rules.inventory.capacity, cooldown: rules.shot.min_release_interval_s, refill: rules.interaction.refill_per_stone_s, walk: 1, tileHp: rules.arena.start_normal_cell_hp };
+export const makeMods = (m?: Partial<Mods>): Mods => ({ ...DEFAULT_MODS, ...m });
+
 export class Battle {
+  mods: [Mods, Mods] = [makeMods(), makeMods()];
   actors: [Actor, Actor] = [this.newActor(0), this.newActor(1)];
   floors: [Map<string, number>, Map<string, number>] = [new Map(), new Map()];
   input: [Point, Point] = [{ x: 0, z: 0 }, { x: 0, z: 0 }];
@@ -54,22 +60,25 @@ export class Battle {
   winner: Side | null = null;
   private shotId = 0;
 
-  constructor() { this.resetFloors(); }
+  constructor(mods?: [Partial<Mods>?, Partial<Mods>?]) {
+    if (mods) this.mods = [makeMods(mods[0]), makeMods(mods[1])];
+    this.actors = [this.newActor(0), this.newActor(1)]; this.resetFloors();
+  }
 
   private newActor(side: Side, at: Cell = START_CELL): Actor {
-    return { pos: cellCentre(at, side), y: 0, vy: 0, falling: false, lives: LIVES, stones: rules.inventory.round_start, cooldown: 0, stun: 0, slide: null };
+    return { pos: cellCentre(at, side), y: 0, vy: 0, falling: false, lives: LIVES, stones: this.mods[side].capacity, cooldown: 0, stun: 0, slide: null };
   }
   private resetFloors() {
     for (const side of [0, 1] as Side[]) {
       this.floors[side].clear();
-      for (const c of map.cells) this.floors[side].set(cellKey(c), c.destructible ? rules.arena.start_normal_cell_hp : Infinity);
+      for (const c of map.cells) this.floors[side].set(cellKey(c), c.destructible ? this.mods[side].tileHp : Infinity);
     }
   }
 
   hp(c: Cell, side: Side) { return this.floors[side].get(cellKey(c)) ?? 0; }
   supported(p: Point, side: Side) { const c = cellAt(p, side); return c !== null && this.hp(c, side) > 0; }
   cellOf(side: Side) { return cellAt(this.actors[side].pos, side); }
-  speed(side: Side) { return this.charges[side] ? rules.character.charge_speed_mps : rules.character.walk_speed_mps; }
+  speed(side: Side) { return (this.charges[side] ? rules.character.charge_speed_mps : rules.character.walk_speed_mps) * this.mods[side].walk; }
   canAct(side: Side) { const a = this.actors[side]; return this.phase === 'playing' && !a.falling && a.stun <= 0; }
 
   nearArsenal(side: Side) {
@@ -86,7 +95,7 @@ export class Battle {
       const c = { x: me.x + dx, z: me.z + dz };
       if (!valid(c)) continue;
       const hp = this.hp(c, side);
-      if (!Number.isFinite(hp) || hp >= rules.arena.start_normal_cell_hp) continue;
+      if (!Number.isFinite(hp) || hp >= this.mods[side].tileHp) continue;
       const q = cellCentre(c, side); out.push({ c, d: Math.hypot(q.x - p.x, q.z - p.z) });
     }
     return out.sort((a, b) => a.d - b.d).map(o => o.c);
@@ -108,7 +117,7 @@ export class Battle {
     if (!ch || !valid(ch.target) || !this.canAct(side) || a.stones < rules.inventory.shot_cost) return null;
     const kind = kindForHold(ch.t);
     const shot: Shot = { id: ++this.shotId, owner: side, kind, cells: cellsFor(kind, ch.target), start: { ...a.pos }, elapsed: 0 };
-    this.shots.push(shot); a.stones -= rules.inventory.shot_cost; a.cooldown = rules.shot.min_release_interval_s;
+    this.shots.push(shot); a.stones -= rules.inventory.shot_cost; a.cooldown = this.mods[side].cooldown;
     this.events.push({ type: 'throw', side, kind }); return shot;
   }
   beginRepair(side: Side) {
@@ -147,13 +156,13 @@ export class Battle {
     if (rp) {
       if (a.stones < rules.inventory.repair_cost || !this.repairCandidates(side).some(c => cellKey(c) === cellKey(rp.cell))) this.repairs[side] = null;
       else if ((rp.t += dt) >= rp.need) {
-        a.stones -= rules.inventory.repair_cost; this.floors[side].set(cellKey(rp.cell), rules.interaction.repair_result_hp);
+        a.stones -= rules.inventory.repair_cost; this.floors[side].set(cellKey(rp.cell), this.mods[side].tileHp);
         this.events.push({ type: 'repaired', side, cell: rp.cell }); this.repairs[side] = null;
       }
     }
-    if (this.nearArsenal(side) && a.stones < rules.inventory.capacity) {
+    if (this.nearArsenal(side) && a.stones < this.mods[side].capacity) {
       this.refills[side] += dt;
-      while (this.refills[side] >= rules.interaction.refill_per_stone_s && a.stones < rules.inventory.capacity) { this.refills[side] -= rules.interaction.refill_per_stone_s; a.stones++; this.events.push({ type: 'refill', side }); }
+      while (this.refills[side] >= this.mods[side].refill && a.stones < this.mods[side].capacity) { this.refills[side] -= this.mods[side].refill; a.stones++; this.events.push({ type: 'refill', side }); }
     } else this.refills[side] = 0;
     this.checkSupport(side);
   }
