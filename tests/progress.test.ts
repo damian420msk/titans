@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dayIndex, rewardBot, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
+import { newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dayIndex, rewardBot, recordQuest, QUESTS, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
 import { Battle } from '../shared/battle.ts';
 
 test('new profile: 1000 rating, starter coins, free cosmetics equipped', () => {
@@ -50,4 +50,15 @@ test('mender shortens repairs for its owner only', () => {
 test('old plates upgrade is refunded once and then gone', () => {
   const p = sanitizeProfile({ coins: 10, up: { plates: 1, bag: 1 } }, 'x'); assert.equal(p.coins, 810); assert.equal(p.up.bag, 1);
   const again = sanitizeProfile(JSON.parse(JSON.stringify(p)), 'x'); assert.equal(again.coins, 810);
+});
+
+test('daily quests pay once when done, count only ranked wins as online wins, and reset on a new day', () => {
+  const p = newProfile('x'), c0 = p.coins;
+  assert.equal(recordQuest(p, 5, { won: true, ranked: false }), 0); assert.equal(recordQuest(p, 5, { won: true, ranked: false }), QUESTS[1].reward, '2 wins');
+  assert.equal(recordQuest(p, 5, { won: false, ranked: false }), QUESTS[0].reward, '3 played'); assert.equal(recordQuest(p, 5, { won: true, ranked: false }), 0, 'paid once');
+  assert.equal(p.quest.online, 0); assert.equal(recordQuest(p, 5, { won: true, ranked: true }), QUESTS[2].reward);
+  assert.equal(p.coins, c0 + 60 + 40 + 80);
+  assert.equal(recordQuest(p, 6, { won: false, ranked: false }), 0); assert.equal(p.quest.day, 6); assert.equal(p.quest.played, 1); assert.deepEqual(p.quest.paid, [false, false, false]);
+  const back = sanitizeProfile(JSON.parse(JSON.stringify(p)), 'x'); assert.deepEqual(back.quest, p.quest);
+  assert.deepEqual(sanitizeProfile({ quest: 'junk' }, 'x').quest, freshQuest(-1));
 });

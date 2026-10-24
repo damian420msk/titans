@@ -34,6 +34,7 @@
       <p class="tag">Бросай небесные камни по острову врага. Разбей плиты под титаном, чтобы он упал.</p>
       <button class="chip player" data-go="settings"><span class="avatar">Я</span><span><b id="nick-label">Игрок</b><i><span id="league-label">Бронза</span> · <span id="rating-label">1000</span></i></span><em class="coins">🪙 <span id="coins-label">0</span></em></button>
       <button id="daily" class="gift" hidden>🎁 Подарок дня: +50 монет</button>
+      <button id="quests-btn" class="gift quest" data-go="quests">📋 Задания <span id="quests-count">0/3</span></button>
     </div>
     <nav class="main-right">
       <button class="big" data-go="bot">БОЙ С БОТОМ</button>
@@ -86,6 +87,11 @@
       <div class="mid"><div class="vs">VS</div><button id="ready" class="big" disabled>ГОТОВ</button><div id="count" class="count"></div></div>
       <div class="seat red" id="seat1"><span class="face coral">2</span><b class="nm"></b><em class="rt"></em><i class="st"></i></div>
     </div>
+  </section>
+
+  <section class="scr" data-scr="quests" hidden>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Задания дня</h2><span class="pill"><i></i><span id="quests-reset">обновятся в полночь</span></span></header>
+    <div class="glass shop" id="quests-list"></div>
   </section>
 
   <section class="scr" data-scr="quick" hidden>

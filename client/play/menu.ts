@@ -5,9 +5,9 @@ import type { Sfx } from './audio';
 import type { NetState } from './online';
 
 import type { RoomInfo, RoomView, MyProfile } from '../../shared/net';
-import { UPGRADES, COSMETICS, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
+import { UPGRADES, COSMETICS, QUESTS, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
 export type { RoomInfo, RoomView };
-export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick';
+export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick' | 'quests';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const store = {
@@ -51,6 +51,7 @@ export function initMenu(h: MenuHooks) {
     if (s === 'online') setRooms(rooms);
     if (s === 'rating') { renderTop(); h.onTop(); }
     if (s === 'shop') renderShop();
+    if (s === 'quests') renderQuests();
     if (s === 'create') { $<HTMLInputElement>('room-name').value = `Комната ${nick()}`; $<HTMLInputElement>('room-pass').value = ''; }
     if (s === 'settings') { $<HTMLInputElement>('nick').value = store.get('nick', ''); paintSound(); paintHaptic(); $('set-rating').textContent = String(prof?.rating ?? 1000); $('set-wins').textContent = String(prof?.wins ?? 0); $('set-games').textContent = String(prof?.games ?? 0); }
   }
@@ -128,9 +129,14 @@ export function initMenu(h: MenuHooks) {
     $('rating-label').textContent = String(r); $('league-label').textContent = lg.name; $('league-label').style.color = lg.color;
     $('coins-label').textContent = String(p?.coins ?? 0); $('shop-coins').textContent = String(p?.coins ?? 0);
     $('daily').hidden = !(p && p.dailyReady);
+    $('quests-count').textContent = `${p ? p.quest.paid.filter(Boolean).length : 0}/${QUESTS.length}`;
     $('rate-pts').textContent = String(r); $('rate-wins').textContent = String(p?.wins ?? 0);
   };
-  function setProfile(p: MyProfile) { prof = p; paintProfile(); if (current === 'shop') renderShop(); if (current === 'rating') renderTop(); }
+  function renderQuests() {
+    const q = prof?.quest;
+    $('quests-list').innerHTML = QUESTS.map((d, i) => { const v = Math.min(d.goal, q?.[d.key] ?? 0), done = !!q?.paid[i]; return `<div class="item quest${done ? ' eq' : ''}"><span class="ic">${done ? '✅' : '🎯'}</span><div class="tx"><b>${esc(d.text)}</b><span class="bar"><i style="width:${100 * v / d.goal}%"></i></span><em>${v} / ${d.goal}</em></div><span class="${done ? 'maxed' : 'rw'}">${done ? 'ГОТОВО' : '+' + d.reward + ' 🪙'}</span></div>`; }).join('');
+  }
+  function setProfile(p: MyProfile) { prof = p; paintProfile(); if (current === 'quests') renderQuests(); if (current === 'shop') renderShop(); if (current === 'rating') renderTop(); }
   function renderShop() {
     root.querySelectorAll<HTMLElement>('#shop-tabs [data-tab]').forEach(b => b.classList.toggle('sel', b.dataset.tab === tab));
     const el = $('shop-list'), p = prof, coins = p?.coins ?? 0;

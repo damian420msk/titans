@@ -44,7 +44,7 @@ test('upgrades reach the match: bigger bag in the start message and in the battl
 test('ranked room: the winner gains rating and coins, the loser drops; both profiles are saved', () => {
   const store = new MemoryStore(), lobby = new Lobby(store), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
   startRanked(lobby, a, b); finish(lobby, b);
-  assert.equal(a.last('end')!.gain!.ranked, true); assert.ok(prof(a).rating > 1000); assert.equal(prof(a).wins, 1); assert.equal(prof(a).coins, 100 + 60);
+  assert.equal(a.last('end')!.gain!.ranked, true); assert.ok(prof(a).rating > 1000); assert.equal(prof(a).wins, 1); assert.equal(prof(a).coins, 100 + 60 + 80, "win reward plus the online-win daily task");
   const b2 = player(lobby, 'Боря'); assert.ok(prof(b2).rating < 1000); assert.equal(prof(b2).losses, 1);
 });
 test('unranked room: only coins change; farming the same opponent stops giving rating', () => {

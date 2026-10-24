@@ -5,7 +5,7 @@ import { Battle, type GameEvent } from '../shared/battle.ts';
 import { cellsValid } from './validate.ts';
 import { MemoryStore, type Store } from './store.ts';
 import { snapshot, mirrorSnap, mirrorEvents, type C2S, type S2C, type RoomInfo, type RoomView, type Seat, type ErrCode, type MyProfile } from '../shared/net.ts';
-import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayIndex, rewardBot, applyOnline, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
+import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayIndex, rewardBot, applyOnline, recordQuest, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
 
 export interface Conn { send(m: S2C): void }
 type Client = {
@@ -118,7 +118,7 @@ export class Lobby {
     if (cached !== undefined) done(cached); else this.store.load(pid).then(done, e => { console.error('profile load failed', e); done(null); });
   }
   private persist(p: Profile) { if (p.id.startsWith('guest-')) return; this.topCache = null; this.store.save(p).catch(e => console.error('profile save failed', e)); }
-  private view(p: Profile): MyProfile { const { id: _id, ...rest } = p; return { ...rest, dailyReady: p.daily < dayIndex(this.now()) }; }
+  private view(p: Profile): MyProfile { const { id: _id, ...rest } = p; const day = dayIndex(this.now()); return { ...rest, quest: p.quest.day === day ? p.quest : freshQuest(day), dailyReady: p.daily < day }; }
   private sendProfile(c: Client) { if (c.profile) c.conn.send({ t: 'profile', p: this.view(c.profile) }); }
   private shop(c: Client, ok: boolean, text: string) { c.conn.send({ t: 'shop', ok, text }); }
 
@@ -132,7 +132,7 @@ export class Lobby {
   private botResult(c: Client, level: unknown, won: boolean) {
     const p = c.profile; if (!p || !['easy', 'normal', 'hard'].includes(level as string)) return;
     if (this.now() - c.lastResult < BOT_RESULT_GAP_MS) return this.shop(c, false, 'Награда за слишком быстрый бой не засчитана');
-    c.lastResult = this.now(); const r = rewardBot(p, level as any, won); this.persist(p); this.sendProfile(c); this.shop(c, true, `+${r} монет`);
+    c.lastResult = this.now(); const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); this.shop(c, true, `+${r} монет` + (qc ? ` · задание +${qc}` : ''));
   }
   private async sendTop(c: Client) {
     try {
@@ -250,6 +250,8 @@ export class Lobby {
       const give = (p: Profile, won: boolean | null) => { const coins = won === null ? FRIENDLY.draw : won ? FRIENDLY.win : FRIENDLY.loss; p.coins += coins; return { rating: 0, coins, ranked: false }; };
       g = [give(pa, winner === null ? null : winner === 0), give(pb, winner === null ? null : winner === 1)];
     }
+    const day = dayIndex(this.now());
+    g[0].coins += recordQuest(pa, day, { won: winner === 0, ranked }); g[1].coins += recordQuest(pb, day, { won: winner === 1, ranked });
     this.persist(pa); this.persist(pb);
     return { ranked, g };
   }

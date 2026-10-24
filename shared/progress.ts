@@ -35,13 +35,28 @@ export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { skin: 'skin_classic
 
 export type Profile = {
   id: string; nick: string; rating: number; wins: number; losses: number; games: number; coins: number;
-  up: Record<UpgradeId, number>; own: string[]; eq: Record<CosmeticKind, string>; daily: number;
+  up: Record<UpgradeId, number>; own: string[]; eq: Record<CosmeticKind, string>; daily: number; quest: Quest;
 };
+
+/** Daily tasks: the same three every day, progress resets at midnight (Moscow). Coins are paid the moment a task completes. */
+export type Quest = { day: number; played: number; won: number; online: number; paid: [boolean, boolean, boolean] };
+export const QUESTS = [
+  { text: 'Сыграй 3 боя', goal: 3, reward: 40, key: 'played' },
+  { text: 'Выиграй 2 боя', goal: 2, reward: 60, key: 'won' },
+  { text: 'Победи живого игрока в рейтинговом бою', goal: 1, reward: 80, key: 'online' },
+] as const;
+export const freshQuest = (day: number): Quest => ({ day, played: 0, won: 0, online: 0, paid: [false, false, false] });
+export function recordQuest(p: Profile, day: number, r: { won: boolean; ranked: boolean }): number {
+  if (p.quest.day !== day) p.quest = freshQuest(day);
+  const q = p.quest; q.played++; if (r.won) q.won++; if (r.won && r.ranked) q.online++;
+  let coins = 0; QUESTS.forEach((d, i) => { if (!q.paid[i] && q[d.key] >= d.goal) { q.paid[i] = true; coins += d.reward; } });
+  p.coins += coins; return coins;
+}
 
 export const START_RATING = 1000;
 export const newProfile = (id: string, nick = 'Игрок'): Profile => ({
   id, nick, rating: START_RATING, wins: 0, losses: 0, games: 0, coins: 100,
-  up: { bag: 0, hands: 0, legs: 0, quarry: 0, mender: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1,
+  up: { bag: 0, hands: 0, legs: 0, quarry: 0, mender: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1, quest: freshQuest(-1),
 });
 
 const num = (v: unknown, d: number, lo = 0, hi = 1e9) => typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : d;
@@ -55,6 +70,7 @@ export function sanitizeProfile(raw: any, id: string): Profile {
   const known = new Set(COSMETICS.map(c => c.id));
   p.own = [...new Set([...p.own, ...(Array.isArray(r.own) ? r.own.filter((x: unknown) => typeof x === 'string' && known.has(x)) : [])])];
   for (const k of ['skin', 'tiles', 'stone'] as CosmeticKind[]) { const e = r.eq?.[k]; p.eq[k] = typeof e === 'string' && p.own.includes(e) && COSMETICS.find(c => c.id === e)?.kind === k ? e : DEFAULT_EQUIP[k]; }
+  const q = r.quest; if (q && typeof q === 'object') p.quest = { day: num(q.day, -1, -1), played: num(q.played, 0, 0, 99), won: num(q.won, 0, 0, 99), online: num(q.online, 0, 0, 99), paid: [0, 1, 2].map(i => q.paid?.[i] === true) as Quest['paid'] };
   return p;
 }
 
