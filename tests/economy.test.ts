@@ -100,3 +100,18 @@ test('an away player who does not come back forfeits after the grace period; a g
   lobby.handle(g1, { t: 'create', name: 'G', pass: '' }); lobby.handle(g2, { t: 'join', id: (g2.last('rooms')!.rooms as RoomInfo[]).find(r => r.name === 'G')!.id, pass: '' });
   lobby.handle(g1, { t: 'ready', on: true }); lobby.handle(g2, { t: 'ready', on: true }); lobby.tick(3.1); lobby.disconnect(g2); assert.equal(g1.last('end')!.reason, 'left');
 });
+
+test('emotes reach only the rival, only during a match, at most one per 1.5 s, ids 0-3', () => {
+  const clock = { t: 1e9 }, lobby = new Lobby(new MemoryStore(), () => clock.t), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
+  lobby.handle(a, { t: 'emote', id: 1 }); assert.equal(b.last('emote'), undefined, 'not in a match');
+  startRanked(lobby, a, b);
+  lobby.handle(a, { t: 'emote', id: 2 }); assert.equal((b.last('emote') as any).id, 2); assert.equal(a.last('emote'), undefined);
+  lobby.handle(a, { t: 'emote', id: 3 }); assert.equal((b.last('emote') as any).id, 2, 'rate limited');
+  clock.t += 1600; lobby.handle(a, { t: 'emote', id: 9 }); assert.equal((b.last('emote') as any).id, 2, 'bad id');
+  lobby.handle(a, { t: 'emote', id: 0 }); assert.equal((b.last('emote') as any).id, 0);
+});
+test('quick match marks the start message so the client can offer "search again"', () => {
+  const lobby = new Lobby(new MemoryStore()), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
+  lobby.handle(a, { t: 'quick', on: true }); lobby.handle(b, { t: 'quick', on: true }); lobby.tick(.1); lobby.tick(3.1);
+  assert.equal(a.last('start')!.quick, true);
+});

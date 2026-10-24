@@ -262,6 +262,19 @@ export class World {
     }
   }
 
+  private slowTime = 0; private fastTime = 0; private qStep = 0; private baseScale = 1;
+  /** One-way quality governor for weak phones: if frames stay slow, draw fewer pixels (up to 3 steps). */
+  adaptQuality(frame: number) {
+    if (this.qStep === 0 && this.baseScale === 1) this.baseScale = this.engine.getHardwareScalingLevel();
+    if (frame > 1 / 38) this.slowTime += frame; else this.slowTime = Math.max(0, this.slowTime - frame);
+    if (this.slowTime > 2.5 && this.qStep < 3) {
+      this.qStep++; this.slowTime = 0;
+      this.engine.setHardwareScalingLevel(this.baseScale * (1 + .3 * this.qStep)); this.engine.resize();
+      if (this.qStep === 3) this.shadows.getShadowMap()!.refreshRate = 2;
+    }
+  }
+  get qualityStep() { return this.qStep; }
+
   private updateCamera(b: Battle, dt: number, aiming: boolean) {
     if (this.freezeCamera) return;
     // pull out while holding a throw, return smoothly after a short delay

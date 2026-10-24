@@ -30,10 +30,11 @@ const token = (() => {
 })();
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const p = newProfile('local', r.nick); Object.assign(p, r); return { ...(p as Omit<Profile, 'id'>), dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
 let pendingResult: { level: Difficulty; won: boolean } | null = null;
-let endGain = '', reconnectAt = 0;
+let endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 const pred = new Predictor();
+const forceHq = new URLSearchParams(location.search).has('hq');
 let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
 const srvEvents: GameEvent[] = [];
 let pendingSnap: { s: Snap; at: number } | null = null;
@@ -88,8 +89,9 @@ async function boot() {
       case 'top': menu.setTop(m.list, m.rank); break;
       case 'shop': if (mode === 'over' && !online) $('end-gain').textContent = m.text; else menu.notice(m.text); if (m.ok) sfx.repaired(); break;
       case 'queue': quickWanted = m.on; menu.setQueue(m.on); break;
+      case 'emote': showBubble(1, m.id); break;
       case 'away': if (online) toast(m.on ? 'Соперник потерял связь. Ждём…' : 'Соперник вернулся'); break;
-      case 'start': quickWanted = false; if (online && mode === 'playing') { reconnectAt = 0; $('reconn').hidden = true; toast('Связь восстановлена'); break; } startMatch(m.foe, { mods: m.mods, look: m.look, rating: m.foeRating, ranked: m.ranked }); break;
+      case 'start': quickWanted = false; if (online && mode === 'playing') { reconnectAt = 0; $('reconn').hidden = true; toast('Связь восстановлена'); break; } lastQuick = !!m.quick; startMatch(m.foe, { mods: m.mods, look: m.look, rating: m.foeRating, ranked: m.ranked }); break;
       case 'snap': if (online) { pendingSnap = { s: m.s, at: performance.now() / 1000 }; srvEvents.push(...m.ev); } break;
       case 'end': reconnectAt = 0; $('reconn').hidden = true; if (online && mode === 'playing') { endGain = m.gain ? `${m.gain.ranked ? (m.gain.rating >= 0 ? '+' : '') + m.gain.rating + ' рейтинг · ' : ''}+${m.gain.coins} 🪙` : ''; showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); } break;
     }
@@ -99,15 +101,23 @@ async function boot() {
     online = typeof foe === 'string'; try { (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}); } catch { /* needs fullscreen on most browsers */ } pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
     world.resetPoses(); const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity);
+    $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
     $('foe-name').textContent = online ? foe! : NAMES[level]; $('foe-face').textContent = online ? foe!.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
   const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
-  $('again').onclick = () => { if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else startMatch(); };
+  $('again').onclick = () => { if (online && lastQuick) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show('quick'); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else startMatch(); };
   const toMenu = () => { if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
   $('to-menu').onclick = toMenu;
   $('loading').hidden = true;
   net.connect();
+  const EMOTES = ['👍', '😎', '😮', '😡'], bubbleT = [0, 0];
+  const showBubble = (who: 0 | 1, id: number) => { const el = $('bubble' + who); el.textContent = EMOTES[id] ?? '👍'; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; window.clearTimeout(bubbleT[who]); bubbleT[who] = window.setTimeout(() => { el.hidden = true; }, 2200); };
+  let lastEmote = -1e9;
+  const sendEmote = (id: number) => { if (!online || mode !== 'playing' || performance.now() - lastEmote < 1500) return; lastEmote = performance.now(); net.send({ t: 'emote', id }); showBubble(0, id); $('emotes').hidden = true; };
+  $('emote-btn').onclick = () => { $('emotes').hidden = !$('emotes').hidden; };
+  $('emotes').addEventListener('click', e => { const b = (e.target as HTMLElement).closest('[data-e]') as HTMLElement | null; if (b) sendEmote(+b.dataset.e!); });
+  window.addEventListener('keydown', e => { if (online && mode === 'playing' && /^Digit[1-4]$/.test(e.code)) sendEmote(+e.code.slice(5) - 1); });
   const toast = (t: string) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); toastTimer = 1.4; };
   const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
   const slots = $('slots'); 
@@ -127,7 +137,7 @@ async function boot() {
   const resize = () => world.engine.resize();
   window.addEventListener('resize', resize); window.visualViewport?.addEventListener('resize', resize); window.addEventListener('orientationchange', () => setTimeout(resize, 250));
   const paused = () => !online && (document.hidden || userPause || (controls.touch && innerWidth < innerHeight));
-  Object.assign(window, { titans: { battle, world, net, controls, setPause, state: () => ({ mode, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
+  Object.assign(window, { titans: { battle, world, net, controls, setPause, state: () => ({ quality: world.qualityStep, mode, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
 
   world.engine.runRenderLoop(() => {
     const rawDt = world.engine.getDeltaTime() / 1000, dt = Math.min(rawDt, .05), isPaused = paused();
@@ -219,13 +229,14 @@ async function boot() {
       $('cancel').hidden = !(charging && controls.touch);
       if ((toastTimer -= dt) <= 0) $('toast').classList.remove('on');
     }
+    if (mode === 'playing' && !isPaused && !forceHq && rawDt < .5) world.adaptQuality(rawDt);
     if (mode !== 'menu') world.scene.render();
   });
   function showEnd(winner: 0 | 1 | null, why?: 'left' | 'conn') {
     mode = 'over'; charging = false; controls.reset(); $('pause').hidden = true; userPause = false;
     $('end-title').textContent = winner === 0 ? 'ПОБЕДА' : winner === 1 ? 'ПОРАЖЕНИЕ' : 'НИЧЬЯ';
     $('end-text').textContent = why === 'left' ? 'Соперник вышел из боя. Победа твоя.' : why === 'conn' ? 'Связь с сервером потеряна.' : winner === 0 ? 'Враг рухнул вниз. Небесные камни твои.' : winner === 1 ? 'Тебя сбросили с острова. Попробуй ещё раз.' : 'Время вышло, силы равны.';
-    $('again').textContent = online ? 'В КОМНАТУ' : 'ЕЩЁ РАЗ';
+    $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'В КОМНАТУ') : 'ЕЩЁ РАЗ';
     $('end-gain').textContent = online ? endGain : '';
     if (!online && why !== 'conn') {
       pendingResult = { level, won: winner === 0 };

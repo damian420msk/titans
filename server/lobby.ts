@@ -10,7 +10,7 @@ import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayInd
 export interface Conn { send(m: S2C): void }
 type Client = {
   conn: Conn; id: string; nick: string; room: Room | null; seat: 0 | 1;
-  pid: string | null; profile: Profile | null; queuedAt: number | null; lastResult: number; away: number | null;
+  pid: string | null; profile: Profile | null; queuedAt: number | null; lastResult: number; away: number | null; lastEmote: number;
 };
 type Phase = 'lobby' | 'count' | 'playing';
 type Room = {
@@ -41,7 +41,7 @@ export class Lobby {
 
   connect(conn: Conn) {
     const id = `p${(++this.seq).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-    this.clients.set(conn, { conn, id, nick: 'Игрок', room: null, seat: 0, pid: null, profile: null, queuedAt: null, lastResult: 0, away: null });
+    this.clients.set(conn, { conn, id, nick: 'Игрок', room: null, seat: 0, pid: null, profile: null, queuedAt: null, lastResult: 0, away: null, lastEmote: 0 });
     conn.send({ t: 'welcome', id }); conn.send({ t: 'rooms', rooms: this.list() });
   }
 
@@ -71,7 +71,7 @@ export class Lobby {
   }
   private startMsg(room: Room, i: 0 | 1): S2C {
     const b = room.battle!, me = room.players[i]!, foe = room.players[i === 0 ? 1 : 0]!, look = (p: Client) => (p.profile ?? newProfile('x')).eq;
-    return { t: 'start', foe: foe.nick, foeRating: foe.profile?.rating ?? 1000, mods: [b.mods[i], b.mods[i === 0 ? 1 : 0]], look: [look(me), look(foe)], ranked: room.ranked };
+    return { t: 'start', foe: foe.nick, foeRating: foe.profile?.rating ?? 1000, mods: [b.mods[i], b.mods[i === 0 ? 1 : 0]], look: [look(me), look(foe)], ranked: room.ranked, quick: room.hidden };
   }
 
   handle(conn: Conn, raw: unknown) {
@@ -91,6 +91,11 @@ export class Lobby {
       case 'claim': return this.claim(c);
       case 'top': return this.sendTop(c);
       case 'result': return this.botResult(c, m.level, !!m.won);
+      case 'emote': {
+        const room = c.room, id = Number(m.id);
+        if (!room || room.phase !== 'playing' || !Number.isInteger(id) || id < 0 || id > 3 || this.now() - c.lastEmote < 1500) return;
+        c.lastEmote = this.now(); room.players[c.seat === 0 ? 1 : 0]?.conn.send({ t: 'emote', id }); return;
+      }
       case 'ping': conn.send({ t: 'pong', n: Number(m.n) || 0 }); return;
       default: return this.intent(c, m);
     }

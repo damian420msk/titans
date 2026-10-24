@@ -31,6 +31,7 @@ export type C2S =
   | { t: 'release'; x: number; z: number }
   | { t: 'cancel' }
   | { t: 'repair'; on: boolean }
+  | { t: 'emote'; id: number }
   | { t: 'ping'; n: number };
 
 export type ErrCode = 'wrong_pass' | 'full' | 'gone' | 'busy' | 'bad';
@@ -43,10 +44,11 @@ export type S2C =
   | { t: 'top'; list: PublicEntry[]; rank: number | null }
   | { t: 'queue'; on: boolean }
   | { t: 'shop'; ok: boolean; text: string }
-  | { t: 'start'; foe: string; foeRating: number; mods: [Mods, Mods]; look: [Look, Look]; ranked: boolean }
+  | { t: 'start'; foe: string; foeRating: number; mods: [Mods, Mods]; look: [Look, Look]; ranked: boolean; quick?: boolean }
   | { t: 'snap'; s: Snap; ev: GameEvent[] }
   | { t: 'end'; winner: Side | null; reason: 'over' | 'left'; gain: { rating: number; coins: number; ranked: boolean } | null }
   | { t: 'away'; on: boolean }
+  | { t: 'emote'; id: number }
   | { t: 'pong'; n: number };
 
 type V2 = [number, number];
