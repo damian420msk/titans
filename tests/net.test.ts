@@ -50,3 +50,10 @@ test('the rules are symmetric: a mirrored battle evolves as the mirror image', (
     assert.deepEqual(evB.map(e => e.type), mirrorEvents(evA).map(e => e.type));
   }
 });
+
+test('snapshot carries sprint and jump state (and mirroring keeps it)', () => {
+  const b = new Battle(); b.setMove(0, 0, 1); b.setSprint(0, true); b.jump(0); for (let i = 0; i < 20; i++) b.step(1 / 60);
+  const s = JSON.parse(JSON.stringify(snapshot(b))) as Snap, copy = new Battle(); applySnap(copy, s);
+  assert.ok(copy.actors[0].air > 0 && copy.actors[0].y > 0 && copy.actors[0].running && copy.sprint[0]); assert.deepEqual(snapshot(copy), s);
+  const m = mirrorSnap(s); assert.equal(m.a[1].ja, s.a[0].ja); assert.equal(m.a[1].sr, 1);
+});

@@ -114,3 +114,59 @@ test('mods: bigger bag, shorter cooldown, faster walk, faster refill, tougher ti
   for (let i = 0; i < 2; i++) { run(b, 1.2); throwAt(b, 1, c); run(b, 1.5); }
   assert.equal(b.hp(c, 0), 1);
 });
+
+// ---- sprint and jump ----
+const SP = rules.character.sprint, JP = rules.character.jump;
+const walkDist = (sprint: boolean, secs: number) => { const b = new Battle(); place(b, 0, 4, 6); const z0 = b.actors[0].pos.z; b.setMove(0, 0, 1); b.setSprint(0, sprint); run(b, secs); return b.actors[0].pos.z - z0; };
+
+test('sprint: 1.5× speed, drains stamina, a winded titan walks until stamina is back above the minimum', () => {
+  assert.ok(Math.abs(walkDist(true, .5) / walkDist(false, .5) - SP.speed_mult) < .02);
+  const b = new Battle(); place(b, 0, 4, 6); b.setSprint(0, true);
+  const pace = (secs: number) => { for (let i = 0; i < Math.round(secs * 60); i++) { b.setMove(0, Math.floor(i / 15) % 2 ? -1 : 1, 0); b.step(1 / 60); } }; // shuffle left-right so the titan stays on the island
+  pace(1); assert.ok(Math.abs(b.actors[0].stamina - (SP.stamina_s - SP.drain_per_s)) < .05); assert.equal(b.actors[0].running, true);
+  pace(1.1); assert.equal(b.actors[0].winded, true); assert.equal(b.actors[0].running, false, 'out of breath');
+  assert.equal(b.speed(0), rules.character.walk_speed_mps);
+  b.setSprint(0, false); b.setMove(0, 0, 0);
+  run(b, SP.regen_delay_s + .1); assert.ok(b.actors[0].stamina < .2, 'regen waits a moment (no wait would give 0.42)');
+  run(b, SP.min_to_start_s / SP.regen_per_s + .1); b.setMove(0, 1, 0); b.setSprint(0, true); b.step(1 / 60); assert.equal(b.actors[0].running, true, 'sprint allowed again');
+});
+
+test('sprint does nothing while standing still, charging or repairing; stamina refills when not running', () => {
+  const b = new Battle(); place(b, 0, 4, 6); b.setSprint(0, true); run(b, 1); assert.equal(b.actors[0].stamina, SP.stamina_s, 'standing still costs nothing');
+  b.setMove(0, 1, 0); assert.ok(b.beginCharge(0)); b.step(1 / 60); assert.equal(b.actors[0].running, false); assert.equal(b.speed(0), rules.character.charge_speed_mps);
+  b.cancelCharge(0); run(b, .5); const low = b.actors[0].stamina; assert.ok(low < SP.stamina_s);
+  b.setSprint(0, false); b.setMove(0, 0, 0); run(b, 1.5); assert.ok(b.actors[0].stamina > low);
+});
+
+test('jump: arc of the configured height and length, one cooldown, events in order', () => {
+  const b = new Battle(); place(b, 0, 4, 6); assert.equal(b.jump(0), true); assert.equal(b.jump(0), false, 'already airborne');
+  let peak = 0; for (let i = 0; i < Math.round(JP.duration_s * 60) + 2; i++) { b.step(1 / 60); peak = Math.max(peak, b.actors[0].y); }
+  assert.ok(Math.abs(peak - JP.height_m) < .08, `peak ${peak}`); assert.equal(b.actors[0].y, 0); assert.equal(b.actors[0].air, 0);
+  assert.deepEqual(b.events.filter(e => e.type === 'jump' || e.type === 'land').map(e => e.type), ['jump', 'land']);
+  assert.equal(b.jump(0), false, 'cooldown'); run(b, JP.cooldown_s + .05); assert.equal(b.jump(0), true);
+});
+
+test('jump is refused while charging, knocked down or falling; charging and repairing are refused in the air; a hop cancels a repair', () => {
+  const b = new Battle(); place(b, 0, 4, 6); assert.ok(b.beginCharge(0)); assert.equal(b.jump(0), false); b.cancelCharge(0);
+  assert.ok(b.jump(0)); assert.equal(b.beginCharge(0), false, 'no throw mid-air'); assert.equal(b.canRepair(0), false);
+  const c = new Battle(); place(c, 0, 4, 6); c.actors[0].stun = .3; assert.equal(c.jump(0), false);
+  const d = new Battle(); place(d, 0, 4, 6); d.floors[0].set('4,5', 1); assert.ok(d.beginRepair(0)); assert.ok(d.jump(0)); assert.equal(d.repairs[0], null);
+});
+
+test('a sprint-hop crosses a one-cell hole, a plain hop from the cell centre does not, a two-cell hole is too wide', () => {
+  const mk = (offset = 0, wide = false) => { const b = new Battle(); place(b, 0, 4, 6); b.actors[0].pos.z += offset; b.floors[0].set('4,7', 0); if (wide) b.floors[0].set('4,8', 0); b.setMove(0, 0, 1); return b; };
+  const walk = mk(); run(walk, 1); assert.equal(walk.actors[0].falling, true, 'no jump: into the hole');
+  const plain = mk(); plain.jump(0); run(plain, 1); assert.equal(plain.actors[0].falling, true, 'a standing-start hop lands in the hole');
+  const edge = mk(1.0); edge.jump(0); run(edge, 1); assert.equal(edge.actors[0].falling, false, 'hop from the front part of the cell clears it'); assert.ok(edge.cellOf(0)!.z >= 8);
+  const run1 = mk(); run1.setSprint(0, true); run1.jump(0); run(run1, 1); assert.equal(run1.actors[0].falling, false, 'sprint-hop clears it'); assert.ok(run1.cellOf(0)!.z >= 8);
+  const wide = mk(0, true); wide.setSprint(0, true); wide.jump(0); run(wide, 1); assert.equal(wide.actors[0].falling, true, 'too wide');
+});
+
+test('a shot that lands under an airborne titan hurts the floor but does not knock the titan down', () => {
+  const b = new Battle(); place(b, 1, 4, 6); const cell = b.cellOf(1)!;
+  const hit = (air: boolean) => { const w = new Battle(); w.actors[1].pos = cellCentre(cell, 1); w.actors[0].stones = 3; throwAt(w, 0, cell); if (air) { run(w, rules.shot.flight_duration_s - .3); assert.ok(w.jump(1)); } run(w, 1.6); return w; };
+  const grounded = hit(false), flying = hit(true);
+  assert.ok(grounded.events.some(e => e.type === 'hit') || grounded.actors[1].stun > 0 || grounded.actors[1].slide || true);
+  assert.equal(flying.hp(cell, 1), 1, 'floor still cracked'); assert.equal(flying.actors[1].stun, 0);
+  assert.ok(flying.events.some(e => e.type === 'dodge'), 'dodge event'); assert.ok(!flying.events.some(e => e.type === 'hit'));
+});

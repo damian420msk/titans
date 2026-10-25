@@ -22,6 +22,8 @@
   <button id="look" aria-label="Обзор своего острова"><span>👁</span><i>ОБЗОР</i></button>
   <div id="stick"><i></i></div>
   <button id="repair" hidden>РЕМОНТ</button>
+  <button id="jump" aria-label="Прыжок"><span>⤒</span><i>ПРЫЖОК</i></button>
+  <div id="stamina"><i></i></div>
   <div id="cancel" hidden>✕</div>
   <div id="hint"></div>
 </div>
@@ -143,7 +145,7 @@
         <div class="setrow col"><span><b>Музыка</b><i>мелодия боя</i></span><div class="slide"><input id="vol-music" type="range" min="0" max="100" step="5" value="100"><em id="vol-music-val">100%</em></div></div>
         <div class="setrow touch-only"><span><b>Вибрация</b><i>отдача при бросках и ударах</i></span><button id="set-haptic" class="toggle"></button></div>
         <div class="setrow touch-only col"><span><b>Чувствительность прицела</b><i>как быстро палец двигает прицел</i></span><div class="slide"><input id="sens" type="range" min="0.6" max="1.8" step="0.1" value="1"><em id="sens-val">×1.0</em></div></div>
-        <div class="setrow pc-only"><span><b>Управление</b><i>WASD · ЛКМ бросок · ПКМ отмена · Пробел ремонт · C оглянуться</i></span></div>
+        <div class="setrow pc-only"><span><b>Управление</b><i>WASD · ЛКМ бросок · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт · C оглянуться</i></span></div>
       </div>
     </div>
   </section>
@@ -152,12 +154,12 @@
     <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Как играть</h2><span></span></header>
     <div class="steps">
       <div class="step"><span class="n">1</span><span class="ic">🏔</span><b>Цель</b><p>Сбрось титана врага с острова. У каждого 3 жизни, бой идёт 3 минуты. Кто упал, тот теряет жизнь.</p></div>
-      <div class="step"><span class="n">2</span><span class="ic">🚶</span><b>Ходьба</b><p><span class="pc">WASD или стрелки.</span><span class="tc">Левый палец: джойстик появляется там, где коснулся.</span></p></div>
+      <div class="step"><span class="n">2</span><span class="ic">🚶</span><b>Ходьба</b><p><span class="pc">WASD или стрелки. Shift: бег (полторы скорости, выносливость 2 секунды). Пробел: прыжок.</span><span class="tc">Левый палец: джойстик появляется там, где коснулся. Потяни за край круга: бег. Кнопка ⤒: прыжок.</span></p></div>
       <div class="step"><span class="n">3</span><span class="ic">🪨</span><b>Бросок</b><p><span class="pc">Зажми ЛКМ на острове врага и отпусти.</span><span class="tc">Нажми правой половиной, сдвинь палец, чтобы навести, и отпусти.</span> Отмена: <span class="pc">ПКМ или Esc.</span><span class="tc">отведи палец на ✕.</span></p></div>
       <div class="step"><span class="n">4</span><span class="ic">⏱</span><b>Сила</b><p>Чем дольше держишь, тем сильнее камень.</p>
         <div class="kinds"><span style="--c:#FFF3B0">обычный</span><span style="--c:#FFB050">кручёный 0,9 с</span><span style="--c:#C08CFF">мощный 2,6 с</span></div></div>
       <div class="step"><span class="n">5</span><span class="ic">🧱</span><b>Камни и плиты</b><p>Камни берут у кучи на своём острове. Плиты трескаются, потом проваливаются. Если плита под титаном пропала, он падает.</p></div>
-      <div class="step"><span class="n">6</span><span class="ic">🛠</span><b>Ремонт и обзор</b><p><span class="pc">Пробел: починить плиту рядом (1 камень). C: оглянуться на свой остров.</span><span class="tc">Кнопка РЕМОНТ чинит плиту рядом (1 камень). Кнопка 👁 вверху: оглянуться на свой остров.</span></p></div>
+      <div class="step"><span class="n">6</span><span class="ic">🛠</span><b>Прыжок, ремонт и обзор</b><p><span class="pc">Прыжок перелетает через дыру (с разбегом через одну клетку) и уворачивается от камня, если он падает под ногами; в воздухе не бросить и не чинить. E: починить плиту рядом (1 камень). C: оглянуться на свой остров.</span><span class="tc">Кнопка РЕМОНТ чинит плиту рядом (1 камень). Кнопка 👁 вверху: оглянуться на свой остров.</span></p></div>
     </div>
   </section>
 

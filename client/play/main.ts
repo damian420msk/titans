@@ -35,7 +35,7 @@ const token = (() => {
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const { id: _id, ...p } = sanitizeProfile(r, 'local'); return { ...p, dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
 let pendingResult: { level: Difficulty; won: boolean } | null = null;
 // First bot match: a short guided start. Steps advance on what the player actually does.
-const tut = { on: false, step: 0, t: 0, x: 0, z: 0, throws: 0 };
+const tut = { on: false, step: 0, t: 0, x: 0, z: 0, throws: 0, jumped: false };
 let matchesPlayed = 0, endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
@@ -49,6 +49,7 @@ let pendingSnap: { s: Snap; at: number } | null = null;
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
 let seenAimHint = (() => { try { return localStorage.getItem('titans.aimhint') === '1'; } catch { return false; } })();
 let roomView: RoomView | null = null;
+let lastSprint = 0;
 let mouseT: Pt | null = null, mouseLast: { x: number; y: number } | null = null;
 let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1, userPause = false, anchorCell: Cell | null = null;
 const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
@@ -56,7 +57,7 @@ const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
-  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел ремонт · C оглянуться';
+  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт · C оглянуться';
   const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
   // a tap on a battle button is the only moment a browser allows fullscreen and the landscape lock; phones that cannot do it just ignore this
   const goFullscreen = () => { if (!touchDevice || document.fullscreenElement || !document.fullscreenEnabled || store.get('nofs') === '1') return; document.documentElement.requestFullscreen().then(() => (screen.orientation as any)?.lock?.('landscape')).catch(() => {}); };
@@ -120,7 +121,7 @@ async function boot() {
   const startMatch = (foe?: string, info?: { mods: [Mods, Mods]; look: [Look, Look]; rating: number; ranked: boolean }) => {
     sfx.unlock(); sfx.startMusic(); sfx.click(); ya.gameplay(true); $('double').hidden = true;
     online = typeof foe === 'string'; try { (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}); } catch { /* needs fullscreen on most browsers */ } pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
-    world.resetMatch(); const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
+    world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity);
     miniKey = ''; $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
     $('foe-name').textContent = online ? foe! : NAMES[level]; $('foe-face').textContent = online ? foe!.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
@@ -160,6 +161,7 @@ async function boot() {
     () => touchDevice ? 'Бросок: нажми правой половиной экрана, сдвинь прицел на остров врага и отпусти' : 'Бросок: зажми левую кнопку мыши на острове врага и отпусти',
     () => 'Чем дольше держишь, тем сильнее камень. Камни кончились — иди к куче в углу своего острова',
     () => 'Плита под титаном пропала — он падает. Разбивай плиты врага и чини свои кнопкой РЕМОНТ',
+    () => touchDevice ? 'Прыжок: кнопка ⤒ — уворот от камня и перелёт через дыру. Бег: тяни джойстик за край круга' : 'Прыжок: Пробел — уворот от камня и перелёт через дыру. Бег: держи Shift',
   ];
   const endTutorial = () => { if (!tut.on) return; tut.on = false; $('tip').hidden = true; store.set('tutorial', '1'); };
   const tutorialTick = (dt: number, events: GameEvent[]) => {
@@ -172,6 +174,7 @@ async function boot() {
     else if (tut.step === 1 && tut.throws >= 1) next();
     else if (tut.step === 2 && (tut.throws >= 3 || tut.t > 14)) next();
     else if (tut.step === 3 && tut.t > 7) next();
+    else if (tut.step === 4 && (tut.jumped || tut.t > 10)) next();
     if (tut.t > 45 && tut.step < 2) next(); // a stuck player still sees the later tips
   };
   // mini map of the own island: plate state, the titan and the cells an incoming shot is about to hit
@@ -231,6 +234,13 @@ async function boot() {
       if (online) {
         const mx = Math.round(b.input[0].x * 100) / 100, mz = Math.round(b.input[0].z * 100) / 100;
         if ((mx !== lastMove.x || mz !== lastMove.z) && nowS - lastMove.t > .04 || nowS - lastMove.t > 1) { lastMove = { x: mx, z: mz, t: nowS }; net.send({ t: 'move', x: mx, z: mz }); }
+      }
+      // sprint (held) and jump (edge); the server gets both as intents, the local copy runs them at once
+      const wantSprint = controls.sprintHeld && b.canAct(0);
+      if (wantSprint !== b.sprint[0] || (online && wantSprint && nowS - lastSprint > 1)) { b.setSprint(0, wantSprint); if (online) { net.send({ t: 'sprint', on: wantSprint }); lastSprint = nowS; } }
+      if (controls.jumpPressed) {
+        controls.jumpPressed = false;
+        if (!controls.lookHeld && b.jump(0)) { pred.jumpAt = nowS; sfx.jump(); haptic(12); if (online) net.send({ t: 'jump' }); tut.jumped = true; }
       }
       // Touch aiming is relative and works in cells, not screen pixels: perspective squeezes depth, so a pixel gain would be too twitchy.
       const unit = Math.max(.8, Math.min(1.6, innerHeight / 390));
@@ -295,6 +305,9 @@ async function boot() {
       if (e.type === 'hit') { sfx.hit(e.side === 0); if (e.side === 0) haptic(e.kind === 'heavy' ? [90, 40, 90] : 70); }
       if (e.type === 'fall') { sfx.fall(e.side === 0); if (e.side === 0) haptic(200); }
       if (e.type === 'respawn') sfx.respawn();
+      if (e.type === 'jump' && !(online && e.side === 0)) sfx.jump(e.side === 0);
+      if (e.type === 'land') sfx.land(e.side === 0);
+      if (e.type === 'dodge') { sfx.dodge(e.side === 0); if (e.side === 0) { haptic([20, 30, 20]); toast('Уворот!'); } }
       if (e.type === 'refill' && e.side === 0) sfx.refill();
       if (e.type === 'repaired' && e.side === 0) { sfx.repaired(); haptic(30); }
     }
@@ -309,7 +322,9 @@ async function boot() {
       $('repair').textContent = rp ? `${Math.round(100 * rp.t / rp.need)}%` : 'РЕМОНТ';
       const bar = $('charge'); bar.classList.toggle('on', !!ch);
       if (ch) { const k = kindForHold(ch.t), tgt = k === 'heavy' ? 1 : k === 'spin' ? (ch.t - .9) / 1.7 : ch.t / .9; (bar.firstElementChild as HTMLElement).style.width = `${Math.min(1, ch.t / 2.6) * 100}%`; (bar.firstElementChild as HTMLElement).style.background = KIND_COLOR[k]; bar.lastElementChild!.textContent = KIND_LABEL[k]; void tgt; }
-      $('cancel').hidden = !(charging && controls.touch);
+      $('cancel').hidden = !(charging && controls.touch); $('jump').style.visibility = charging ? 'hidden' : ''; $('jump').classList.toggle('cool', b.actors[0].jumpCd > 0 || b.actors[0].air > 0);
+      const me0 = b.actors[0], st = $('stamina'), frac = me0.stamina / rules.character.sprint.stamina_s; st.classList.toggle('on', mode === 'playing' && (frac < .999 || me0.running)); st.classList.toggle('low', frac < .35 && !me0.winded); st.classList.toggle('winded', me0.winded);
+      (st.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(1, frac)) * 100}%`;
       if ((toastTimer -= dt) <= 0) $('toast').classList.remove('on');
     }
     if (mode === 'playing' && !isPaused && !forceHq && rawDt < .5) world.adaptQuality(rawDt);

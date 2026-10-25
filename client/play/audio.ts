@@ -92,6 +92,9 @@ export class Sfx {
     n.osc.frequency.setTargetAtTime(110 * Math.pow(2, Math.min(t, 3) / 1.6), this.t, .05);
     if (tier > n.tier) { n.tier = tier; this.tone(tier === 2 ? 261.63 : 196, .35, 'sawtooth', .16, { lp: 1400, echo: .4, attack: .03 }); this.tone(tier === 2 ? 392 : 293.66, .35, 'sawtooth', .1, { lp: 1400, attack: .03 }); }
   }
+  jump(mine = true) { const k = mine ? 1 : .5; this.tone(220, .16, 'triangle', .16 * k, { to: 440 }); this.noise(.12, .08 * k, { type: 'highpass', f0: 1800, f1: 3500 }); }
+  land(mine = true) { const k = mine ? 1 : .5; this.tone(110, .12, 'sine', .22 * k, { to: 60 }); this.noise(.1, .12 * k, { type: 'lowpass', f0: 900 }); }
+  dodge(mine = true) { this.tone(660, .1, 'triangle', .12, { to: 990, echo: .3 }); this.tone(990, .14, 'triangle', .08, { delay: .06, echo: .3 }); void mine; }
   impact(kind: Kind, hpBefore: number, hpAfter: number, near = 1) {
     const v = near * (kind === 'heavy' ? 1 : kind === 'spin' ? .8 : .65);
     if (hpBefore === Infinity) { this.noise(.1, .3 * v, { type: 'highpass', f0: 2500 }); this.tone(900, .06, 'square', .06 * v, { lp: 3000 }); return; }

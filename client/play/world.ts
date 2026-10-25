@@ -30,7 +30,7 @@ const STONE_COLOR: Record<Kind, string> = { normal: '#C9C3B6', spin: '#E3A862', 
 type CellView = { root: TransformNode[]; intact: TransformNode; cracked: TransformNode; foundation: Mesh; shown: 'intact' | 'cracked' | 'hole'; fall: number; base: Vector3[] };
 type Bone = { node: TransformNode; rest: Quaternion };
 type TitanView = { mats: Material[]; holder: TransformNode; body: TransformNode; walk: AnimationGroup | null; stone: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
-  bones: Map<string, Bone>; off: Map<string, Quaternion>; windup: number; swing: number; cheer: number; flail: number; cheerTarget: boolean };
+  bones: Map<string, Bone>; off: Map<string, Quaternion>; windup: number; swing: number; cheer: number; flail: number; cheerTarget: boolean; squash: number };
 /** Local rotation offset from Euler angles in degrees (x, y, z). */
 const rot = (x: number, y: number, z: number) => Quaternion.RotationYawPitchRoll(y * Math.PI / 180, x * Math.PI / 180, z * Math.PI / 180);
 type Particle = { mesh: Mesh; v: Vector3; life: number; max: number; gravity: number };
@@ -77,7 +77,7 @@ export class World {
     this.resetPoses();
   }
   private snapCamera = false;
-  resetPoses() { this.foeVis.ok = false; for (const t of this.titans) { t.cheerTarget = false; t.cheer = t.windup = t.swing = t.flail = 0; } }
+  resetPoses() { this.foeVis.ok = false; for (const t of this.titans) { t.cheerTarget = false; t.cheer = t.windup = t.swing = t.flail = t.squash = 0; } }
 
   private constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: true, preserveDrawingBuffer: false }, false);
@@ -203,7 +203,7 @@ export class World {
       if (walk) { walk.start(false, 1, walk.from, walk.to); walk.goToFrame(walk.from + (walk.to - walk.from) * .25); walk.pause(); } // standing pose = a still frame of the walk cycle
       const bones = new Map<string, Bone>();
       for (const n of c.transformNodes) if (n.name.startsWith('mixamorig:') && n.rotationQuaternion) bones.set(n.name.slice(10), { node: n, rest: n.rotationQuaternion.clone() });
-      this.titans[side] = { mats: [...c.materials], holder, body, walk, stone, yaw: side === 0 ? 0 : Math.PI, lean: 0, lie: 0, moving: false, bones, off: new Map(), windup: 0, swing: 0, cheer: 0, flail: 0, cheerTarget: false };
+      this.titans[side] = { mats: [...c.materials], holder, body, walk, stone, yaw: side === 0 ? 0 : Math.PI, lean: 0, lie: 0, moving: false, bones, off: new Map(), windup: 0, swing: 0, cheer: 0, flail: 0, cheerTarget: false, squash: 0 };
     }
   }
 
@@ -366,15 +366,19 @@ export class World {
       if (a.falling) t.yaw += dt * 5;
       t.holder.rotation.y = t.yaw;
       // posture: lean back while charging, flat when knocked down, spin and sink while falling
-      const targetLean = a.stun > 0 ? -1.35 : charging ? -.16 : 0, targetLie = a.stun > 0 ? 1 : 0;
+      const targetLean = a.stun > 0 ? -1.35 : charging ? -.16 : a.running && !a.falling ? .2 : 0, targetLie = a.stun > 0 ? 1 : 0;
       t.lean += (targetLean - t.lean) * Math.min(1, dt * (a.stun > 0 ? 14 : 8));
       t.lie += (targetLie - t.lie) * Math.min(1, dt * 10);
       t.body.rotation.x = side === 0 ? t.lean : -t.lean;
-      t.body.position.y = t.lie * .5 + (a.falling ? 0 : Math.abs(Math.sin(this.time * 14)) * (moving ? .08 : 0));
+      t.body.position.y = t.lie * .5 + (a.falling || a.air > 0 ? 0 : Math.abs(Math.sin(this.time * (a.running ? 20 : 14))) * (moving ? .08 : 0));
+      // stretch while rising, squash right after landing
+      t.squash = Math.max(0, t.squash - dt / .18); const sy = a.air > 0 ? 1.07 : 1 - .12 * t.squash;
+      t.body.scaling.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy));
       if (t.walk) {
-        if (moving && !t.moving) t.walk.start(true, charging ? .6 : 1);
+        const rate = charging ? .6 : a.running ? 1.5 : 1;
+        if (moving && !t.moving) t.walk.start(true, rate);
         else if (!moving && t.moving) { t.walk.stop(); }
-        t.walk.speedRatio = charging ? .6 : 1; t.moving = moving;
+        t.walk.speedRatio = rate; t.moving = moving;
       }
       this.poseTitan(t, side, a, !!b.charges[side], dt);
       const ch = b.charges[side];
@@ -455,6 +459,9 @@ export class World {
       }
       if (e.type === 'hit') { const t = this.titans[e.side].holder.position; for (let i = 0; i < 10; i++) this.burst({ x: t.x, z: t.z }, .9, this.mats.dust, 1.5); }
       if (e.type === 'repaired') { const c = cellCentre(e.cell, e.side); for (let i = 0; i < 10; i++) this.burst(c, .6, this.mats.sky, 2.2); }
+      if (e.type === 'jump') { const t = this.titans[e.side].holder.position; for (let i = 0; i < 4; i++) this.burst({ x: t.x, z: t.z }, .35, this.mats.dust, .15); }
+      if (e.type === 'land') { const t = this.titans[e.side]; t.squash = 1; for (let i = 0; i < 7; i++) this.burst({ x: t.holder.position.x, z: t.holder.position.z }, .5, this.mats.dust, .15); }
+      if (e.type === 'dodge') { const t = this.titans[e.side].holder.position; for (let i = 0; i < 6; i++) this.burst({ x: t.x, z: t.z }, .6, this.mats.sky, 1.2); }
       if (e.type === 'throw') { this.titans[e.side].lean = .5; this.titans[e.side].swing = 1; }
       if (e.type === 'over') { this.titans[0].cheerTarget = e.winner === 0; this.titans[1].cheerTarget = e.winner === 1; }
     }

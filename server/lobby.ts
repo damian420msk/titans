@@ -52,7 +52,7 @@ export class Lobby {
     const room = c.room, b = room?.battle;
     // a saved account that drops in the middle of a match keeps its seat for a while: mobile networks blink
     if (room && b && room.phase === 'playing' && b.phase === 'playing' && c.pid) {
-      c.away = this.now(); b.setMove(c.seat, 0, 0); b.cancelCharge(c.seat); b.cancelRepair(c.seat);
+      c.away = this.now(); b.setMove(c.seat, 0, 0); b.setSprint(c.seat, false); b.cancelCharge(c.seat); b.cancelRepair(c.seat);
       room.players[c.seat === 0 ? 1 : 0]?.conn.send({ t: 'away', on: true }); return;
     }
     this.leave(c);
@@ -282,6 +282,8 @@ export class Lobby {
       case 'target': if (cellsValid(m.x, m.z)) b.setTarget(s, { x: m.x, z: m.z }); return;
       case 'release': if (cellsValid(m.x, m.z)) b.setTarget(s, { x: m.x, z: m.z }); b.releaseCharge(s, m.k === 'spin' || m.k === 'heavy' ? m.k : undefined); return;
       case 'cancel': b.cancelCharge(s); return;
+      case 'sprint': b.setSprint(s, m.on === true); return;
+      case 'jump': b.jump(s); return;
       case 'repair': if (m.on) { if (!b.charges[s]) b.beginRepair(s); } else b.cancelRepair(s); return;
     }
   }

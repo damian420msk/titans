@@ -6,11 +6,16 @@ export type Shot = { id: number; owner: Side; kind: Kind; cells: Cell[]; start: 
 export type Actor = {
   pos: Point; y: number; vy: number; falling: boolean;
   lives: number; stones: number; cooldown: number; stun: number; slide: { dx: number; dz: number; t: number } | null;
+  /** jump: seconds left in the air (0 = on the ground) and the cooldown after landing; sprint: stamina in seconds of running left, 'winded' blocks sprint until it recovers */
+  air: number; jumpCd: number; stamina: number; winded: boolean; sprintWait: number; running: boolean;
 };
 export type Charge = { t: number; target: Cell | null };
 export type Repair = { cell: Cell; t: number; need: number };
 export type GameEvent =
   | { type: 'throw'; side: Side; kind: Kind }
+  | { type: 'jump'; side: Side }
+  | { type: 'land'; side: Side }
+  | { type: 'dodge'; side: Side }
   | { type: 'impact'; side: Side; cell: Cell; kind: Kind; hpBefore: number; hpAfter: number }
   | { type: 'hit'; side: Side; kind: Kind }
   | { type: 'fall'; side: Side }
@@ -26,6 +31,7 @@ export const MATCH_SECONDS = 180;
 export const LIVES = 3;
 export const RESPAWN_CELL: Cell = { x: 4, z: 0 };
 const START_CELL: Cell = { x: rules.arena.spawn_cell[0], z: rules.arena.spawn_cell[1] };
+const SPRINT = rules.character.sprint, JUMP = rules.character.jump;
 const GRAVITY = 18, FALL_DEPTH = -12, SLIDE_S = .25;
 const valid = (c: Cell | null): c is Cell => !!c && Number.isInteger(c.x) && Number.isInteger(c.z) && c.x >= 0 && c.x < rules.arena.width_cells && c.z >= 0 && c.z < rules.arena.depth_cells;
 
@@ -52,6 +58,8 @@ export class Battle {
   actors: [Actor, Actor] = [this.newActor(0), this.newActor(1)];
   floors: [Map<string, number>, Map<string, number>] = [new Map(), new Map()];
   input: [Point, Point] = [{ x: 0, z: 0 }, { x: 0, z: 0 }];
+  /** sprint intent (held button); whether the titan really runs is decided in `step` */
+  sprint: [boolean, boolean] = [false, false];
   charges: [Charge | null, Charge | null] = [null, null];
   repairs: [Repair | null, Repair | null] = [null, null];
   refills: [number, number] = [0, 0];
@@ -68,7 +76,7 @@ export class Battle {
   }
 
   private newActor(side: Side, at: Cell = START_CELL): Actor {
-    return { pos: cellCentre(at, side), y: 0, vy: 0, falling: false, lives: LIVES, stones: this.mods[side].capacity, cooldown: 0, stun: 0, slide: null };
+    return { pos: cellCentre(at, side), y: 0, vy: 0, falling: false, lives: LIVES, stones: this.mods[side].capacity, cooldown: 0, stun: 0, slide: null, air: 0, jumpCd: 0, stamina: SPRINT.stamina_s, winded: false, sprintWait: 0, running: false };
   }
   private resetFloors() {
     for (const side of [0, 1] as Side[]) {
@@ -80,7 +88,7 @@ export class Battle {
   hp(c: Cell, side: Side) { return this.floors[side].get(cellKey(c)) ?? 0; }
   supported(p: Point, side: Side) { const c = cellAt(p, side); return c !== null && this.hp(c, side) > 0; }
   cellOf(side: Side) { return cellAt(this.actors[side].pos, side); }
-  speed(side: Side) { return (this.charges[side] ? rules.character.charge_speed_mps : rules.character.walk_speed_mps) * this.mods[side].walk; }
+  speed(side: Side) { return (this.charges[side] ? rules.character.charge_speed_mps : rules.character.walk_speed_mps) * this.mods[side].walk * (this.actors[side].running ? SPRINT.speed_mult : 1) * (this.actors[side].air > 0 ? JUMP.air_speed_mult : 1); }
   canAct(side: Side) { const a = this.actors[side]; return this.phase === 'playing' && !a.falling && a.stun <= 0; }
 
   nearArsenal(side: Side) {
@@ -102,14 +110,21 @@ export class Battle {
     }
     return out.sort((a, b) => a.d - b.d).map(o => o.c);
   }
-  canRepair(side: Side) { return this.canAct(side) && this.actors[side].stones >= rules.inventory.repair_cost && this.repairCandidates(side).length > 0; }
+  canRepair(side: Side) { return this.canAct(side) && this.actors[side].air <= 0 && this.actors[side].stones >= rules.inventory.repair_cost && this.repairCandidates(side).length > 0; }
 
   // ---- intents (client/bot call these) ----
   setMove(side: Side, x: number, z: number) { const l = Math.max(1, Math.hypot(x, z)); this.input[side] = { x: x / l, z: z / l }; }
   beginCharge(side: Side) {
     const a = this.actors[side];
-    if (!this.canAct(side) || this.charges[side] || a.stones < rules.inventory.shot_cost || a.cooldown > 0) return false;
+    if (!this.canAct(side) || a.air > 0 || this.charges[side] || a.stones < rules.inventory.shot_cost || a.cooldown > 0) return false;
     this.repairs[side] = null; this.charges[side] = { t: 0, target: null }; return true;
+  }
+  setSprint(side: Side, on: boolean) { this.sprint[side] = on; }
+  /** Hop: a short airborne arc. Floor is ignored while in the air (cross a hole, land on the far side) and shots that land meanwhile miss. */
+  jump(side: Side) {
+    const a = this.actors[side];
+    if (!this.canAct(side) || a.air > 0 || a.jumpCd > 0 || this.charges[side]) return false;
+    this.repairs[side] = null; a.air = JUMP.duration_s; this.events.push({ type: 'jump', side }); return true;
   }
   setTarget(side: Side, c: Cell | null) { const ch = this.charges[side]; if (ch) ch.target = valid(c) ? { ...c } : null; }
   cancelCharge(side: Side) { this.charges[side] = null; }
@@ -143,18 +158,28 @@ export class Battle {
   private stepActor(side: Side, dt: number) {
     const a = this.actors[side];
     if (a.falling) {
-      a.vy -= GRAVITY * dt; a.y += a.vy * dt;
+      a.running = false; a.air = 0; a.vy -= GRAVITY * dt; a.y += a.vy * dt;
       if (a.y < FALL_DEPTH) this.afterFall(side);
       return;
     }
-    a.cooldown = Math.max(0, a.cooldown - dt); a.stun = Math.max(0, a.stun - dt);
+    a.cooldown = Math.max(0, a.cooldown - dt); a.stun = Math.max(0, a.stun - dt); a.jumpCd = Math.max(0, a.jumpCd - dt);
     const ch = this.charges[side]; if (ch) ch.t += dt;
+    if (a.air > 0) {
+      a.air = Math.max(0, a.air - dt); const u = 1 - a.air / JUMP.duration_s; a.y = JUMP.height_m * 4 * u * (1 - u);
+      if (a.air <= 0) { a.y = 0; a.jumpCd = JUMP.cooldown_s; this.events.push({ type: 'land', side }); }
+    }
+    // sprint: needs a moving, free titan with stamina; runs the stamina down, recovers shortly after it stops
+    const m0 = this.input[side], moving = Math.hypot(m0.x, m0.z) > .1;
+    if (a.winded && a.stamina >= SPRINT.min_to_start_s) a.winded = false;
+    a.running = this.sprint[side] && moving && !this.charges[side] && !this.repairs[side] && a.stun <= 0 && !a.slide && !a.winded && a.stamina > 0;
+    if (a.running && a.air <= 0) { a.stamina = Math.max(0, a.stamina - SPRINT.drain_per_s * dt); a.sprintWait = SPRINT.regen_delay_s; if (a.stamina <= 0) a.winded = true; }
+    else if (!a.running) { a.sprintWait = Math.max(0, a.sprintWait - dt); if (a.sprintWait <= 0) a.stamina = Math.min(SPRINT.stamina_s, a.stamina + SPRINT.regen_per_s * dt); }
     let dx = 0, dz = 0;
     if (a.slide) { const s = Math.min(dt, a.slide.t), k = s / SLIDE_S; dx += a.slide.dx * k; dz += a.slide.dz * k; a.slide.t -= s; if (a.slide.t <= 1e-9) a.slide = null; }
     else if (a.stun <= 0) { const v = this.speed(side), m = this.input[side]; dx = m.x * v * dt; dz = m.z * v * dt; }
     if (dx || dz) {
       if (this.repairs[side] && Math.hypot(dx, dz) > 0) this.repairs[side] = null;
-      a.pos = move(a.pos, dx, dz, p => this.supported(p, side), side);
+      a.pos = move(a.pos, dx, dz, a.air > 0 ? () => true : p => this.supported(p, side), side);
     }
     const rp = this.repairs[side];
     if (rp) {
@@ -173,7 +198,7 @@ export class Battle {
 
   private checkSupport(side: Side) {
     const a = this.actors[side];
-    if (a.falling || this.supported(a.pos, side)) return;
+    if (a.falling || a.air > 0 || this.supported(a.pos, side)) return;
     a.falling = true; a.vy = 0; this.charges[side] = null; this.repairs[side] = null; a.slide = null;
     this.events.push({ type: 'fall', side });
   }
@@ -203,7 +228,8 @@ export class Battle {
       this.events.push({ type: 'impact', side, cell: c, kind: s.kind, hpBefore: before, hpAfter: after });
     }
     const v = this.actors[side], here = this.cellOf(side);
-    if (!v.falling && here && hitCells.has(cellKey(here)) && this.phase === 'playing') {
+    if (!v.falling && v.air > 0 && here && hitCells.has(cellKey(here)) && this.phase === 'playing') this.events.push({ type: 'dodge', side });
+    else if (!v.falling && here && hitCells.has(cellKey(here)) && this.phase === 'playing') {
       v.stun = rules.recovery.knockdown_and_stand_s; this.charges[side] = null; this.repairs[side] = null;
       const dist = t.knockback_cells * size, dir = side === 0 ? -1 : 1;
       v.slide = { dx: 0, dz: dir * dist, t: SLIDE_S };

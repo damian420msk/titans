@@ -10,6 +10,11 @@ export class Controls {
   cancelled = false;     // current hold was cancelled (RMB, Esc, finger over ✕)
   overCancel = false;
   repairHeld = false;
+  /** edge: jump was pressed (Space / button); consumed by the game loop */
+  jumpPressed = false;
+  /** sprint is held: Shift, or the stick pushed past its rim */
+  sprintHeld = false;
+  private keySprint = false; private stickFast = false;
   lookHeld = false; lookToggle = false; lookSince = 0;
   pauseRequested = false;
   touch = false;
@@ -38,13 +43,16 @@ export class Controls {
     const lookEl = document.getElementById('look')!;
     // a tap switches the overview on and off (it also ends by itself); the C key keeps the hold behaviour
     lookEl.addEventListener('pointerdown', e => { e.preventDefault(); this.touch = e.pointerType !== 'mouse'; this.lookToggle = true; this.lookHeld = !this.lookHeld; this.lookSince = performance.now(); lookEl.classList.toggle('hold', this.lookHeld); });
+    const jumpEl = document.getElementById('jump')!;
+    jumpEl.addEventListener('pointerdown', e => { e.preventDefault(); this.touch = e.pointerType !== 'mouse'; this.jumpPressed = true; jumpEl.classList.add('hold'); });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) jumpEl.addEventListener(ev, () => jumpEl.classList.remove('hold'));
     this.repairEl.addEventListener('pointerdown', e => { e.preventDefault(); this.touch = e.pointerType !== 'mouse'; this.repairId = e.pointerId; this.repairHeld = true; this.repairEl.classList.add('hold'); this.repairEl.setPointerCapture(e.pointerId); });
   }
 
   clearLook() { this.lookHeld = false; this.lookToggle = false; document.getElementById('look')?.classList.remove('hold'); }
   reset() {
     if (this.held) this.cancelHold();
-    this.keys.clear(); this.stick = null; this.aimId = null; this.repairId = null; this.repairHeld = false; this.clearLook(); this.move = { x: 0, z: 0 };
+    this.keys.clear(); this.keySprint = this.stickFast = this.sprintHeld = false; this.jumpPressed = false; this.stick = null; this.aimId = null; this.repairId = null; this.repairHeld = false; this.clearLook(); this.move = { x: 0, z: 0 };
     this.stickEl.classList.remove('on'); this.repairEl.classList.remove('hold');
   }
   private cancelHold() { this.cancelled = true; this.held = false; this.released = true; this.overCancel = false; }
@@ -77,6 +85,8 @@ export class Controls {
     if (this.stick && e.pointerId === this.stick.id) {
       const max = 55; let dx = e.clientX - this.stick.ox, dy = e.clientY - this.stick.oy; const l = Math.hypot(dx, dy);
       if (l > max) { dx *= max / l; dy *= max / l; }
+      // pushing the knob well past the rim = run (hysteresis so it does not flicker at the edge)
+      this.stickFast = l > max * (this.stickFast ? 1.0 : 1.22); this.sprintHeld = this.keySprint || this.stickFast; this.stickEl.classList.toggle('fast', this.stickFast);
       this.stick.x = dx / max; this.stick.y = dy / max;
       (this.stickEl.firstElementChild as HTMLElement).style.transform = `translate(${dx}px,${dy}px)`;
       this.updateMove();
@@ -93,7 +103,7 @@ export class Controls {
 
   private up(e: PointerEvent, cancelled = false) {
     if (e.pointerType === 'mouse') { if (e.button === 0 && this.held) { this.held = false; this.released = true; } return; }
-    if (this.stick && e.pointerId === this.stick.id) { this.stick = null; this.stickEl.classList.remove('on'); this.updateMove(); }
+    if (this.stick && e.pointerId === this.stick.id) { this.stick = null; this.stickEl.classList.remove('on', 'fast'); this.stickFast = false; this.sprintHeld = this.keySprint; this.updateMove(); }
     if (e.pointerId === this.aimId) {
       this.aimId = null;
       // the fingertip rolls and slips as it lifts: aim where it was a moment before, not where the last jittery sample says
@@ -106,10 +116,13 @@ export class Controls {
 
   private key(e: KeyboardEvent, down: boolean) {
     const code = e.code;
+    if ((e.target as HTMLElement | null)?.closest?.('input,textarea')) return;
     if (e.repeat && (code === 'Escape' || code === 'KeyQ')) return;
-    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyE'].includes(code)) { e.preventDefault(); if (down) this.keys.add(code); else this.keys.delete(code); this.touch = false; this.updateMove(); }
-    if ((code === 'Space' || code === 'KeyE')) this.repairHeld = down;
-    if (code === 'KeyC' || code === 'ShiftLeft' || code === 'ShiftRight') { this.lookToggle = false; this.lookHeld = down; }
+    if (code === 'Space') { e.preventDefault(); if (down && !e.repeat) this.jumpPressed = true; this.touch = false; return; }
+    if (code === 'ShiftLeft' || code === 'ShiftRight') { this.keySprint = down; this.sprintHeld = this.keySprint || this.stickFast; this.touch = false; return; }
+    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE'].includes(code)) { e.preventDefault(); if (down) this.keys.add(code); else this.keys.delete(code); this.touch = false; this.updateMove(); }
+    if (code === 'KeyE') this.repairHeld = down;
+    if (code === 'KeyC') { this.lookToggle = false; this.lookHeld = down; }
     if (down && (code === 'Escape' || code === 'KeyQ')) { if (this.held) this.cancelHold(); else if (code === 'Escape') this.pauseRequested = true; }
   }
 

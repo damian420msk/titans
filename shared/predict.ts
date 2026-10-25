@@ -8,9 +8,11 @@ export class Predictor {
   rtt = .12;
   /** Time (seconds) when the player last released or cancelled a charge; stops stale server charges from coming back. */
   lastEnd = -9;
+  /** Time (seconds) when the player last pressed jump: the local hop is kept until the server has had time to start its own. */
+  jumpAt = -9;
   private hist: { t: number; x: number; z: number }[] = [];
 
-  reset() { this.hist.length = 0; this.lastEnd = -9; }
+  reset() { this.hist.length = 0; this.lastEnd = -9; this.jumpAt = -9; }
   /** Call once per frame, before reading input, with the own actor position. */
   record(now: number, x: number, z: number) { this.hist.push({ t: now, x, z }); while (this.hist.length && this.hist[0].t < now - 2) this.hist.shift(); }
 
@@ -27,10 +29,10 @@ export class Predictor {
    * Own charge and stick input stay local; own position is corrected only when it really diverged from what the server saw.
    */
   reconcile(b: Battle, s: Snap, at: number, now: number) {
-    const me = b.actors[0], oldPos = { x: me.pos.x, z: me.pos.z }, busy = me.falling || me.stun > 0 || !!me.slide, oldCharge = b.charges[0], myInput = { ...b.input[0] }, oldTime = b.time;
+    const me = b.actors[0], oldPos = { x: me.pos.x, z: me.pos.z }, busy = me.falling || me.stun > 0 || !!me.slide || me.air > 0, oldAir = me.air, oldY = me.y, oldJc = me.jumpCd, mySprint = b.sprint[0], oldCharge = b.charges[0], myInput = { ...b.input[0] }, oldTime = b.time;
     applySnap(b, s);
-    b.input[0] = myInput;
-    const srvPos = { ...b.actors[0].pos }, sa = b.actors[0], srvBusy = sa.falling || sa.stun > 0 || !!sa.slide, srvCharge = b.charges[0];
+    b.input[0] = myInput; b.sprint[0] = mySprint;
+    const srvPos = { ...b.actors[0].pos }, sa = b.actors[0], srvBusy = sa.falling || sa.stun > 0 || !!sa.slide || sa.air > 0, srvCharge = b.charges[0];
     const age = Math.min(.3, this.rtt / 2 + Math.max(0, now - at));
     for (let t = 0; t < age - 1e-9 && b.phase === 'playing'; t += 1 / 60) b.step(Math.min(1 / 60, age - t));
     b.events.length = 0; b.time = Math.max(oldTime, b.time);
@@ -38,7 +40,8 @@ export class Predictor {
     if (oldCharge) b.charges[0] = srvCharge || oldCharge.t <= grace ? oldCharge : null;
     else if (srvCharge && now - this.lastEnd < .6 + this.rtt) b.charges[0] = null;
     const a = b.actors[0];
-    if (!busy && !srvBusy && !a.falling && a.stun <= 0 && !a.slide) {
+    if (oldAir > 0 && a.air === 0 && !a.falling && now - this.jumpAt < grace) { a.air = oldAir; a.y = oldY; a.jumpCd = oldJc; }
+    if (!busy && !srvBusy && !a.falling && a.stun <= 0 && !a.slide && a.air <= 0) {
       const then = this.posAt(at - this.rtt);
       if (!then) a.pos = oldPos;
       else {

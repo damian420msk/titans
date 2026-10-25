@@ -80,3 +80,15 @@ test('the guest steers in its own view: stick right moves the guest titan to ITS
   lobby.handle(b, { t: 'move', x: 0, z: 1 }); for (let i = 0; i < 20; i++) lobby.tick(1 / 30);
   assert.ok(b.last('snap')!.s.a[0].z > guestView.a[0].z, 'guest forward (+z in own view) is forward for the guest');
 });
+
+test('sprint and jump intents reach the battle for both seats; jump from the guest works too', () => {
+  const { lobby, a, b } = setup();
+  lobby.handle(a, { t: 'create', name: 'S', pass: '' }); lobby.handle(b, { t: 'join', id: a.last('room')!.room!.id, pass: '' });
+  lobby.handle(a, { t: 'ready', on: true }); lobby.handle(b, { t: 'ready', on: true }); lobby.tick(3.1);
+  const room = [...(lobby as any).rooms.values()][0], bt = room.battle;
+  lobby.handle(a, { t: 'move', x: 0, z: 1 }); lobby.handle(a, { t: 'sprint', on: true }); lobby.tick(.5);
+  assert.equal(bt.actors[0].running, true); lobby.handle(a, { t: 'sprint', on: false }); lobby.tick(.05); assert.equal(bt.actors[0].running, false);
+  lobby.handle(b, { t: 'jump' }); assert.ok(bt.actors[1].air > 0); lobby.handle(a, { t: 'sprint', on: 'yes' as any }); lobby.tick(.05); assert.equal(bt.sprint[0], false, 'only a real true counts');
+  lobby.tick(.3); lobby.handle(b, { t: 'jump' }); assert.ok(bt.actors[1].air > 0, 'still the first hop or a refused second one, never a crash');
+  const snap = a.last('snap')!.s; assert.ok('ja' in snap.a[0]);
+});

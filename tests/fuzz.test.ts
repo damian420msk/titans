@@ -34,10 +34,12 @@ test('fuzz: random intents, drops and reconnects never break the server or the b
     else if (r < .7) lobby.handle(p.conn, { t: 'release', x: Math.floor(rnd() * 9), z: Math.floor(rnd() * 11) });
     else if (r < .75) lobby.handle(p.conn, { t: 'cancel' });
     else if (r < .8) lobby.handle(p.conn, { t: 'repair', on: rnd() < .5 });
+    else if (r < .87) lobby.handle(p.conn, { t: 'sprint', on: rnd() < .6 });
+    else if (r < .93) lobby.handle(p.conn, { t: 'jump' });
     lobby.tick(.05 + rnd() * .1);
     if (step % 50 === 0) for (const q of players) {
       const s = (q.conn.log.filter(m => m.t === 'snap').pop() as any)?.s; if (!s) continue;
-      for (const a of s.a) { assert.ok(Number.isFinite(a.x) && Number.isFinite(a.z) && Number.isFinite(a.y), 'finite position'); assert.ok(a.s >= 0 && a.s <= 6, 'stones in range'); assert.ok(a.l >= 0 && a.l <= 3, 'lives in range'); }
+      for (const a of s.a) { assert.ok(Number.isFinite(a.x) && Number.isFinite(a.z) && Number.isFinite(a.y), 'finite position'); assert.ok(a.s >= 0 && a.s <= 6, 'stones in range'); assert.ok(a.sm >= 0 && a.sm <= 2.001 && a.ja >= 0 && a.ja <= .56 && a.y > -13 && a.y < 1.6 || a.f === 1, 'stamina and jump in range'); assert.ok(a.l >= 0 && a.l <= 3, 'lives in range'); }
       for (const f of s.fl) for (const v of f) assert.ok(Number.isFinite(v) && v >= 0, 'plate hp is a number');
     }
   }
