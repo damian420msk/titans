@@ -5,6 +5,8 @@ import type { Sfx } from './audio';
 import type { NetState } from './online';
 
 import type { RoomInfo, RoomView, MyProfile } from '../../shared/net';
+import { checkNick, checkText } from '../../shared/names';
+import { QUICK_SEARCH_S } from '../../shared/quick';
 import { UPGRADES, COSMETICS, QUESTS, LEAGUES, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
 export type { RoomInfo, RoomView };
 export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick' | 'quests' | 'play';
@@ -24,6 +26,7 @@ export type MenuHooks = {
   onScreen: (s: Screen) => void;
   onCreate: (name: string, password: string, ranked: boolean) => void;
   onQuick: (on: boolean) => void;
+  onQuickTimeout: () => void;
   onBuy: (kind: 'up' | 'item', id: string) => void;
   onEquip: (id: string) => void;
   onClaim: () => void;
@@ -41,7 +44,7 @@ export function initMenu(h: MenuHooks) {
   let prof: MyProfile | null = null, top: PublicEntry[] = [], topRank: number | null = null, tab: 'up' | CosmeticKind = 'up';
   document.body.classList.toggle('touch', h.touch);
 
-  const nick = () => (store.get('nick', '').trim() || 'Игрок');
+  const nick = () => { const n = store.get('nick', '').trim(); return n && checkNick(n).ok ? n : 'Игрок'; };
   const sens = () => Math.max(.6, Math.min(1.8, parseFloat(store.get('sens', '1')) || 1));
   const paintNick = () => { $('nick-label').textContent = nick(); $('rate-me').textContent = nick(); document.querySelectorAll('#menu .avatar').forEach(a => { a.textContent = nick().slice(0, 1).toUpperCase(); }); };
 
@@ -66,7 +69,7 @@ export function initMenu(h: MenuHooks) {
     if (s === 'shop') renderShop();
     if (s === 'quests') renderQuests();
     if (s === 'create') { $<HTMLInputElement>('room-name').value = `Сервер ${nick()}`; $<HTMLInputElement>('room-pass').value = ''; }
-    if (s === 'settings') { $<HTMLInputElement>('nick').value = store.get('nick', ''); paintSound(); paintHaptic(); $('set-rating').textContent = String(prof?.rating ?? 1000); $('set-wins').textContent = String(prof?.wins ?? 0); $('set-games').textContent = String(prof?.games ?? 0); }
+    if (s === 'settings') { $<HTMLInputElement>('nick').value = store.get('nick', ''); $('nick-err').textContent = ''; $('nick').classList.remove('bad'); paintSound(); paintHaptic(); $('set-rating').textContent = String(prof?.rating ?? 1000); $('set-wins').textContent = String(prof?.wins ?? 0); $('set-games').textContent = String(prof?.games ?? 0); }
   }
   let noticeT = 0;
   function notice(t: string) { const el = $('menu-toast'); el.textContent = t; el.classList.add('on'); window.clearTimeout(noticeT); noticeT = window.setTimeout(() => el.classList.remove('on'), 2800); }
@@ -81,9 +84,9 @@ export function initMenu(h: MenuHooks) {
     if (t.dataset.go === 'online' && !unlocked()) { notice(LOCK_TEXT); return; }
     if (t.dataset.go) open(t.dataset.go as Screen);
     if (t.dataset.soon) notice(t.dataset.soon);
-    if (t.id === 'quick-btn') { h.onQuick(true); open('quick'); }
+    if (t.id === 'quick-btn') { h.onQuick(true); quickSearch(); }
     if (t.id === 'train-btn') h.onTrain();
-    if (t.id === 'quick-cancel') { h.onQuick(false); open('online'); }
+    if (t.id === 'quick-cancel') { qStop(); h.onQuick(false); open('online'); }
     if (t.id === 'daily') h.onClaim();
     if (t.dataset.tab) { tab = t.dataset.tab as typeof tab; renderShop(); }
     if (t.dataset.buy) h.onBuy(t.dataset.kind as 'up' | 'item', t.dataset.buy);
@@ -119,6 +122,8 @@ export function initMenu(h: MenuHooks) {
   $<HTMLFormElement>('create-form').addEventListener('submit', e => {
     e.preventDefault();
     const name = $<HTMLInputElement>('room-name').value.trim() || `Сервер ${nick()}`, pass = $<HTMLInputElement>('room-pass').value.trim();
+    const ck = checkText(name); $('room-err').textContent = ck.ok ? '' : ck.text; $('room-name').classList.toggle('bad', !ck.ok);
+    if (!ck.ok) return;
     sfx.click();
     h.onCreate(name, pass, $<HTMLInputElement>('room-ranked').checked);
   });
@@ -191,14 +196,31 @@ export function initMenu(h: MenuHooks) {
     const w = prof?.wins ?? 0, l = prof?.losses ?? 0; $('rc-wl').textContent = `${w} поб · ${l} пор${w + l ? ` · ${Math.round(w / (w + l) * 100)}%` : ''}`;
     $('recent-list').innerHTML = prof?.recent?.length ? prof.recent.map(x => `<div class="rrow ${x.won === true ? 'w' : x.won === false ? 'l' : 'd'}"><b>${x.won === true ? 'Победа' : x.won === false ? 'Поражение' : 'Ничья'}</b><span>${x.online ? '' : '🤖 '}${esc(x.nick)}</span><em>${x.delta ? (x.delta > 0 ? '+' : '') + x.delta : '·'}</em></div>`).join('') : '<div class="empty">Здесь появятся твои последние бои</div>';
   }
-  const setQueue = (on: boolean) => { if (!on && current === 'quick') open('online'); if (on && current !== 'quick') open('quick'); };
+  // quick search: 20 → 0; a found opponent freezes the number, nobody found at 0 → the host app starts a bot match
+  let qT = 0, qLeft = 0, qGone = 0;
+  const qPaint = () => { $('quick-count').textContent = String(qLeft); };
+  const qStop = () => { window.clearInterval(qT); qT = 0; window.clearTimeout(qGone); };
+  function quickSearch() {
+    qStop(); qLeft = QUICK_SEARCH_S; qPaint(); $('quick-ring').classList.remove('found'); $('quick-title').textContent = 'Ищем соперника…'; $('quick-note').textContent = 'Подбираем игрока близкого к тебе по рейтингу.';
+    open('quick');
+    qT = window.setInterval(() => { qLeft--; qPaint(); if (qLeft <= 0) { qStop(); h.onQuickTimeout(); } }, 1000);
+  }
+  const quickFound = (foe?: string) => { $('quick-ring').classList.add('found'); $('quick-title').textContent = 'Соперник найден!'; if (foe) $('quick-note').textContent = `Играем с ${foe}`; };
+  const setQueue = (on: boolean) => {
+    if (on && current !== 'quick') quickSearch();
+    if (!on && current === 'quick' && qT) { qStop(); quickFound(); qGone = window.setTimeout(() => { if (current === 'quick') open('online'); }, 6000); }
+  };
 
   // settings
   function paintSound() { const b = $('set-sound'); b.textContent = sfx.muted ? 'Выкл' : 'Вкл'; b.classList.toggle('on', !sfx.muted); }
   const paintHaptic = () => { const b = $('set-haptic'), on = store.get('haptic', '1') !== '0'; b.textContent = on ? 'Вкл' : 'Выкл'; b.classList.toggle('on', on); };
   $('set-haptic').onclick = () => { store.set('haptic', store.get('haptic', '1') !== '0' ? '0' : '1'); paintHaptic(); };
   $('set-sound').onclick = () => { sfx.setMuted(!sfx.muted); paintSound(); document.getElementById('mute-btn')!.textContent = sfx.muted ? '🔇' : '🔊'; if (!sfx.muted) sfx.click(); };
-  $<HTMLInputElement>('nick').addEventListener('input', e => { store.set('nick', (e.target as HTMLInputElement).value); paintNick(); });
+  $<HTMLInputElement>('nick').addEventListener('input', e => {
+    const el = e.target as HTMLInputElement, v = el.value.trim(), ck = v ? checkNick(v) : { ok: true as const };
+    el.classList.toggle('bad', !ck.ok); $('nick-err').textContent = ck.ok ? '' : ck.text;
+    if (ck.ok) { store.set('nick', v); paintNick(); }
+  });
   const sl = $<HTMLInputElement>('sens'); sl.value = String(sens()); $('sens-val').textContent = `×${sens().toFixed(1)}`;
   sl.addEventListener('input', () => { store.set('sens', sl.value); $('sens-val').textContent = `×${sens().toFixed(1)}`; });
   for (const k of ['sfx', 'music'] as const) {
@@ -211,6 +233,6 @@ export function initMenu(h: MenuHooks) {
 
   const setTrained = () => paintTrain();
   const botWin = () => { store.set('botwin', '1'); paintLocks(); };
-  return { trainDone, setTrained, botWin, setProfile, setTop, setQueue, show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
+  return { trainDone, setTrained, botWin, setProfile, setTop, setQueue, quickSearch, quickFound, quickStop: qStop, show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
 }
 export type Menu = ReturnType<typeof initMenu>;

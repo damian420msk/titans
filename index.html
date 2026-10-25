@@ -92,7 +92,7 @@
   <section class="scr" data-scr="create" hidden>
     <header class="top"><button class="back" data-go="online">‹ Назад</button><h2>Новый сервер</h2><span></span></header>
     <form id="create-form" class="glass form" autocomplete="off">
-      <label>Название<input id="room-name" maxlength="24" placeholder="Например, «Дуэль на облаках»"></label>
+      <label>Название<input id="room-name" maxlength="24" placeholder="Например, «Дуэль на облаках»"><div class="err" id="room-err"></div></label>
       <label><span>Пароль <em>(необязательно)</em></span><input id="room-pass" maxlength="16" placeholder="Пусто — сервер открытый"></label>
       <label class="check"><input id="room-ranked" type="checkbox" checked><span>Рейтинговая игра <em>(рейтинг и монеты за бой)</em></span></label>
       <button class="big" type="submit">СОЗДАТЬ</button>
@@ -114,7 +114,7 @@
   </section>
 
   <section class="scr" data-scr="quick" hidden>
-    <div class="searching"><div class="spinner"></div><h2>Ищем соперника…</h2><p id="quick-note">Подбираем игрока близкого к тебе по рейтингу. Чем дольше ждёшь, тем шире поиск.</p><button class="ghost" id="quick-cancel">Отмена</button></div>
+    <div class="searching"><div class="qring" id="quick-ring"><b id="quick-count">20</b></div><h2 id="quick-title">Ищем соперника…</h2><p id="quick-note">Подбираем игрока близкого к тебе по рейтингу.</p><button class="ghost" id="quick-cancel">Отмена</button></div>
   </section>
 
   <section class="scr" data-scr="rating" hidden>
@@ -149,7 +149,7 @@
       <div class="glass card">
         <h3>Профиль</h3>
         <div class="who"><span class="avatar big-av">Я</span>
-          <div class="grow"><label for="nick">Ник в игре</label><input id="nick" maxlength="14" placeholder="Игрок" autocomplete="off"></div></div>
+          <div class="grow"><label for="nick">Ник в игре</label><input id="nick" maxlength="14" placeholder="Игрок" autocomplete="off"><div class="err" id="nick-err"></div></div></div>
         <div class="stats"><div><b id="set-rating">1000</b><i>рейтинг</i></div><div><b id="set-wins">0</b><i>побед</i></div><div><b id="set-games">0</b><i>боёв</i></div></div>
         <p class="note">Прогресс хранится на сервере и привязан к этому устройству. Не очищай данные браузера, иначе профиль потеряется.</p>
       </div>

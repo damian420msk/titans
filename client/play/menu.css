@@ -121,6 +121,8 @@ body.touch .howto .pc,body:not(.touch) .howto .tc{display:none}
 .modal .form{width:min(380px,100%)}
 .modal h3{margin:0;font-size:20px;text-align:center}
 .err{color:#ffb3a3;font-size:13px;min-height:16px;text-align:center}
+input.bad{border-color:#ff8a7a !important;box-shadow:0 0 0 3px rgba(255,138,122,.35)}
+#nick-err{text-align:left;font-weight:700}
 .modal .row2 button{margin:0}
 
 @media (max-height:480px){
@@ -156,6 +158,7 @@ body.touch .howto .pc,body:not(.touch) .howto .tc{display:none}
 .searching{margin:auto;text-align:center;max-width:440px;padding:22px 30px;border-radius:24px;background:rgba(32,30,58,.78);border:2px solid rgba(255,255,255,.22);box-shadow:0 6px 0 rgba(0,0,0,.22);display:flex;flex-direction:column;align-items:center;gap:14px}
 .searching h2{margin:0;font-size:28px;color:#fff2c4;text-shadow:0 3px 0 #b05a12}
 .searching p{margin:0;font-size:14px;line-height:1.5;opacity:1;color:#e9e4ff}
+.qring{position:relative;width:86px;height:86px;display:grid;place-items:center;font-size:32px;font-weight:800;color:#fff2c4}.qring::before{content:'';position:absolute;inset:0;border-radius:50%;border:6px solid rgba(255,255,255,.25);border-top-color:#ffd25a;animation:spin 1s linear infinite}.qring.found::before{animation:none;border-color:#6be28f}
 .spinner{width:64px;height:64px;border-radius:50%;border:6px solid rgba(255,255,255,.25);border-top-color:#ffd25a;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -331,3 +334,4 @@ body.touch .step .pc,body:not(.touch) .step .tc{display:none}
 @media (max-height:480px){#chat{gap:3px}#chat .msg:nth-last-child(n+4){display:none}#chat .msg{padding:4px 10px 5px;font-size:12px}#chat .msg b{font-size:10px}}
 .coin{display:inline-block;width:1em;height:1em;border-radius:50%;vertical-align:-.14em;background:radial-gradient(circle at 35% 30%,#fff3b0,#f7c53a 55%,#c98a10);box-shadow:inset 0 0 0 .09em #a86d0a,inset 0 0 0 .19em rgba(255,240,170,.5)}
 input::placeholder{color:rgba(255,255,255,.6)}
+.qring.found ~ #quick-cancel{display:none}

@@ -19,6 +19,7 @@ type Room = {
 };
 
 const STEP = 1 / 60, SNAP_EVERY = 3, COUNT_FROM = 3, MAX_ROOMS = 60, BOT_RESULT_GAP_MS = 25000, FARM_LIMIT = 6, TOP_TTL_MS = 10000, GRACE_MS = 15000;
+import { checkNick, checkText } from '../shared/names.ts';
 const clean = (s: unknown, max: number) => (typeof s === 'string' ? s : '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, max);
 const BOT_NAMES = { easy: 'ИИ · лёгкий', normal: 'ИИ · средний', hard: 'ИИ · сложный' };
 const FRIENDLY = { win: 30, loss: 10, draw: 15 };
@@ -80,7 +81,7 @@ export class Lobby {
     const m = raw as C2S;
     switch (m.t) {
       case 'hello': return this.hello(c, m.nick, m.token);
-      case 'nick': { c.nick = clean(m.nick, 14) || c.nick; if (c.profile) { c.profile.nick = c.nick; this.persist(c.profile); } if (c.room) this.pushRoom(c.room); return; }
+      case 'nick': { const w = clean(m.nick, 14), ck = checkNick(w); if (!ck.ok) return this.err(c, 'bad_nick', ck.text); c.nick = w; if (c.profile) { c.profile.nick = c.nick; this.persist(c.profile); } if (c.room) this.pushRoom(c.room); return; }
       case 'list': conn.send({ t: 'rooms', rooms: this.list() }); return;
       case 'create': return this.create(c, m.name, m.pass, m.ranked !== false);
       case 'join': return this.join(c, m.id, m.pass);
@@ -92,7 +93,7 @@ export class Lobby {
       case 'claim': return this.claim(c);
       case 'trained': return this.trained(c);
       case 'top': return this.sendTop(c);
-      case 'result': return this.botResult(c, m.level, !!m.won);
+      case 'result': return this.botResult(c, m.level, !!m.won, m.foe);
       case 'bonus': return this.bonus(c);
       case 'emote': {
         const room = c.room, id = Number(m.id);
@@ -111,7 +112,7 @@ export class Lobby {
 
   // ---- profiles ----
   private hello(c: Client, nick: unknown, token: unknown) {
-    c.nick = clean(nick, 14) || 'Игрок';
+    const wish = clean(nick, 14); c.nick = wish && checkNick(wish).ok ? wish : 'Игрок';
     const tk = typeof token === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(token) ? token : null;
     if (!tk) { c.pid = null; c.profile = newProfile(`guest-${c.id}`, c.nick); this.sendProfile(c); if (c.room) this.pushRoom(c.room); return; }
     const pid = createHash('sha256').update(tk).digest('hex').slice(0, 32); c.pid = pid;
@@ -138,10 +139,10 @@ export class Lobby {
   private doEquip(c: Client, id: string) { const p = c.profile; if (!p) return; const r = equip(p, id); if (r.ok) this.persist(p); this.sendProfile(c); if (!r.ok) this.shop(c, false, r.error); }
   private claim(c: Client) { const p = c.profile; if (!p) return; const g = claimDaily(p, dayIndex(this.now())); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Подарок дня: +${g} монет` : 'Подарок уже получен сегодня'); }
   private trained(c: Client) { const p = c.profile; if (!p) return; const g = claimTrained(p); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Обучение пройдено: +${g} монет` : 'Награда за обучение уже получена'); }
-  private botResult(c: Client, level: unknown, won: boolean) {
+  private botResult(c: Client, level: unknown, won: boolean, foe?: unknown) {
     const p = c.profile; if (!p || !['easy', 'normal', 'hard'].includes(level as string)) return;
     if (this.now() - c.lastResult < BOT_RESULT_GAP_MS) return this.shop(c, false, 'Награда за слишком быстрый бой не засчитана');
-    c.lastResult = this.now(); const dr = botRatingDelta(p, level as any, won); p.rating += dr; pushRecent(p, { nick: BOT_NAMES[level as 'easy' | 'normal' | 'hard'], won, delta: dr, online: false }); const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0; this.shop(c, true, `+${r} монет · ${dr > 0 ? '+' : ''}${dr} рейтинг` + (qc ? ` · задание +${qc}` : ''));
+    c.lastResult = this.now(); const dr = botRatingDelta(p, level as any, won); p.rating += dr; pushRecent(p, { nick: typeof foe === 'string' && checkNick(clean(foe, 14)).ok ? clean(foe, 14) : BOT_NAMES[level as 'easy' | 'normal' | 'hard'], won, delta: dr, online: false }); const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0; this.shop(c, true, `+${r} монет · ${dr > 0 ? '+' : ''}${dr} рейтинг` + (qc ? ` · задание +${qc}` : ''));
   }
   /** Rewarded-ad bonus: repeats the last reward once. The server cannot see the ad, so it only trusts one claim per match. */
   private bonus(c: Client) {
@@ -172,7 +173,9 @@ export class Lobby {
     if (c.room) return this.err(c, 'busy', 'Сначала выйди с текущего сервера');
     if (this.rooms.size >= MAX_ROOMS) return this.err(c, 'busy', 'Сервер переполнен, попробуй позже');
     this.dequeue(c);
-    const room = this.makeRoom(clean(name, 24) || `Комната ${c.nick}`, clean(pass, 16), ranked, false);
+    const rn = clean(name, 24), rck = rn ? checkText(rn) : { ok: true as const };
+    if (!rck.ok) return this.err(c, 'bad_nick', 'Название сервера: ' + rck.text.toLowerCase());
+    const room = this.makeRoom(rn || `Комната ${c.nick}`, clean(pass, 16), ranked, false);
     room.players[0] = c; c.room = room; c.seat = 0;
     this.pushRoom(room); this.broadcastList();
   }

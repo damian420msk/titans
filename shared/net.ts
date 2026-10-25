@@ -19,7 +19,7 @@ export type C2S =
   | { t: 'claim' }
   | { t: 'trained' }
   | { t: 'top' }
-  | { t: 'result'; level: Difficulty; won: boolean }
+  | { t: 'result'; level: Difficulty; won: boolean; foe?: string }
   | { t: 'quick'; on: boolean }
   | { t: 'list' }
   | { t: 'create'; name: string; pass: string; ranked?: boolean }
@@ -43,7 +43,7 @@ export type C2S =
 export const PHRASES = ['Привет!', 'Готов?', 'Ещё разок!', 'Хорошая игра!', 'Минутку…', 'Спасибо!'];
 export const REMATCH_S = 40;
 
-export type ErrCode = 'wrong_pass' | 'full' | 'gone' | 'busy' | 'bad';
+export type ErrCode = 'wrong_pass' | 'full' | 'gone' | 'busy' | 'bad' | 'bad_nick';
 export type S2C =
   | { t: 'welcome'; id: string }
   | { t: 'rooms'; rooms: RoomInfo[] }

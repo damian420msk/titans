@@ -92,3 +92,13 @@ test('sprint and jump intents reach the battle for both seats; jump from the gue
   lobby.tick(.3); lobby.handle(b, { t: 'jump' }); assert.ok(bt.actors[1].air > 0, 'still the first hop or a refused second one, never a crash');
   const snap = a.last('snap')!.s; assert.ok('ja' in snap.a[0]);
 });
+
+test('bad nicks and room names are refused by the server', () => {
+  const { lobby, a } = setup();
+  lobby.handle(a, { t: 'nick', nick: 'с у к а' });
+  assert.equal(a.last('err')?.code, 'bad_nick');
+  lobby.handle(a, { t: 'create', name: 'Сервер для пидоров', pass: '', ranked: false });
+  assert.equal(a.all('err').length, 2); assert.equal(a.last('err')?.code, 'bad_nick');
+  const c = fake(); lobby.connect(c); lobby.handle(c, { t: 'hello', nick: 'fuck' });
+  assert.equal(c.last('profile')?.p.nick, 'Игрок');
+});

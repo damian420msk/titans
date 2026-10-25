@@ -3,6 +3,7 @@ import { Sfx } from './audio';
 import { Controls } from './controls';
 import { PHRASES } from '../../shared/net';
 import { createChat } from './chat';
+import { pickBot, DISGUISE_BOT } from '../../shared/quick';
 import type { RoomView } from '../../shared/net';
 import { touchAim, magnet } from '../../shared/aim';
 import { Battle, kindForHold, cellKey, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
@@ -35,7 +36,7 @@ const token = (() => {
   return t;
 })();
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const { id: _id, ...p } = sanitizeProfile(r, 'local'); return { ...p, dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
-let pendingResult: { level: Difficulty; won: boolean } | null = null;
+let pendingResult: { level: Difficulty; won: boolean; foe?: string } | null = null, disguise: string | null = null;
 let training: Training | null = null, pendingTrained = false, trainDoneShown = false;
 let matchesPlayed = 0, endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
@@ -65,15 +66,16 @@ async function boot() {
   const hello = () => net.send({ t: 'hello', nick: menu.nick(), token });
   const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
   menu = initMenu({
-    sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); level = l; if (matchesPlayed > 0) await ya.interstitial(); training = null; paintTrain(); startMatch(); },
+    sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); level = l; disguise = null; if (matchesPlayed > 0) await ya.interstitial(); training = null; paintTrain(); startMatch(); },
     onTrain: () => {
-      goFullscreen(); level = 'easy'; startMatch();
+      goFullscreen(); level = 'easy'; disguise = null; startMatch();
       training = new Training(menu.trainDone() ? [] : savedSteps(), battle.actors[0].pos); trainDoneShown = false;
       for (const c of [{ x: 2, z: 6 }, { x: 6, z: 5 }]) battle.floors[0].set(cellKey(c), 1); // two cracked tiles of our own to repair
       paintTrain();
     },
     onScreen: sc => { if (sc === 'online') { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); } },
     onCreate: (name, pass, ranked) => { createdPass = pass; hello(); net.send({ t: 'create', name, pass, ranked }); },
+    onQuickTimeout: () => { quickWanted = false; net.send({ t: 'quick', on: false }); const pk = pickBot(myProfile?.rating ?? 1000, Math.random); level = pk.level; disguise = DISGUISE_BOT ? pk.nick : null; goFullscreen(); startMatch(); },
     onQuick: on => { if (on) { goFullscreen(); if (!needNet()) { quickWanted = true; return; } hello(); net.send({ t: 'quick', on: true }); } else { quickWanted = false; net.send({ t: 'quick', on: false }); } },
     onBuy: (kind, id) => { if (needNet()) net.send({ t: 'buy', kind, id }); },
     onEquip: id => { if (needNet()) net.send({ t: 'equip', id }); },
@@ -105,14 +107,14 @@ async function boot() {
       case 'rooms': menu.setRooms(m.rooms); break;
       case 'room':
         roomView = m.room; updateRematch();
-        if (m.room) { menu.renderRoom(m.room); if (!menu.hidden && (menu.screen === 'online' || menu.screen === 'create' || (inviteWait && menu.screen !== 'room'))) { inviteWait = false; menu.open('room'); } }
+        if (m.room) { menu.renderRoom(m.room); if (menu.screen === 'quick') menu.quickFound(m.room.seats[m.room.me === 0 ? 1 : 0]?.nick); if (!menu.hidden && (menu.screen === 'online' || menu.screen === 'create' || (inviteWait && menu.screen !== 'room'))) { inviteWait = false; menu.open('room'); } }
         else { menu.clearRoom(); if (!menu.hidden && menu.screen === 'room') menu.open('online'); }
         break;
       case 'err': inviteWait = false; if (!$('pwd').hidden && m.code === 'wrong_pass') menu.pwdError(m.text); else menu.notice(m.text); break;
       case 'profile': {
         myProfile = m.p; store.set('profile', JSON.stringify(m.p)); menu.setProfile(m.p);
         if (pendingTrained) { net.send({ t: 'trained' }); pendingTrained = false; }
-        if (pendingResult) { net.send({ t: 'result', level: pendingResult.level, won: pendingResult.won }); pendingResult = null; }
+        if (pendingResult) { net.send({ t: 'result', level: pendingResult.level, won: pendingResult.won, foe: pendingResult.foe }); pendingResult = null; }
         break;
       }
       case 'top': menu.setTop(m.list, m.rank); break;
@@ -132,11 +134,11 @@ async function boot() {
     world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity); paintNotches();
     $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
-    $('foe-name').textContent = online ? foe! : NAMES[level]; $('foe-face').textContent = online ? foe!.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
+    if (online) disguise = null; const shown = online ? foe! : (disguise ?? NAMES[level]); $('foe-name').textContent = shown; $('foe-face').textContent = online || disguise ? shown.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
   const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
-  $('again').onclick = () => { if (online && lastQuick) { online = false; net.send({ t: 'leave' }); $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show('quick'); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else { void ya.interstitial().then(() => startMatch()); } };
+  $('again').onclick = () => { if ((online && lastQuick) || (!online && disguise)) { if (online) net.send({ t: 'leave' }); online = false; disguise = null; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.quickSearch(); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else { void ya.interstitial().then(() => startMatch()); } };
   const toMenu = () => { endTraining(false); ya.gameplay(false); if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; chat.clear(); menu.show('main'); mode = 'menu'; };
   $('to-menu').onclick = toMenu;
   // rematch = "ready" in the room that is still open after the fight
@@ -323,12 +325,12 @@ async function boot() {
     mode = 'over'; ya.gameplay(false); matchesPlayed++; charging = false; controls.reset(); $('pause').hidden = true; userPause = false;
     $('end-title').textContent = winner === 0 ? 'ПОБЕДА' : winner === 1 ? 'ПОРАЖЕНИЕ' : 'НИЧЬЯ';
     $('end-text').textContent = why === 'left' ? 'Соперник вышел из боя. Победа твоя.' : why === 'conn' ? 'Связь с сервером потеряна.' : winner === 0 ? 'Враг рухнул вниз. Небесные камни твои.' : winner === 1 ? 'Тебя сбросили с острова. Попробуй ещё раз.' : 'Время вышло, силы равны.';
-    $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'НА СЕРВЕР') : 'ЕЩЁ РАЗ';
+    $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'НА СЕРВЕР') : disguise ? 'ИСКАТЬ ЕЩЁ' : 'ЕЩЁ РАЗ';
     $('end-gain').textContent = online ? endGain : ''; $('end-foe').textContent = ''; $('rematch').hidden = $('end-say').hidden = true; if (online && !why) setTimeout(updateRematch, 0);
     if (!online && why !== 'conn') {
       if (winner === 0) menu.botWin();
-      pendingResult = { level, won: winner === 0 };
-      if (net.state === 'on') { hello(); net.send({ t: 'result', level, won: winner === 0 }); pendingResult = null; } else net.connect();
+      pendingResult = { level, won: winner === 0, foe: disguise ?? undefined };
+      if (net.state === 'on') { hello(); net.send({ t: 'result', level, won: winner === 0, foe: disguise ?? undefined }); pendingResult = null; } else net.connect();
     }
     if (why === 'left') { sfx.win(); }
     setTimeout(() => { $('end').hidden = false; }, 900);
