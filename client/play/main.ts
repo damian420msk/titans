@@ -96,7 +96,7 @@ async function boot() {
       case 'away': if (online) toast(m.on ? 'Соперник потерял связь. Ждём…' : 'Соперник вернулся'); break;
       case 'start': quickWanted = false; if (online && mode === 'playing') { reconnectAt = 0; $('reconn').hidden = true; toast('Связь восстановлена'); break; } lastQuick = !!m.quick; startMatch(m.foe, { mods: m.mods, look: m.look, rating: m.foeRating, ranked: m.ranked }); break;
       case 'snap': if (online) { pendingSnap = { s: m.s, at: performance.now() / 1000 }; srvEvents.push(...m.ev); } break;
-      case 'end': reconnectAt = 0; $('reconn').hidden = true; if (online && mode === 'playing') { endGain = m.gain ? `${m.gain.ranked ? (m.gain.rating >= 0 ? '+' : '') + m.gain.rating + ' рейтинг · ' : ''}+${m.gain.coins} 🪙` : ''; showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); if (m.gain && m.gain.coins > 0) setTimeout(offerDouble, 1000); } break;
+      case 'end': reconnectAt = 0; $('reconn').hidden = true; if (online && mode === 'playing') { endGain = m.gain ? `${m.gain.ranked ? (m.gain.rating >= 0 ? '+' : '') + m.gain.rating + ' рейтинг · ' : ''}+${m.gain.coins} 🪙${m.gain.note ? '\n' + m.gain.note : ''}` : ''; showEnd(m.winner, m.reason === 'left' ? 'left' : undefined); if (m.gain && m.gain.coins > 0) setTimeout(offerDouble, 1000); } break;
     }
   };
   const startMatch = (foe?: string, info?: { mods: [Mods, Mods]; look: [Look, Look]; rating: number; ranked: boolean }) => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dayIndex, rewardBot, recordQuest, QUESTS, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
+import { newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dayIndex, rewardBot, botRatingDelta, recordQuest, QUESTS, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
 import { Battle } from '../shared/battle.ts';
 
 test('new profile: 1000 rating, starter coins, free cosmetics equipped', () => {
@@ -67,4 +67,15 @@ test('mods stay finite for an old or damaged profile (missing or junk upgrade le
     const m = modsFor({ up } as any); for (const v of Object.values(m)) assert.ok(Number.isFinite(v), JSON.stringify(up));
   }
   assert.equal(modsFor({ up: { legs: 99 } } as any).walk, 1 + .04 * 3, 'levels are capped');
+});
+
+test('bot fights move rating, half as much as a live player; a win always gives at least +1, a loss costs at least 1', () => {
+  const p = { rating: 1000, games: 50 };
+  const live = elo(1000, 1050, 1)[0], vs = botRatingDelta(p, 'normal', true);
+  assert.ok(vs > 0 && vs <= Math.ceil(live / 2), `bot win ${vs} vs live win ${live}`);
+  assert.ok(botRatingDelta(p, 'normal', false) < 0);
+  assert.ok(botRatingDelta(p, 'hard', true) > botRatingDelta(p, 'easy', true), 'a harder bot pays more');
+  assert.ok(botRatingDelta(p, 'easy', false) < botRatingDelta(p, 'hard', false), 'losing to an easy bot costs more');
+  assert.equal(botRatingDelta({ rating: 2000, games: 50 }, 'easy', true), 1); assert.ok(botRatingDelta({ rating: 2000, games: 50 }, 'easy', false) <= -1);
+  assert.equal(botRatingDelta({ rating: 0, games: 50 }, 'hard', false), 0, 'never below zero');
 });

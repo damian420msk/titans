@@ -124,3 +124,17 @@ test('rewarded bonus repeats the last reward once, capped, and only for saved ac
   const g = fake(); lobby.connect(g); lobby.handle(g, { t: 'hello', nick: 'Гость' }); lobby.handle(g, { t: 'result', level: 'hard', won: true }); lobby.handle(g, { t: 'bonus' });
   assert.equal(g.last('profile')!.p.coins, 100 + 60 , 'guest got only the plain reward');
 });
+
+test('a bot win raises rating, a bot loss lowers it (after the anti-spam gap); the message says so', () => {
+  const clock = { t: 1e9 }, lobby = new Lobby(new MemoryStore(), () => clock.t), a = player(lobby, 'Аня');
+  lobby.handle(a, { t: 'result', level: 'normal', won: true }); const up = prof(a).rating; assert.ok(up > 1000); assert.match((a.last('shop') as any).text, /\+\d+ рейтинг/);
+  clock.t += 30000; lobby.handle(a, { t: 'result', level: 'normal', won: false }); assert.ok(prof(a).rating < up); assert.match((a.last('shop') as any).text, /-\d+ рейтинг/);
+});
+test('the end message says why rating did not change: same account, friendly room', () => {
+  const lobby = new Lobby(new MemoryStore()), a = player(lobby, 'Аня'), a2 = player(lobby, 'Аня'); // same token = same account
+  startRanked(lobby, a, a2); finish(lobby, a2); assert.match(a.last('end')!.gain!.note!, /одного аккаунта/); assert.equal(a.last('end')!.gain!.rating, 0);
+  const b = player(lobby, 'Боря'), c = player(lobby, 'Вася');
+  lobby.handle(b, { t: 'create', name: 'Д', pass: '', ranked: false }); lobby.handle(c, { t: 'join', id: (c.last('rooms')!.rooms as RoomInfo[]).find(r => r.name === 'Д')!.id, pass: '' });
+  lobby.handle(b, { t: 'ready', on: true }); lobby.handle(c, { t: 'ready', on: true }); lobby.tick(3.1); finish(lobby, c);
+  assert.match(b.last('end')!.gain!.note!, /Дружеский/);
+});

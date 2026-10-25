@@ -107,6 +107,13 @@ export const DAILY_BONUS = 50;
 export const dayIndex = (ms: number) => Math.floor((ms + 3 * 3600e3) / 86400e3);
 
 export function claimDaily(p: Profile, day: number): number { if (p.daily >= day) return 0; p.daily = day; p.coins += DAILY_BONUS; return DAILY_BONUS; }
+/** Rating for a bot fight: Elo against a fixed bot rating, then halved (a bot is worth half a live player). A win always gives at least +1, a loss costs at least 1. */
+export const BOT_RATING: Record<Difficulty, number> = { easy: 850, normal: 1050, hard: 1250 };
+export function botRatingDelta(p: Pick<Profile, 'rating' | 'games'>, level: Difficulty, won: boolean): number {
+  const [d] = elo(p.rating, BOT_RATING[level], won ? 1 : 0, p.games, 99), half = Math.round(d / 2);
+  const delta = won ? Math.max(1, half) : Math.min(-1, half);
+  return Math.max(delta, -p.rating) || 0;
+}
 export function rewardBot(p: Profile, level: Difficulty, won: boolean): number { const r = BOT_REWARD[level][won ? 'win' : 'loss']; p.coins += r; p.games++; if (won) p.wins++; else p.losses++; return r; }
 
 /** Elo with a larger step for the first games. Returns the two rating changes. */

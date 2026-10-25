@@ -47,7 +47,7 @@ export type S2C =
   | { t: 'shop'; ok: boolean; text: string }
   | { t: 'start'; foe: string; foeRating: number; mods: [Mods, Mods]; look: [Look, Look]; ranked: boolean; quick?: boolean }
   | { t: 'snap'; s: Snap; ev: GameEvent[] }
-  | { t: 'end'; winner: Side | null; reason: 'over' | 'left'; gain: { rating: number; coins: number; ranked: boolean } | null }
+  | { t: 'end'; winner: Side | null; reason: 'over' | 'left'; gain: { rating: number; coins: number; ranked: boolean; note?: string } | null }
   | { t: 'away'; on: boolean }
   | { t: 'emote'; id: number }
   | { t: 'pong'; n: number };

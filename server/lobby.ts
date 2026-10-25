@@ -5,7 +5,7 @@ import { Battle, type GameEvent } from '../shared/battle.ts';
 import { cellsValid } from './validate.ts';
 import { MemoryStore, type Store } from './store.ts';
 import { snapshot, mirrorSnap, mirrorEvents, type C2S, type S2C, type RoomInfo, type RoomView, type Seat, type ErrCode, type MyProfile } from '../shared/net.ts';
-import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayIndex, rewardBot, applyOnline, recordQuest, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
+import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayIndex, rewardBot, botRatingDelta, applyOnline, recordQuest, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
 
 export interface Conn { send(m: S2C): void }
 type Client = {
@@ -133,7 +133,7 @@ export class Lobby {
   private botResult(c: Client, level: unknown, won: boolean) {
     const p = c.profile; if (!p || !['easy', 'normal', 'hard'].includes(level as string)) return;
     if (this.now() - c.lastResult < BOT_RESULT_GAP_MS) return this.shop(c, false, 'Награда за слишком быстрый бой не засчитана');
-    c.lastResult = this.now(); const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0; this.shop(c, true, `+${r} монет` + (qc ? ` · задание +${qc}` : ''));
+    c.lastResult = this.now(); const dr = botRatingDelta(p, level as any, won); p.rating += dr; const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0; this.shop(c, true, `+${r} монет · ${dr > 0 ? '+' : ''}${dr} рейтинг` + (qc ? ` · задание +${qc}` : ''));
   }
   /** Rewarded-ad bonus: repeats the last reward once. The server cannot see the ad, so it only trusts one claim per match. */
   private bonus(c: Client) {
@@ -245,15 +245,16 @@ export class Lobby {
   private settle(room: Room, winner: 0 | 1 | null) {
     const [a, b] = room.players, pa = a?.profile, pb = b?.profile;
     if (!a || !b || !pa || !pb) return { ranked: false, g: [null, null] as [null, null] };
-    let ranked = room.ranked && !!a.pid && !!b.pid && a.pid !== b.pid;
+    let ranked = room.ranked && !!a.pid && !!b.pid && a.pid !== b.pid, note = '';
+    if (!room.ranked) note = 'Дружеский бой: рейтинг не меняется'; else if (a.pid && a.pid === b.pid) note = 'Оба игрока с одного аккаунта: рейтинг не меняется'; else if (!a.pid || !b.pid) note = 'Игра без сохранения: рейтинг не меняется';
     if (ranked) {
       const key = [a.pid, b.pid].sort().join(':'), log = (this.pairLog.get(key) ?? []).filter(t => this.now() - t < 3600e3);
-      if (log.length >= FARM_LIMIT) ranked = false; else { log.push(this.now()); this.pairLog.set(key, log); }
+      if (log.length >= FARM_LIMIT) { ranked = false; note = 'Много боёв с этим соперником за час: рейтинг не меняется'; } else { log.push(this.now()); this.pairLog.set(key, log); }
     }
     let g: [{ rating: number; coins: number; ranked: boolean }, { rating: number; coins: number; ranked: boolean }];
     if (ranked) { const [ga, gb] = applyOnline(pa, pb, winner); g = [{ ...ga, ranked }, { ...gb, ranked }]; }
     else {
-      const give = (p: Profile, won: boolean | null) => { const coins = won === null ? FRIENDLY.draw : won ? FRIENDLY.win : FRIENDLY.loss; p.coins += coins; return { rating: 0, coins, ranked: false }; };
+      const give = (p: Profile, won: boolean | null) => { const coins = won === null ? FRIENDLY.draw : won ? FRIENDLY.win : FRIENDLY.loss; p.coins += coins; return { rating: 0, coins, ranked: false, note }; };
       g = [give(pa, winner === null ? null : winner === 0), give(pb, winner === null ? null : winner === 1)];
     }
     const day = dayIndex(this.now());
