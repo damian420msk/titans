@@ -1,0 +1,222 @@
+<title>Карта Титанов</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: sticky header with tabs, then one of three views. The map is a pan/zoom canvas of screen cards joined by curves. */
+:root{
+  --bg:#17132e; --panel:#231d44; --panel2:#2d2558; --line:#4a3f86; --fg:#f2eeff; --dim:#b3a9de;
+  --gold:#ffd25a; --teal:#35c9b8; --coral:#ff7b62; --sky:#6db6ff; --grey:#8d86b3;
+  --ui:'Rubik',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 var(--ui);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;overflow:hidden}
+header{flex:none;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding-block:12px 10px}
+h1{margin:0;font-size:20px;font-weight:800;letter-spacing:.02em;color:var(--gold)}
+h1 small{display:block;font:500 11px var(--mono);color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;color:inherit;cursor:pointer}
+.tab,.chip{border:1px solid var(--line);background:var(--panel);padding:6px 14px;border-radius:20px;font-weight:500}
+.tab[aria-selected=true],.chip[aria-pressed=true]{background:var(--gold);border-color:var(--gold);color:#2b1c00;font-weight:700}
+.tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--dim)}
+.legend span{display:inline-flex;gap:5px;align-items:center}
+.st{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font:700 11px/1 var(--ui);flex:none}
+.st.ok{background:var(--teal);color:#05332d}.st.wip{background:var(--gold);color:#2b1c00}.st.todo{background:transparent;border:2px solid var(--grey);color:var(--grey)}.st.q{background:var(--coral);color:#3a0d02}
+main{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;display:none}
+.view.on{display:block}
+/* map */
+#map{overflow:hidden;touch-action:none;cursor:grab;border:1px solid var(--line);border-radius:14px;background:
+ radial-gradient(circle at 1px 1px,#322a62 1px,transparent 1.5px) 0 0/28px 28px,#120f26}
+#map.drag{cursor:grabbing}
+#plane{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+#lines{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.node{position:absolute;width:300px;border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden;box-shadow:0 6px 0 #0d0a1d}
+.node.soft{border-style:dashed;background:#1b1637}
+.node .hd{display:flex;gap:8px;align-items:center;padding:8px 10px 6px}
+.node h3{margin:0;font-size:14px;font-weight:700;flex:1;min-width:0}
+.ver{font:500 11px var(--mono);padding:1px 7px;border-radius:9px;background:var(--panel2);color:var(--dim);flex:none}
+.ver.v10{color:#05332d;background:var(--teal)}.ver.v11{color:#0b2a4d;background:var(--sky)}.ver.v20{color:#3a0d02;background:var(--coral)}
+.shot{display:block;width:100%;aspect-ratio:2/1;object-fit:cover;background:#0d0a1d;cursor:zoom-in}
+.noshot{aspect-ratio:2/1;display:grid;place-items:center;background:repeating-linear-gradient(135deg,#1b1637 0 10px,#211b44 10px 20px);color:var(--grey);font:500 12px var(--mono);text-align:center;padding:10px}
+.node p{margin:0;padding:7px 10px 10px;font-size:12px;color:var(--dim);min-height:48px}
+.node.dim{opacity:.18}
+.hint{position:absolute;left:12px;bottom:12px;background:#120f26cc;border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:12px;color:var(--dim)}
+.zoom{position:absolute;right:12px;bottom:12px;display:flex;gap:6px}
+.zoom button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:18px;font-weight:700}
+/* lists */
+.scroll{overflow:auto;height:100%;padding-block:4px 24px}
+.lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.lane{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:14px 14px 10px;min-width:0}
+.lane h2{margin:0 0 2px;font-size:17px}
+.lane .when{font:500 12px var(--mono);color:var(--dim);margin-bottom:10px}
+.lane h4{margin:12px 0 4px;font:700 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.lane ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.lane li{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+.lane li .st{margin-top:2px}
+.lane.cur{border-color:var(--gold)}
+.note{margin:14px 0 0;border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:14px}
+.note h2{margin:0 0 8px;font-size:16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:700 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+td.n,th.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+.twrap{overflow-x:auto}
+.cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+.cols2 .note{margin:0}
+.bar{display:flex;gap:2px;height:12px;border-radius:6px;overflow:hidden;margin:6px 0 2px}
+.bar i{display:block;height:100%}
+#lb{position:fixed;inset:0;background:#0a0818ee;display:none;place-items:center;z-index:20;padding:16px}
+#lb.on{display:grid}
+#lb img{max-width:100%;max-height:100%;border-radius:10px;border:1px solid var(--line)}
+@media (max-width:820px){.lanes,.cols2{grid-template-columns:1fr}.tools{margin-left:0}}
+@media (prefers-reduced-motion:no-preference){.node{transition:opacity .15s}}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+</style>
+
+<header>
+  <h1>Карта Титанов<small>игра 1×1 · экраны, версии, время в игре · 25.10.2026</small></h1>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-v="map" aria-selected="true">Экраны</button>
+    <button class="tab" role="tab" data-v="ver" aria-selected="false">Версии</button>
+    <button class="tab" role="tab" data-v="time" aria-selected="false">Время в игре</button>
+  </div>
+  <div class="tools" id="tools">
+    <button class="chip" data-dev="ph" aria-pressed="true">📱 Телефон</button>
+    <button class="chip" data-dev="pc" aria-pressed="false">🖥 ПК</button>
+    <button class="chip" data-f="all" aria-pressed="true">Все</button>
+    <button class="chip" data-f="v10" aria-pressed="false">1.0</button>
+    <button class="chip" data-f="v11" aria-pressed="false">1.1</button>
+    <button class="chip" data-f="v20" aria-pressed="false">2.0</button>
+  </div>
+</header>
+<div class="legend" style="padding-bottom:8px">
+  <span><i class="st ok">✓</i>готово</span><span><i class="st wip">~</i>нужно доработать</span><span><i class="st todo">○</i>не начато</span><span><i class="st q">?</i>решения нет</span>
+</div>
+<main>
+  <section class="view on" id="v-map"><div id="map"><div id="plane"><svg id="lines"></svg></div>
+    <div class="hint">тяни — двигать · колесо или кнопки — масштаб · клик по картинке — крупно</div>
+    <div class="zoom"><button id="zi" aria-label="Приблизить">+</button><button id="zo" aria-label="Отдалить">−</button><button id="zf" aria-label="Вписать">⌂</button></div></div></section>
+  <section class="view" id="v-ver"><div class="scroll" id="ver"></div></section>
+  <section class="view" id="v-time"><div class="scroll" id="time"></div></section>
+</main>
+<div id="lb"><img alt=""></div>
+
+<script>
+const IMG = __IMAGES__;
+const S = {ok:['ok','✓'],wip:['wip','~'],todo:['todo','○'],q:['q','?']};
+/* node: id, title, col,row (grid), status, version, shot key (or null), note, parent(s), soft (concept card) */
+const N = [
+ {id:'main',t:'Главная',c:0,r:2.2,s:'ok',v:'v10',k:'main',n:'Профиль и монеты слева, 🏆 и ⚙ справа, ИГРАТЬ, плитки внизу.'},
+ {id:'gift',t:'Подарок дня: серия 7 дней',c:0,r:3.9,s:'todo',v:'v10',soft:1,from:'main',n:'Окно со сундуком и календарём, иконка если закрыл. Сейчас простая разовая награда.'},
+ {id:'base',t:'Моя база',c:0,r:4.75,s:'todo',v:'v20',soft:1,from:'main',n:'Плитка «скоро». Остров игрока, постройки, рейды.'},
+ {id:'camp',t:'Кампания',c:0,r:5.6,s:'todo',v:'v20',soft:1,from:'main',n:'Плитка «скоро». Сюжетные миссии с ботами-боссами.'},
+ {id:'play',t:'Играть',c:1,r:1.4,s:'ok',v:'v10',k:'play',from:'main',n:'Онлайн, бой с ботом, тренировка (мелкая плашка), «Как играть».'},
+ {id:'shop',t:'Магазин',c:1,r:5.0,s:'ok',v:'v10',k:'shop',from:'main',n:'7 улучшений (в т.ч. выносливость). Цены ждут проверки.'},
+ {id:'quests',t:'Задания дня',c:1,r:6.0,s:'wip',v:'v10',k:'quests',from:'main',n:'Три задания. До релиза: три сложности ботов. В 1.1: недельные.'},
+ {id:'rating',t:'Рейтинг',c:1,r:7.0,s:'ok',v:'v10',k:'rating',from:'main',n:'Топ 100, своё место, последние бои. В 1.1: сезоны и награды за лигу.'},
+ {id:'settings',t:'Настройки',c:1,r:8.0,s:'ok',v:'v10',k:'settings',from:'main',n:'Ник, звук, вибрация, чувствительность прицела.'},
+ {id:'online',t:'Онлайн',c:2,r:0.5,s:'q',v:'v10',k:'online',from:'play',n:'Закрыт до первой победы над ботом. Нужно решить судьбу списка серверов.'},
+ {id:'search',t:'Быстрая игра: поиск',c:3,r:0,s:'wip',v:'v10',k:'quick',from:'online',n:'Нужны потолок разницы рейтинга ~400 и бот через 20 с.'},
+ {id:'create',t:'Новый сервер',c:3,r:1.0,s:'q',v:'v10',k:'create',from:'online',n:'Название, пароль, рейтинговая. Приватные серверы под вопросом.'},
+ {id:'room',t:'Ожидание на сервере',c:4,r:1.0,s:'q',v:'v10',from:'create',n:'Два места, «Готов», отсчёт, ссылка «Позвать друга» (в Яндексе внешние ссылки нельзя).'},
+ {id:'bot',t:'Бой с ботом: уровни',c:2,r:2.3,s:'ok',v:'v10',k:'bot',from:'play',n:'Гром, Боргар, Торвальд. В 1.1 можно добавить боссов.'},
+ {id:'fight',t:'Бой',c:3,r:2.3,s:'wip',v:'v10',k:'fight',from:'bot',n:'Бот не прыгает и не бегает. Запасные позы прыжка и падения. Фон неба без параллакса.'},
+ {id:'end',t:'Конец боя',c:4,r:2.3,s:'wip',v:'v10',k:'end',from:'fight',n:'Добавить строку «Ближайшая цель». Есть удвоение награды рекламой.'},
+ {id:'train',t:'Тренировка',c:2,r:3.6,s:'ok',v:'v10',from:'play',n:'Плашка на экране «Играть», золотая пока не пройдена; «✓ пройдено» после.'},
+ {id:'trainfight',t:'Тренировка: чек-лист',c:3,r:3.6,s:'ok',v:'v10',k:'training',from:'train',n:'7 заданий, неподвижный враг, без рейтинга, +100 монет один раз.'},
+ {id:'pause',t:'Пауза',c:4,r:3.6,s:'ok',v:'v10',k:'pause',from:'trainfight',n:'Выйти можно в любой момент, прогресс заданий сохраняется.'},
+ {id:'howto',t:'Как играть',c:2,r:4.7,s:'ok',v:'v10',k:'howto',from:'play',n:'Шесть карточек. Перевод на английский в 1.1.'},
+ {id:'skins',t:'Магазин: косметика',c:2,r:5.8,s:'wip',v:'v11',k:'shop_skins',from:'shop',n:'Мало предметов. В 1.1 новые скины титана, плиты, камни.'},
+];
+const W=300,H=222,GX=400,GY=262,X0=40,Y0=30;
+const pos = n => ({x:X0+n.c*GX, y:Y0+n.r*GY, h:n.soft?112:H});
+let dev='ph', filt='all';
+const plane=document.getElementById('plane'), lines=document.getElementById('lines');
+function build(){
+  plane.querySelectorAll('.node').forEach(e=>e.remove());
+  let maxX=0,maxY=0;
+  for(const n of N){
+    const p=pos(n), el=document.createElement('div'); el.className='node'+(n.soft?' soft':'')+((filt!=='all'&&n.v!==filt)?' dim':''); el.id='n-'+n.id;
+    el.style.left=p.x+'px'; el.style.top=p.y+'px'; el.style.height=p.h+'px';
+    const [cls,ch]=S[n.s]; const lab={ok:'готово',wip:'нужно доработать',todo:'не начато',q:'решения нет'}[n.s];
+    const vt={v10:'1.0',v11:'1.1',v20:'2.0'}[n.v];
+    const img = n.k && IMG[n.k] && IMG[n.k][dev];
+    el.innerHTML=`<div class="hd"><i class="st ${cls}" title="${lab}" aria-label="${lab}">${ch}</i><h3>${n.t}</h3><span class="ver ${n.v}">${vt}</span></div>`+
+      (n.soft?'':(img?`<img class="shot" src="${img}" alt="${n.t}" loading="lazy">`:`<div class="noshot">снимка нет<br>экран ещё не снят</div>`))+`<p>${n.n}</p>`;
+    plane.appendChild(el); maxX=Math.max(maxX,p.x+W+40); maxY=Math.max(maxY,p.y+p.h+40);
+  }
+  lines.setAttribute('width',maxX); lines.setAttribute('height',maxY); lines.innerHTML='';
+  for(const n of N){ if(!n.from) continue; const a=N.find(x=>x.id===n.from), pa=pos(a), pb=pos(n);
+    const x1=pa.x+W, y1=pa.y+(a.soft?56:60), x2=pb.x, y2=pb.y+(n.soft?56:60);
+    const [x1b,y1b,x2b,y2b]= a.soft||a.c===n.c ? [pa.x+W/2,pa.y+pa.h,pb.x+W/2,pb.y] : [x1,y1,x2,y2];
+    const dim=(filt!=='all'&&n.v!==filt)||(filt!=='all'&&a.v!==filt&&false);
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path'); const dx=(x2b-x1b)/2;
+    p.setAttribute('d',a.soft||a.c===n.c?`M${x1b},${y1b} C${x1b},${y1b+40} ${x2b},${y2b-40} ${x2b},${y2b}`:`M${x1b},${y1b} C${x1b+dx},${y1b} ${x2b-dx},${y2b} ${x2b},${y2b}`);
+    p.setAttribute('fill','none'); p.setAttribute('stroke','#6a5cc0'); p.setAttribute('stroke-width','2.5'); p.setAttribute('opacity',dim?'.15':'.9'); if(n.s==='q'||n.s==='todo') p.setAttribute('stroke-dasharray','7 6');
+    lines.appendChild(p);
+    const d=document.createElementNS('http://www.w3.org/2000/svg','circle'); d.setAttribute('cx',x2b); d.setAttribute('cy',y2b); d.setAttribute('r','4.5'); d.setAttribute('fill','#6a5cc0'); d.setAttribute('opacity',dim?'.15':'1'); lines.appendChild(d);
+  }
+  plane.dataset.w=maxX; plane.dataset.h=maxY;
+}
+/* pan and zoom */
+const map=document.getElementById('map'); let sc=1,tx=0,ty=0; const pts=new Map(); let pinch=0;
+const apply=()=>{plane.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`};
+function fit(){const r=map.getBoundingClientRect(),w=+plane.dataset.w,h=+plane.dataset.h; sc=Math.min(r.width/w,r.height/h); sc=Math.max(.12,Math.min(sc,1)); if(r.width<700) sc=Math.max(sc,.34); tx=Math.max(8,(r.width-w*sc)/2); ty=8; apply();}
+function zoomAt(f,cx,cy){const ns=Math.max(.12,Math.min(2.2,sc*f)); tx=cx-(cx-tx)*(ns/sc); ty=cy-(cy-ty)*(ns/sc); sc=ns; apply();}
+map.addEventListener('wheel',e=>{e.preventDefault(); const r=map.getBoundingClientRect(); if(e.ctrlKey||Math.abs(e.deltaY)>0&&!e.shiftKey) zoomAt(e.deltaY<0?1.12:1/1.12,e.clientX-r.left,e.clientY-r.top);},{passive:false});
+map.addEventListener('pointerdown',e=>{pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); map.setPointerCapture(e.pointerId); map.classList.add('drag'); pinch=0; map._moved=0;});
+map.addEventListener('pointermove',e=>{const p=pts.get(e.pointerId); if(!p) return; const dx=e.clientX-p.x,dy=e.clientY-p.y; map._moved+=Math.abs(dx)+Math.abs(dy);
+  if(pts.size===2){const [a,b]=[...pts.values()]; const old=Math.hypot(a.x-b.x,a.y-b.y); p.x=e.clientX;p.y=e.clientY; const [c,d]=[...pts.values()]; const nw=Math.hypot(c.x-d.x,c.y-d.y); const r=map.getBoundingClientRect(); if(old>0) zoomAt(nw/old,(c.x+d.x)/2-r.left,(c.y+d.y)/2-r.top); return;}
+  p.x=e.clientX;p.y=e.clientY; tx+=dx;ty+=dy; apply();});
+const up=e=>{pts.delete(e.pointerId); if(!pts.size) map.classList.remove('drag');};
+map.addEventListener('pointerup',up); map.addEventListener('pointercancel',up);
+map.addEventListener('click',e=>{ if(map._moved>6) return; const im=e.target.closest('.shot'); if(im){const lb=document.getElementById('lb'); lb.querySelector('img').src=im.src; lb.classList.add('on');}});
+document.getElementById('lb').onclick=e=>e.currentTarget.classList.remove('on');
+document.getElementById('zi').onclick=()=>{const r=map.getBoundingClientRect();zoomAt(1.25,r.width/2,r.height/2)};
+document.getElementById('zo').onclick=()=>{const r=map.getBoundingClientRect();zoomAt(.8,r.width/2,r.height/2)};
+document.getElementById('zf').onclick=fit;
+/* tools */
+document.getElementById('tools').addEventListener('click',e=>{const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.dev){dev=b.dataset.dev; document.querySelectorAll('[data-dev]').forEach(x=>x.setAttribute('aria-pressed',x===b)); build();}
+  if(b.dataset.f){filt=b.dataset.f; document.querySelectorAll('[data-f]').forEach(x=>x.setAttribute('aria-pressed',x===b)); build();}});
+document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('.tab'); if(!b) return;
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',x===b)); document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));
+  document.getElementById('tools').style.visibility=b.dataset.v==='map'?'visible':'hidden'; if(b.dataset.v==='map') fit();});
+/* versions */
+const li=(s,t)=>`<li><i class="st ${S[s][0]}">${S[s][1]}</i><span>${t}</span></li>`;
+const LANES=[
+ {h:'0.9 альфа',w:'сейчас',cur:0,done:[['ok','Бой 1×1: правила, 3 типа броска, жизни, ремонт, 89 автотестов'],['ok','Бот трёх уровней'],['ok','Онлайн: быстрая игра, серверы, переподключение'],['ok','Профиль, монеты, рейтинг и 5 лиг, магазин'],['ok','Титан v04, камера v3, выносливость и прыжок'],['ok','Меню v2 и обучение с чек-листом'],['ok','Обёртка Яндекс SDK (выключена)']],todo:[]},
+ {h:'1.0 MVP',w:'отправка на модерацию в начале недели',cur:1,done:[],todo:[['todo','Включить SDK, собрать архив Яндекса, прогнать в черновике'],['todo','Шрифт Rubik в сборку (Google Fonts не использовать)'],['todo','Скрыть «Позвать друга» в версии Яндекса'],['wip','Подбор: потолок рейтинга ~400, бот через 20 с, тест'],['todo','Подарок дня: серия 7 дней, окно, иконка'],['todo','Задания дня трёх сложностей'],['todo','«Ближайшая цель» на экране конца боя'],['todo','Привязка профиля к игроку Яндекса'],['todo','Бот прыгает и бегает, прогон баланса'],['wip','Сервер не засыпает, ключ Supabase перевыпущен'],['todo','Иконка, обложка, описание, скриншоты для каталога'],['todo','Проверка на 3 телефонах и ПК, консоль без ошибок']]},
+ {h:'1.1 Повод вернуться',w:'через 2–3 недели после 1.0',cur:0,done:[],todo:[['todo','События: погода, часовые или случайные'],['todo','Недельные задания, сезон рейтинга с наградой за лигу'],['todo','Ачивки, лидерборд Яндекса'],['todo','Английская локализация'],['todo','Новые скины титана, плиты, камни, недостающие анимации'],['todo','2–3 размера арен, больше эмоций'],['q','Онлайн-меню: убрать список серверов или оставить?'],['q','Скрытый матч «позвать друга», если Яндекс пропустит ссылку']]},
+ {h:'2.0 Мой остров',w:'отдельный этап, 1–2 месяца',cur:0,done:[],todo:[['todo','Своя база, башня, стены, улучшение базы'],['todo','Рейды: остров игрока под управлением бота'],['todo','Кампания и миссии с боссами'],['todo','Сохранения и острова на сервере, кубки'],['todo','Новые правила в battle.ts, новые ассеты, пересчёт экономики']]},
+];
+document.getElementById('ver').innerHTML=`<div class="lanes">`+LANES.slice(0).map(l=>`<div class="lane${l.cur?' cur':''}"><h2>${l.h}</h2><div class="when">${l.w}</div><ul>${[...l.done,...l.todo].map(x=>li(x[0],x[1])).join('')}</ul></div>`).join('')+`</div>
+<div class="note"><h2>Что Яндекс проверяет и чем нам это грозит</h2><ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+<li>Модерация полная 3–5 рабочих дней плюс очередь (у нового аккаунта очередь бывает долгой). После отказа следующая отправка через 24 ч, 2, 4, 8, 16 дней: первую отправку делаем в начале недели.</li>
+<li>Запрещены ссылки на внешние сайты и призывы уйти на сторонние ресурсы: «Позвать друга» в Яндексе скрываем.</li>
+<li>Иконка и обложка не могут быть скриншотами игры: нужна отдельная картинка.</li>
+<li>Игра должна быть завершённой, без ошибок в консоли, без предупреждения про WebGL, работать при повороте, сворачивании, рекламе.</li>
+<li>Гостевой вход обязателен, вход только через Яндекс ID и только по действию игрока.</li>
+<li>Рейтинг игры в каталоге должен быть выше 30, иначе через три недели снимут с публикации.</li></ul></div>
+<div class="note"><h2>Нерешённое (не блокирует 1.0)</h2><ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+<li>Приватные серверы и меню онлайна: оставить, убрать или заменить скрытым матчем по приглашению.</li><li>Принимает ли Яндекс внешний сервер для онлайна и ссылку-приглашение.</li><li>Награда сложного бота 60 или 30; цены улучшений выносливости; 100 монет за обучение.</li><li>Русский на старте или сразу русский и английский.</li></ul></div>`;
+/* time in game */
+document.getElementById('time').innerHTML=`<div class="note"><h2>Сколько контента сейчас</h2>
+<p style="margin:0 0 8px;color:var(--dim)">Всё, что можно купить: улучшения 7 340 монет (7 штук, 20 уровней) и косметика 3 000 (14 предметов), итого <b style="color:var(--fg)">10 340 монет</b>. Матч идёт до 3 минут. Доход: бой с ботом 20 / 35 / 60 за победу, онлайн 60, задания дня 180, подарок дня 50, обучение 100 один раз.</p>
+<div class="twrap"><table><tr><th>Игрок</th><th class="n">Боёв в день</th><th class="n">Время в день</th><th class="n">Монет в день</th><th class="n">Купит всё за</th></tr>
+<tr><td>Мимоходом</td><td class="n">3</td><td class="n">≈ 10 мин</td><td class="n">≈ 300</td><td class="n"><b>≈ 5 недель</b></td></tr>
+<tr><td>Обычный</td><td class="n">8</td><td class="n">≈ 25 мин</td><td class="n">≈ 470</td><td class="n"><b>≈ 3 недели</b></td></tr>
+<tr><td>Увлечённый</td><td class="n">20</td><td class="n">≈ 1 час</td><td class="n">≈ 870</td><td class="n"><b>≈ 12 дней</b></td></tr></table></div></div>
+<div class="cols2"><div class="note"><h2>Лиги</h2><p style="margin:0 0 6px;color:var(--dim)">Очки лиги и сколько побед до Алмаза (≈ +14 за ровную победу).</p>
+<div class="bar"><i style="flex:1100;background:#c98b4a"></i><i style="flex:150;background:#b8c2d6"></i><i style="flex:200;background:#f0c85a"></i><i style="flex:200;background:#6fd6c8"></i><i style="flex:350;background:#7fb4ff"></i></div>
+<div class="twrap"><table><tr><th>Лига</th><th class="n">С очков</th></tr><tr><td>Бронза</td><td class="n">0</td></tr><tr><td>Серебро</td><td class="n">1 100</td></tr><tr><td>Золото</td><td class="n">1 250</td></tr><tr><td>Платина</td><td class="n">1 450</td></tr><tr><td>Алмаз</td><td class="n">1 650</td></tr></table></div>
+<p style="margin:8px 0 0;color:var(--dim)">До Алмаза 650 очков: 60–80 побед. Увлечённому около недели, обычному три недели.</p></div>
+<div class="note"><h2>Что держит игрока</h2><ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px">
+<li><b>Бой.</b> 3 минуты, понятный повод сыграть ещё раз.</li><li><b>Серия входов.</b> 7 дней, крупный приз в конце (1.0).</li><li><b>Задания.</b> Сегодняшняя цель на 180 монет (1.0), недельные (1.1).</li><li><b>Ближайшая цель.</b> «До улучшения не хватает 40 монет» после каждого боя (1.0).</li><li><b>Лиги и сезоны.</b> Лиги уже есть, сезоны в 1.1.</li><li><b>События.</b> Погода и особые часы, повод зайти в разное время (1.1).</li></ul>
+<p style="margin:10px 0 0;color:var(--dim)">Риск: улучшения дают силу, а онлайн-подбор идёт по рейтингу, не по прокачке. Смотрим по данным после релиза.</p></div></div>`;
+build(); requestAnimationFrame(fit); addEventListener('resize',()=>{ if(document.getElementById('v-map').classList.contains('on')) fit(); });
+</script>
