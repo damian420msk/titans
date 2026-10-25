@@ -183,3 +183,13 @@ test('a shot that lands under an airborne titan hurts the floor but does not kno
   assert.equal(flying.hp(cell, 1), 1, 'floor still cracked'); assert.equal(flying.actors[1].stun, 0);
   assert.ok(flying.events.some(e => e.type === 'dodge'), 'dodge event'); assert.ok(!flying.events.some(e => e.type === 'hit'));
 });
+
+test('stamina upgrades: a bigger pool and cheaper hops/sprint apply per side only', () => {
+  const b = new Battle([{ stam: 1.3, thrift: .8 }, {}]); place(b, 0, 4, 6); place(b, 1, 4, 6);
+  assert.ok(Math.abs(b.actors[0].stamina - SP.stamina_s * 1.3) < 1e-9); assert.equal(b.actors[1].stamina, SP.stamina_s);
+  assert.ok(Math.abs(b.jumpCost(0) - JP.stamina_cost_s * .8) < 1e-9); assert.equal(b.jumpCost(1), JP.stamina_cost_s);
+  b.jump(0); b.jump(1); assert.ok(b.actors[0].stamina > SP.stamina_s * 1.3 - JP.stamina_cost_s, 'cheaper hop'); assert.ok(Math.abs(b.actors[1].stamina - (SP.stamina_s - JP.stamina_cost_s)) < 1e-9);
+  run(b, JP.duration_s + 5); assert.ok(b.actors[0].stamina <= SP.stamina_s * 1.3 + 1e-9 && b.actors[0].stamina > SP.stamina_s + .1, 'regen refills up to the bigger pool'); assert.equal(b.actors[1].stamina, SP.stamina_s);
+  const s = new Battle([{ thrift: .5 }, {}]); place(s, 0, 4, 6); place(s, 1, 4, 6); for (const k of [0, 1] as const) { s.setMove(k, 0, 1); s.setSprint(k, true); } run(s, 1);
+  assert.ok(Math.abs((SP.stamina_s - s.actors[0].stamina) * 2 - (SP.stamina_s - s.actors[1].stamina)) < .05, 'half the drain');
+});

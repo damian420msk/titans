@@ -17,6 +17,7 @@ export type C2S =
   | { t: 'buy'; kind: 'up' | 'item'; id: string }
   | { t: 'equip'; id: string }
   | { t: 'claim' }
+  | { t: 'trained' }
   | { t: 'top' }
   | { t: 'result'; level: Difficulty; won: boolean }
   | { t: 'quick'; on: boolean }

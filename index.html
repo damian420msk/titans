@@ -11,7 +11,8 @@
   <div class="badge r"><div class="face coral" id="foe-face">ИИ</div><div><div class="who" id="foe-name">БОРГАР</div><div class="hearts" id="hearts1"></div></div></div>
   <div id="timer">3:00</div>
   <div id="tools"><button id="pause-btn" aria-label="Пауза">❚❚</button><button id="mute-btn" aria-label="Звук">🔊</button><button id="fs-btn" aria-label="Полный экран">⛶</button><button id="emote-btn" aria-label="Фразы" hidden>💬</button></div>
-  <div id="tip" hidden></div>
+  <div id="train" hidden><div class="th">Обучение <b id="train-n">0/7</b></div><ul id="train-list"></ul><div id="train-hint" hidden></div></div>
+  <div id="train-done" class="overlay" hidden><div class="panel"><h1>Обучение пройдено!</h1><p id="train-done-text"></p><button id="train-menu" class="big">В МЕНЮ</button><button id="train-more">Ещё потренироваться</button></div></div>
   <div id="toast"></div>
   <div id="emotes" hidden><button data-e="0">👍</button><button data-e="1">😎</button><button data-e="2">😮</button><button data-e="3">😡</button></div>
   <div class="bubble" id="bubble0" hidden></div><div class="bubble r" id="bubble1" hidden></div>
@@ -37,58 +38,62 @@
         <button class="chip player" data-go="settings"><span class="avatar">Я</span><span><b id="nick-label">Игрок</b><i><span id="league-label">Бронза</span> · <span id="rating-label">1000</span></i></span></button>
         <span class="pill gold coins-pill">🪙 <b id="coins-label">0</b></span>
       </div>
-      <button class="round" data-go="settings" aria-label="Настройки">⚙</button>
+      <div class="hub-act">
+        <button class="round" data-go="rating" aria-label="Рейтинг">🏆</button>
+        <button class="round" data-go="settings" aria-label="Настройки">⚙</button>
+      </div>
     </header>
-    <div class="hub-mid">
+    <div class="hub-center">
       <h1 class="logo">ТИТАНЫ<small>БРОСКИ С НЕБЕСНЫХ ОСТРОВОВ</small></h1>
-      <button class="big play-btn" data-go="play">ИГРАТЬ</button>
+      <button class="big play-btn" data-go="play" id="play-btn">ИГРАТЬ</button>
       <button id="daily" class="gift" hidden>🎁 Подарок дня: +50 монет</button>
+      <nav class="hub-bottom">
+        <button class="tile" data-go="shop"><span>🛒</span><b>Магазин</b></button>
+        <button class="tile" id="quests-btn" data-go="quests"><span>📋</span><b>Задания</b><em id="quests-count">0/3</em></button>
+        <button class="tile soon" data-soon="Моя база появится в одном из следующих обновлений"><span>🏰</span><b>Моя база</b><em>скоро</em></button>
+        <button class="tile soon" data-soon="Кампания появится в одном из следующих обновлений"><span>🗺</span><b>Кампания</b><em>скоро</em></button>
+      </nav>
     </div>
-    <nav class="hub-bottom">
-      <button class="tile" data-go="shop"><span>🛒</span><b>Магазин</b></button>
-      <button class="tile" id="quests-btn" data-go="quests"><span>📋</span><b>Задания</b><em id="quests-count">0/3</em></button>
-      <button class="tile" data-go="rating"><span>🏆</span><b>Рейтинг</b></button>
-      <button class="tile soon" data-soon="Моя база появится в одном из следующих обновлений"><span>🏰</span><b>Моя база</b><em>скоро</em></button>
-      <button class="tile soon" data-soon="Кампания появится в одном из следующих обновлений"><span>🗺</span><b>Кампания</b><em>скоро</em></button>
-    </nav>
   </section>
 
   <section class="scr" data-scr="play" hidden>
     <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Играть</h2><span></span></header>
-    <div class="modes">
-      <button class="mode" data-go="bot"><span class="mi">⚔</span><b>Быстрый бой</b><em>против бота или живого соперника из твоей лиги</em></button>
-      <button class="mode" id="friends-btn" data-go="online"><span class="mi">👥</span><b>С друзьями</b><em>комнаты и пароли</em><i class="lockmark">🔒</i></button>
-      <button class="mode" id="train-btn"><span class="mi">🎯</span><b>Тренировка</b><em>учимся двигаться и бросать, выйти можно в любой момент</em></button>
+    <div class="body-c">
+      <div class="modes">
+        <button class="mode" id="online-btn" data-go="online"><span class="mi">🌐</span><b>Онлайн</b><em>быстрая игра с живым соперником или свой сервер</em><i class="lockmark">🔒</i></button>
+        <button class="mode" data-go="bot"><span class="mi">🤖</span><b>Бой с ботом</b><em>три уровня сложности</em></button>
+      </div>
+      <button class="train" id="train-btn"><span class="mi">🎯</span><b>Тренировка</b><em id="train-state">выполни задания и получи награду</em></button>
+      <button class="ghost small" data-go="howto">Как играть</button>
     </div>
-    <button class="ghost" data-go="howto">Как играть</button>
   </section>
 
   <section class="scr" data-scr="bot" hidden>
-    <header class="top"><button class="back" data-go="play">‹ Назад</button><h2>Быстрый бой</h2><span></span></header>
-    <div class="seg" id="opp-seg"><button data-opp="bot" class="sel">🤖 Бот</button><button data-opp="live" id="opp-live">🌐 Живой соперник <i class="lockmark">🔒</i></button></div>
-    <div class="levels" id="levels">
-      <button class="lvl" data-level="easy"><span class="face teal">1</span><b>ГРОМ</b><i>Лёгкий</i><em>Редко попадает, ходит неспешно. Чтобы освоиться.</em></button>
-      <button class="lvl sel" data-level="normal"><span class="face teal">2</span><b>БОРГАР</b><i>Средний</i><em>Уворачивается, чинит остров, бросает кручёные.</em></button>
-      <button class="lvl" data-level="hard"><span class="face coral">3</span><b>ТОРВАЛЬД</b><i>Сложный</i><em>Точный и быстрый. Мощные броски, почти не промахивается.</em></button>
+    <header class="top"><button class="back" data-go="play">‹ Назад</button><h2>Бой с ботом</h2><span></span></header>
+    <div class="body-c">
+      <div class="levels" id="levels">
+        <button class="lvl" data-level="easy"><span class="face teal">1</span><b>ГРОМ</b><i>Лёгкий</i><em>Редко попадает, ходит неспешно. Чтобы освоиться.</em></button>
+        <button class="lvl sel" data-level="normal"><span class="face teal">2</span><b>БОРГАР</b><i>Средний</i><em>Уворачивается, чинит остров, бросает кручёные.</em></button>
+        <button class="lvl" data-level="hard"><span class="face coral">3</span><b>ТОРВАЛЬД</b><i>Сложный</i><em>Точный и быстрый. Мощные броски, почти не промахивается.</em></button>
+      </div>
+      <button id="start" class="big wide">В БОЙ</button>
     </div>
-    <p class="live-note" id="live-note" hidden>Соперник подбирается по рейтингу и лиге. Бой идёт на рейтинг, за победу монеты.</p>
-    <button id="start" class="big wide">В БОЙ</button>
   </section>
 
   <section class="scr" data-scr="online" hidden>
     <header class="top"><button class="back" data-go="play">‹ Назад</button><h2>Онлайн</h2><span class="pill" id="net-pill"><i></i><span>сервер не подключён</span></span></header>
+    <div class="actions"><button id="quick-btn" class="big blue"><b>⚡ БЫСТРАЯ ИГРА</b><i>соперник из твоей лиги</i></button><button class="big" data-go="create"><b>СОЗДАТЬ СЕРВЕР</b><i>свой, можно с паролем</i></button><button id="refresh" class="ghost">Обновить</button></div>
     <div class="glass list-wrap">
-      <div class="list-head"><span>Комната</span><span>Хозяин</span><span>Игроки</span><span></span></div>
+      <div class="list-head"><span>Сервер</span><span>Хозяин</span><span>Игроки</span><span></span></div>
       <div id="rooms" class="rooms"></div>
     </div>
-    <div class="actions"><button class="big" data-go="create">СОЗДАТЬ КОМНАТУ</button><button id="refresh" class="ghost">Обновить</button></div>
   </section>
 
   <section class="scr" data-scr="create" hidden>
-    <header class="top"><button class="back" data-go="online">‹ Назад</button><h2>Новая комната</h2><span></span></header>
+    <header class="top"><button class="back" data-go="online">‹ Назад</button><h2>Новый сервер</h2><span></span></header>
     <form id="create-form" class="glass form" autocomplete="off">
       <label>Название<input id="room-name" maxlength="24" placeholder="Например, «Дуэль на облаках»"></label>
-      <label><span>Пароль <em>(необязательно)</em></span><input id="room-pass" maxlength="16" placeholder="Пусто — комната открытая"></label>
+      <label><span>Пароль <em>(необязательно)</em></span><input id="room-pass" maxlength="16" placeholder="Пусто — сервер открытый"></label>
       <label class="check"><input id="room-ranked" type="checkbox" checked><span>Рейтинговая игра <em>(рейтинг и монеты за бой)</em></span></label>
       <button class="big" type="submit">СОЗДАТЬ</button>
     </form>
@@ -119,6 +124,7 @@
         <div class="glass rate-card">
           <div class="rc-top"><b id="rc-league">Бронза</b><span id="rc-pts">1000</span></div>
           <div class="bar"><i id="rc-bar"></i></div>
+          <div class="rc-place" id="rc-place"></div>
           <div class="rc-sub"><span id="rc-next"></span><span id="rc-wl"></span></div>
         </div>
         <div class="glass recent"><h3>Последние бои</h3><div id="recent-list"></div></div>
@@ -126,7 +132,7 @@
       <div class="glass table">
         <div class="trow th"><span>#</span><span>Игрок</span><span>Победы</span><span>Очки</span></div>
         <div id="top-list" class="top-list"></div>
-        <div class="trow me" id="top-me"><span>—</span><span id="rate-me">Игрок</span><span id="rate-wins">0</span><span id="rate-pts">1000</span></div>
+        <div class="trow me" id="top-me" hidden><span>—</span><span id="rate-me">Игрок</span><span id="rate-wins">0</span><span id="rate-pts">1000</span></div>
       </div>
     </div>
   </section>
@@ -173,7 +179,7 @@
   </section>
 
   <div id="menu-toast"></div>
-  <div id="pwd" class="modal" hidden><form class="glass form"><h3 id="pwd-title">Пароль</h3><input id="pwd-in" maxlength="16" placeholder="Пароль комнаты" autocomplete="off"><div class="err" id="pwd-err"></div><div class="row2"><button type="button" class="ghost" id="pwd-cancel">Отмена</button><button class="big" type="submit">ВОЙТИ</button></div></form></div>
+  <div id="pwd" class="modal" hidden><form class="glass form"><h3 id="pwd-title">Пароль</h3><input id="pwd-in" maxlength="16" placeholder="Пароль сервера" autocomplete="off"><div class="err" id="pwd-err"></div><div class="row2"><button type="button" class="ghost" id="pwd-cancel">Отмена</button><button class="big" type="submit">ВОЙТИ</button></div></form></div>
 </div>
 <div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><div id="end-gain" class="gain"></div><button id="double" class="ghost" hidden>🎬 Удвоить награду</button><div id="end-foe" class="gain"></div><button id="rematch" class="big" hidden>РЕВАНШ</button><div id="end-say" class="say" hidden></div><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>
 <div id="pause" class="overlay" hidden><div class="panel"><h1>ПАУЗА</h1><button id="resume" class="big">ПРОДОЛЖИТЬ</button><button id="pause-menu">Выйти в меню</button></div></div>

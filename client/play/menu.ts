@@ -37,7 +37,7 @@ export type MenuHooks = {
 
 export function initMenu(h: MenuHooks) {
   const root = $('menu'), { sfx } = h;
-  let opp: 'bot' | 'live' = 'bot', level: Difficulty = 'normal', current: Screen = 'main', view: RoomView | null = null, netState: NetState = 'off', slow = false;
+  let level: Difficulty = 'normal', current: Screen = 'main', view: RoomView | null = null, netState: NetState = 'off', slow = false;
   let prof: MyProfile | null = null, top: PublicEntry[] = [], topRank: number | null = null, tab: 'up' | CosmeticKind = 'up';
   document.body.classList.toggle('touch', h.touch);
 
@@ -49,20 +49,15 @@ export function initMenu(h: MenuHooks) {
   const unlocked = () => store.get('botwin', '0') === '1' || (prof?.wins ?? 0) > 0;
   const paintLocks = () => {
     const lk = !unlocked();
-    $('friends-btn').classList.toggle('locked', lk); $('opp-live').classList.toggle('locked', lk);
+    $('online-btn').classList.toggle('locked', lk);
     document.querySelectorAll<HTMLElement>('#menu .lockmark').forEach(x => { x.hidden = !lk; });
-    if (lk && opp === 'live') setOpp('bot');
   };
-  function setOpp(o: 'bot' | 'live') {
-    opp = o;
-    root.querySelectorAll('#opp-seg [data-opp]').forEach(x => x.classList.toggle('sel', (x as HTMLElement).dataset.opp === o));
-    $('levels').hidden = o === 'live'; $('live-note').hidden = o !== 'live';
-    $('start').textContent = o === 'live' ? 'ИСКАТЬ СОПЕРНИКА' : 'В БОЙ';
-  }
-  const LOCK_TEXT = 'Живые соперники откроются после первой победы над ботом';
+  const trainDone = () => store.get('train.done', '0') === '1' || !!prof?.trained;
+  const paintTrain = () => { const d = trainDone(), b = $('train-btn'); b.classList.toggle('done', d); b.classList.toggle('todo', !d); $('train-state').textContent = d ? '✓ Обучение пройдено, можно повторить' : 'пройди задания и получи 100 🪙'; };
+  const LOCK_TEXT = 'Онлайн откроется после первой победы над ботом';
   function open(s: Screen) {
     current = s;
-    if (s === 'bot' || s === 'play') paintLocks();
+    if (s === 'play') { paintLocks(); paintTrain(); }
     root.querySelectorAll<HTMLElement>('.scr').forEach(x => { x.hidden = x.dataset.scr !== s; });
     $('pwd').hidden = true;
     h.onScreen(s);
@@ -70,7 +65,7 @@ export function initMenu(h: MenuHooks) {
     if (s === 'rating') { renderTop(); h.onTop(); }
     if (s === 'shop') renderShop();
     if (s === 'quests') renderQuests();
-    if (s === 'create') { $<HTMLInputElement>('room-name').value = `Комната ${nick()}`; $<HTMLInputElement>('room-pass').value = ''; }
+    if (s === 'create') { $<HTMLInputElement>('room-name').value = `Сервер ${nick()}`; $<HTMLInputElement>('room-pass').value = ''; }
     if (s === 'settings') { $<HTMLInputElement>('nick').value = store.get('nick', ''); paintSound(); paintHaptic(); $('set-rating').textContent = String(prof?.rating ?? 1000); $('set-wins').textContent = String(prof?.wins ?? 0); $('set-games').textContent = String(prof?.games ?? 0); }
   }
   let noticeT = 0;
@@ -82,19 +77,20 @@ export function initMenu(h: MenuHooks) {
   root.addEventListener('click', e => {
     const t = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null; if (!t) return;
     sfx.unlock(); sfx.click();
+    if (t.id === 'play-btn' && !trainDone() && store.get('train.skipped', '0') !== '1') { h.onTrain(); return; }
     if (t.dataset.go === 'online' && !unlocked()) { notice(LOCK_TEXT); return; }
     if (t.dataset.go) open(t.dataset.go as Screen);
     if (t.dataset.soon) notice(t.dataset.soon);
-    if (t.dataset.opp) { if (t.dataset.opp === 'live' && !unlocked()) notice(LOCK_TEXT); else setOpp(t.dataset.opp as 'bot' | 'live'); }
+    if (t.id === 'quick-btn') { h.onQuick(true); open('quick'); }
     if (t.id === 'train-btn') h.onTrain();
-    if (t.id === 'quick-cancel') { h.onQuick(false); open('main'); }
+    if (t.id === 'quick-cancel') { h.onQuick(false); open('online'); }
     if (t.id === 'daily') h.onClaim();
     if (t.dataset.tab) { tab = t.dataset.tab as typeof tab; renderShop(); }
     if (t.dataset.buy) h.onBuy(t.dataset.kind as 'up' | 'item', t.dataset.buy);
     if (t.dataset.eq) h.onEquip(t.dataset.eq);
     if (t.dataset.level) { level = t.dataset.level as Difficulty; root.querySelectorAll('[data-level]').forEach(x => x.classList.toggle('sel', x === t)); }
   });
-  $('start').addEventListener('click', () => { if (opp === 'live') { if (!unlocked()) { notice(LOCK_TEXT); return; } h.onQuick(true); open('quick'); } else h.onStartBot(level); });
+  $('start').addEventListener('click', () => h.onStartBot(level));
 
   // online lobby
   let rooms: RoomInfo[] = [];
@@ -106,7 +102,7 @@ export function initMenu(h: MenuHooks) {
   }
   function setRooms(list: RoomInfo[]) {
     rooms = list; const el = $('rooms');
-    if (!list.length) { el.innerHTML = `<div class="empty">${netState === 'on' ? 'Пока нет комнат. Создай первую и позови друга.' : netState === 'connecting' ? (slow ? 'Бесплатный сервер просыпается после простоя, это занимает до минуты. Подожди немного.' : 'Подключаемся к серверу…') : 'Не удалось подключиться к серверу. Проверь интернет и нажми «Обновить».'}</div>`; return; }
+    if (!list.length) { el.innerHTML = `<div class="empty">${netState === 'on' ? 'Пока нет серверов. Нажми «Быстрая игра» или создай свой.' : netState === 'connecting' ? (slow ? 'Бесплатный сервер просыпается после простоя, это занимает до минуты. Подожди немного.' : 'Подключаемся к серверу…') : 'Не удалось подключиться к серверу. Проверь интернет и нажми «Обновить».'}</div>`; return; }
     el.innerHTML = list.map(r => `<div class="room${r.players >= 2 ? ' full' : ''}"><b>${r.locked ? '🔒 ' : ''}${r.ranked ? '🏆 ' : ''}${esc(r.name)}</b><span>${esc(r.host)}</span><span>${r.players}/2</span><button data-join="${esc(r.id)}" ${r.players >= 2 ? 'disabled' : ''}>${r.playing ? 'Идёт бой' : r.players >= 2 ? 'Занято' : 'Войти'}</button></div>`).join('');
   }
   let joining: RoomInfo | null = null;
@@ -122,7 +118,7 @@ export function initMenu(h: MenuHooks) {
   $('refresh').onclick = () => h.onRefresh();
   $<HTMLFormElement>('create-form').addEventListener('submit', e => {
     e.preventDefault();
-    const name = $<HTMLInputElement>('room-name').value.trim() || `Комната ${nick()}`, pass = $<HTMLInputElement>('room-pass').value.trim();
+    const name = $<HTMLInputElement>('room-name').value.trim() || `Сервер ${nick()}`, pass = $<HTMLInputElement>('room-pass').value.trim();
     sfx.click();
     h.onCreate(name, pass, $<HTMLInputElement>('room-ranked').checked);
   });
@@ -182,7 +178,10 @@ export function initMenu(h: MenuHooks) {
   function renderTop() {
     const el = $('top-list'), r = prof?.rating ?? 1000, mineRow = (e: PublicEntry) => !!prof && e.nick === prof.nick && e.rating === prof.rating;
     el.innerHTML = top.length ? top.map((e, i) => `<div class="trow${mineRow(e) ? ' mine' : ''}"><span>${i + 1}</span><span><i class="ld" style="background:${league(e.rating).color}"></i>${esc(e.nick)}</span><span>${e.wins}</span><span>${e.rating}</span></div>`).join('') : '<div class="empty">Рейтинг пока пуст. Сыграй рейтинговый бой.</div>';
-    $('top-me').children[0].textContent = topRank ? String(topRank) : (prof?.games && top.length ? '50+' : '—');
+    // own row: highlighted inside the list when we are in the top, otherwise pinned under it with our place (100+ when outside)
+    const inList = top.some(mineRow); $('top-me').hidden = inList;
+    $('top-me').children[0].textContent = topRank ? String(topRank) : (prof?.games && top.length ? '100+' : '—');
+    const place = topRank ?? (top.findIndex(mineRow) + 1 || null); $('rc-place').textContent = place ? `Место в рейтинге: ${place}` : prof?.games ? 'Место в рейтинге: 100+' : 'Сыграй рейтинговый бой';
     $('rate-me').textContent = nick(); $('rate-pts').textContent = String(r); $('rate-wins').textContent = String(prof?.wins ?? 0);
     // own league card: progress to the next league
     const cur = league(r), idx = LEAGUES.findIndex(l => l.min === cur.min), next = LEAGUES[idx + 1];
@@ -192,7 +191,7 @@ export function initMenu(h: MenuHooks) {
     const w = prof?.wins ?? 0, l = prof?.losses ?? 0; $('rc-wl').textContent = `${w} поб · ${l} пор${w + l ? ` · ${Math.round(w / (w + l) * 100)}%` : ''}`;
     $('recent-list').innerHTML = prof?.recent?.length ? prof.recent.map(x => `<div class="rrow ${x.won === true ? 'w' : x.won === false ? 'l' : 'd'}"><b>${x.won === true ? 'Победа' : x.won === false ? 'Поражение' : 'Ничья'}</b><span>${x.online ? '' : '🤖 '}${esc(x.nick)}</span><em>${x.delta ? (x.delta > 0 ? '+' : '') + x.delta : '·'}</em></div>`).join('') : '<div class="empty">Здесь появятся твои последние бои</div>';
   }
-  const setQueue = (on: boolean) => { if (!on && current === 'quick') open('main'); if (on && current !== 'quick') open('quick'); };
+  const setQueue = (on: boolean) => { if (!on && current === 'quick') open('online'); if (on && current !== 'quick') open('quick'); };
 
   // settings
   function paintSound() { const b = $('set-sound'); b.textContent = sfx.muted ? 'Выкл' : 'Вкл'; b.classList.toggle('on', !sfx.muted); }
@@ -208,9 +207,10 @@ export function initMenu(h: MenuHooks) {
     el.addEventListener('input', () => { sfx.setVolume(k, +el.value / 100); paint(); });
     el.addEventListener('change', () => { if (k === 'sfx' && !sfx.muted) sfx.click(); }); // a click as a sample of the new level
   }
-  paintNick(); paintSound(); paintHaptic(); setRooms([]); paintProfile(); setOpp('bot');
+  paintNick(); paintSound(); paintHaptic(); setRooms([]); paintProfile();
 
+  const setTrained = () => paintTrain();
   const botWin = () => { store.set('botwin', '1'); paintLocks(); };
-  return { botWin, setProfile, setTop, setQueue, show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
+  return { trainDone, setTrained, botWin, setProfile, setTop, setQueue, show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
 }
 export type Menu = ReturnType<typeof initMenu>;

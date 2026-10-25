@@ -4,7 +4,8 @@ import { Controls } from './controls';
 import { PHRASES } from '../../shared/net';
 import type { RoomView } from '../../shared/net';
 import { touchAim, magnet } from '../../shared/aim';
-import { Battle, kindForHold, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
+import { Battle, kindForHold, cellKey, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
+import { Training, STEPS, type StepId } from './training';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
 import { initMenu } from './menu';
@@ -34,8 +35,7 @@ const token = (() => {
 })();
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const { id: _id, ...p } = sanitizeProfile(r, 'local'); return { ...p, dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
 let pendingResult: { level: Difficulty; won: boolean } | null = null;
-// First bot match: a short guided start. Steps advance on what the player actually does.
-const tut = { on: false, step: 0, t: 0, x: 0, z: 0, throws: 0, jumped: false };
+let training: Training | null = null, pendingTrained = false, trainDoneShown = false;
 let matchesPlayed = 0, endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
@@ -56,7 +56,7 @@ const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
-  { const j = rules.character.jump.stamina_cost_s / rules.character.sprint.stamina_s * 100; $('stamina').style.setProperty('--c1', j + '%'); $('stamina').style.setProperty('--c2', 2 * j + '%'); } // notches = one hop each
+  const paintNotches = () => { const j = battle.jumpCost(0) / battle.staminaMax(0) * 100; $('stamina').style.setProperty('--c1', j + '%'); $('stamina').style.setProperty('--c2', 2 * j + '%'); }; // notches = one hop each
   $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт';
   const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
   // a tap on a battle button is the only moment a browser allows fullscreen and the landscape lock; phones that cannot do it just ignore this
@@ -64,8 +64,13 @@ async function boot() {
   const hello = () => net.send({ t: 'hello', nick: menu.nick(), token });
   const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
   menu = initMenu({
-    sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); const first = store.get('tutorial') !== '1'; level = first ? 'easy' : l; if (!first && matchesPlayed > 0) await ya.interstitial(); startMatch(); if (first) { tut.on = true; tut.step = 0; tut.t = 0; tut.throws = 0; tut.x = battle.actors[0].pos.x; tut.z = battle.actors[0].pos.z; } },
-    onTrain: () => { goFullscreen(); level = 'easy'; startMatch(); tut.jumped = false; tut.on = true; tut.step = 0; tut.t = 0; tut.throws = 0; tut.x = battle.actors[0].pos.x; tut.z = battle.actors[0].pos.z; },
+    sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); level = l; if (matchesPlayed > 0) await ya.interstitial(); training = null; paintTrain(); startMatch(); },
+    onTrain: () => {
+      goFullscreen(); level = 'easy'; startMatch();
+      training = new Training(menu.trainDone() ? [] : savedSteps(), battle.actors[0].pos); trainDoneShown = false;
+      for (const c of [{ x: 2, z: 6 }, { x: 6, z: 5 }]) battle.floors[0].set(cellKey(c), 1); // two cracked tiles of our own to repair
+      paintTrain();
+    },
     onScreen: sc => { if (sc === 'online') { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); } },
     onCreate: (name, pass, ranked) => { createdPass = pass; hello(); net.send({ t: 'create', name, pass, ranked }); },
     onQuick: on => { if (on) { goFullscreen(); if (!needNet()) { quickWanted = true; return; } hello(); net.send({ t: 'quick', on: true }); } else { quickWanted = false; net.send({ t: 'quick', on: false }); } },
@@ -88,7 +93,7 @@ async function boot() {
   if (myProfile) menu.setProfile(myProfile);
   net.onState = st => {
     menu.setNet(st, net.slow);
-    if (st === 'on' && inviteLink && !inviteDone) { inviteDone = true; inviteWait = true; hello(); menu.notice('Заходим в комнату друга…'); net.send({ t: 'join', id: inviteLink.id, pass: inviteLink.pw }); history.replaceState(null, '', location.pathname); }
+    if (st === 'on' && inviteLink && !inviteDone) { inviteDone = true; inviteWait = true; hello(); menu.notice('Заходим на сервер друга…'); net.send({ t: 'join', id: inviteLink.id, pass: inviteLink.pw }); history.replaceState(null, '', location.pathname); }
     if (st === 'on') { retries = 0; if (quickWanted) { hello(); net.send({ t: 'quick', on: true }); } }
     if (st === 'off' && online && mode === 'playing') { if (!reconnectAt) { reconnectAt = performance.now(); $('reconn').hidden = false; } window.setTimeout(() => net.connect(), 700); }
     // a sleeping free server needs up to a minute: keep knocking while the player waits in the lobby
@@ -105,6 +110,7 @@ async function boot() {
       case 'err': inviteWait = false; if (!$('pwd').hidden && m.code === 'wrong_pass') menu.pwdError(m.text); else menu.notice(m.text); break;
       case 'profile': {
         myProfile = m.p; store.set('profile', JSON.stringify(m.p)); menu.setProfile(m.p);
+        if (pendingTrained) { net.send({ t: 'trained' }); pendingTrained = false; }
         if (pendingResult) { net.send({ t: 'result', level: pendingResult.level, won: pendingResult.won }); pendingResult = null; }
         break;
       }
@@ -120,17 +126,17 @@ async function boot() {
     }
   };
   const startMatch = (foe?: string, info?: { mods: [Mods, Mods]; look: [Look, Look]; rating: number; ranked: boolean }) => {
-    sfx.unlock(); sfx.startMusic(); sfx.click(); ya.gameplay(true); $('double').hidden = true;
+    sfx.unlock(); sfx.startMusic(); sfx.click(); ya.gameplay(true); $('double').hidden = true; if (typeof foe === 'string') { training = null; paintTrain(); }
     online = typeof foe === 'string'; try { (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}); } catch { /* needs fullscreen on most browsers */ } pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
     world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
-    slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity);
+    slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity); paintNotches();
     $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
     $('foe-name').textContent = online ? foe! : NAMES[level]; $('foe-face').textContent = online ? foe!.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
   const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
   $('again').onclick = () => { if (online && lastQuick) { online = false; net.send({ t: 'leave' }); $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show('quick'); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else { void ya.interstitial().then(() => startMatch()); } };
-  const toMenu = () => { ya.gameplay(false); if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
+  const toMenu = () => { endTraining(false); ya.gameplay(false); if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
   $('to-menu').onclick = toMenu;
   // rematch = "ready" in the room that is still open after the fight
   function updateRematch() {
@@ -157,26 +163,34 @@ async function boot() {
   $('emote-btn').onclick = () => { $('emotes').hidden = !$('emotes').hidden; };
   $('emotes').addEventListener('click', e => { const b = (e.target as HTMLElement).closest('[data-e]') as HTMLElement | null; if (b) sendEmote(+b.dataset.e!); });
   window.addEventListener('keydown', e => { if (online && mode === 'playing' && /^Digit[1-4]$/.test(e.code)) sendEmote(+e.code.slice(5) - 1); });
-  const TIPS = [
-    () => touchDevice ? 'Двигайся: левым пальцем веди джойстик' : 'Двигайся: клавиши W A S D',
-    () => touchDevice ? 'Бросок: нажми правой половиной экрана, сдвинь прицел на остров врага и отпусти' : 'Бросок: зажми левую кнопку мыши на острове врага и отпусти',
-    () => 'Чем дольше держишь, тем сильнее камень. Камни кончились — иди к куче в углу своего острова',
-    () => 'Плита под титаном пропала — он падает. Разбивай плиты врага и чини свои кнопкой РЕМОНТ',
-    () => touchDevice ? 'Прыжок: кнопка ⤒ — уворот от камня и перелёт через дыру. Бег: тяни джойстик за край круга' : 'Прыжок: Пробел — уворот от камня и перелёт через дыру. Бег: держи Shift',
-  ];
-  const endTutorial = () => { if (!tut.on) return; tut.on = false; $('tip').hidden = true; store.set('tutorial', '1'); };
-  const tutorialTick = (dt: number, events: GameEvent[]) => {
-    if (!tut.on || online || mode !== 'playing') { if (tut.on && mode !== 'playing') endTutorial(); return; }
-    const tip = $('tip'), txt = TIPS[tut.step]!(); if (tip.textContent !== txt) { tip.textContent = txt; tip.hidden = false; }
-    tut.t += dt; const me = battle.actors[0];
-    for (const e of events) if (e.type === 'throw' && e.side === 0) tut.throws++;
-    const next = () => { tut.step++; tut.t = 0; if (tut.step >= TIPS.length) endTutorial(); };
-    if (tut.step === 0 && Math.hypot(me.pos.x - tut.x, me.pos.z - tut.z) > 2.5) next();
-    else if (tut.step === 1 && tut.throws >= 1) next();
-    else if (tut.step === 2 && (tut.throws >= 3 || tut.t > 14)) next();
-    else if (tut.step === 3 && tut.t > 7) next();
-    else if (tut.step === 4 && (tut.jumped || tut.t > 10)) next();
-    if (tut.t > 45 && tut.step < 2) next(); // a stuck player still sees the later tips
+  // Training: a checklist of tasks in a calm sandbox (the enemy stands still). No rating, no bot rewards; finishing it pays coins once.
+  const trainList = $('train-list'), trainHint = $('train-hint');
+  const savedSteps = () => (store.get('train.steps') ?? '').split(',').filter(Boolean) as StepId[];
+  const paintTrain = () => {
+    const tr = training; $('train').hidden = !tr;
+    if (!tr) return;
+    trainList.innerHTML = STEPS.map(s => `<li class="${tr.done.has(s.id) ? 'ok' : tr.current === s ? 'now' : ''}"><i>${tr.done.has(s.id) ? '✓' : ''}</i>${s.text}</li>`).join('');
+    $('train-n').textContent = `${tr.done.size}/${STEPS.length}`;
+    const cur = tr.current; trainHint.hidden = !(tr.nudge && cur); if (cur) trainHint.textContent = touchDevice ? cur.touch : cur.pc;
+  };
+  const endTraining = (finished: boolean) => {
+    if (!training) return; const was = training; training = null; paintTrain(); $('train-done').hidden = true;
+    if (!finished && !was.complete) store.set('train.skipped', '1');
+  };
+  const finishTraining = () => {
+    const first = !menu.trainDone(); store.set('train.done', '1'); menu.setTrained();
+    if (first) { if (net.state === 'on') { hello(); net.send({ t: 'trained' }); } else { pendingTrained = true; net.connect(); } }
+    $('train-done-text').textContent = first ? 'Награда за обучение: +100 🪙' : 'Ты уже проходил обучение, повторная награда не даётся';
+    $('train-done').hidden = false; userPause = true; controls.reset(); charging = false; battle.cancelCharge(0); battle.cancelRepair(0);
+  };
+  $('train-more').onclick = () => { $('train-done').hidden = true; userPause = false; };
+  $('train-menu').onclick = () => { userPause = false; $('train-done').hidden = true; endTraining(true); toMenu(); };
+  const trainTick = (dt: number, events: GameEvent[]) => {
+    if (!training || online || mode !== 'playing') return;
+    const got = training.update(dt, events, battle.actors[0].pos);
+    if (got.length) { store.set('train.steps', [...training.done].join(',')); toast('✓ Задание выполнено'); sfx.repaired(); }
+    paintTrain();
+    if (training.complete && $('train-done').hidden && !trainDoneShown) { trainDoneShown = true; finishTraining(); }
   };
   const toast = (t: string) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); toastTimer = 1.4; };
   const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
@@ -223,7 +237,7 @@ async function boot() {
       if (wantSprint !== b.sprint[0] || (online && wantSprint && nowS - lastSprint > 1)) { b.setSprint(0, wantSprint); if (online) { net.send({ t: 'sprint', on: wantSprint }); lastSprint = nowS; } }
       if (controls.jumpPressed) {
         controls.jumpPressed = false;
-        if (b.jump(0)) { pred.jumpAt = nowS; sfx.jump(); haptic(12); if (online) net.send({ t: 'jump' }); tut.jumped = true; }
+        if (b.jump(0)) { pred.jumpAt = nowS; sfx.jump(); haptic(12); if (online) net.send({ t: 'jump' }); }
       }
       // Touch aiming is relative and works in cells, not screen pixels: perspective squeezes depth, so a pixel gain would be too twitchy.
       const unit = Math.max(.8, Math.min(1.6, innerHeight / 390));
@@ -261,15 +275,16 @@ async function boot() {
       hover = !charging && controls.aim.seen && !controls.touch ? pick() : null;
       // Online the simulation must keep real time even on a slow phone, or the server (real time) outruns the local copy and pulls it back.
       acc += online ? Math.min(rawDt, .25) : dt;
-      while (acc >= 1 / 60) { acc -= 1 / 60; if (!online) bot.update(1 / 60); b.step(1 / 60); if (online) b.events.length = 0; if (b.phase !== 'playing') break; }
+      while (acc >= 1 / 60) { acc -= 1 / 60; if (!online && !training) bot.update(1 / 60); b.step(1 / 60); if (online) b.events.length = 0; if (b.phase !== 'playing') break; }
     }
     if (online && srvEvents.length) { battle.events.push(...srvEvents); srvEvents.length = 0; }
     const b = battle, ch = b.charges[0], kind: Kind | null = ch ? kindForHold(ch.t) : hover ? 'normal' : null;
     world.smoothFoe = online;
     world.update(b, isPaused ? 0 : dt, { aiming: charging, kind, aimCell: ch ? ch.target : hover, cancel: controls.cancelled || controls.overCancel });
-    tutorialTick(isPaused ? 0 : dt, b.events);
+    trainTick(isPaused ? 0 : dt, b.events);
     for (const e of b.events) {
       if (e.type === 'hit' && e.side === 0) toast('Сбили с ног!'); if (e.type === 'fall' && e.side === 0) toast('Падаешь!'); if (e.type === 'fall' && e.side === 1) toast('Враг упал!');
+      if (e.type === 'over' && training && !online) { const fin = training.complete; endTraining(fin); toMenu(); menu.notice('Тренировка закончилась. Прогресс сохранён, можно начать снова'); break; }
       if (e.type === 'over') { if (mode !== 'over') showEnd(e.winner); sfx.charge(false, 0); sfx.repair(false); if (e.winner === 0) { sfx.win(); haptic([40, 60, 40, 60, 120]); } else sfx.lose(); }
       if (e.type === 'throw') { sfx.throwSfx(e.kind, e.side === 0); if (e.side === 0) haptic(e.kind === 'heavy' ? 40 : 18); }
       if (e.type === 'impact') sfx.impact(e.kind, e.hpBefore, e.hpAfter, e.side === 0 ? 1 : .75);
@@ -293,8 +308,8 @@ async function boot() {
       $('repair').textContent = rp ? `${Math.round(100 * rp.t / rp.need)}%` : 'РЕМОНТ';
       const bar = $('charge'); bar.classList.toggle('on', !!ch);
       if (ch) { const k = kindForHold(ch.t), tgt = k === 'heavy' ? 1 : k === 'spin' ? (ch.t - .9) / 1.7 : ch.t / .9; (bar.firstElementChild as HTMLElement).style.width = `${Math.min(1, ch.t / 2.6) * 100}%`; (bar.firstElementChild as HTMLElement).style.background = KIND_COLOR[k]; bar.lastElementChild!.textContent = KIND_LABEL[k]; void tgt; }
-      $('cancel').hidden = !(charging && controls.touch); $('jump').style.visibility = charging ? 'hidden' : ''; $('jump').classList.toggle('cool', b.actors[0].air > 0 || b.actors[0].stamina < rules.character.jump.stamina_cost_s);
-      const me0 = b.actors[0], st = $('stamina'), frac = me0.stamina / rules.character.sprint.stamina_s; st.classList.toggle('on', mode === 'playing'); st.classList.toggle('use', frac < .999 || me0.running); st.classList.toggle('low', me0.stamina < rules.character.jump.stamina_cost_s && !me0.winded); st.classList.toggle('winded', me0.winded);
+      $('cancel').hidden = !(charging && controls.touch); $('jump').style.visibility = charging ? 'hidden' : ''; $('jump').classList.toggle('cool', b.actors[0].air > 0 || b.actors[0].stamina < b.jumpCost(0));
+      const me0 = b.actors[0], st = $('stamina'), frac = me0.stamina / b.staminaMax(0); st.classList.toggle('on', mode === 'playing'); st.classList.toggle('use', frac < .999 || me0.running); st.classList.toggle('low', me0.stamina < b.jumpCost(0) && !me0.winded); st.classList.toggle('winded', me0.winded);
       (st.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(1, frac)) * 100}%`;
       if ((toastTimer -= dt) <= 0) $('toast').classList.remove('on');
     }
@@ -302,10 +317,10 @@ async function boot() {
     if (mode !== 'menu') world.scene.render();
   });
   function showEnd(winner: 0 | 1 | null, why?: 'left' | 'conn') {
-    mode = 'over'; endTutorial(); ya.gameplay(false); matchesPlayed++; charging = false; controls.reset(); $('pause').hidden = true; userPause = false;
+    mode = 'over'; ya.gameplay(false); matchesPlayed++; charging = false; controls.reset(); $('pause').hidden = true; userPause = false;
     $('end-title').textContent = winner === 0 ? 'ПОБЕДА' : winner === 1 ? 'ПОРАЖЕНИЕ' : 'НИЧЬЯ';
     $('end-text').textContent = why === 'left' ? 'Соперник вышел из боя. Победа твоя.' : why === 'conn' ? 'Связь с сервером потеряна.' : winner === 0 ? 'Враг рухнул вниз. Небесные камни твои.' : winner === 1 ? 'Тебя сбросили с острова. Попробуй ещё раз.' : 'Время вышло, силы равны.';
-    $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'В КОМНАТУ') : 'ЕЩЁ РАЗ';
+    $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'НА СЕРВЕР') : 'ЕЩЁ РАЗ';
     $('end-gain').textContent = online ? endGain : ''; $('end-foe').textContent = ''; $('rematch').hidden = $('end-say').hidden = true; if (online && !why) setTimeout(updateRematch, 0);
     if (!online && why !== 'conn') {
       if (winner === 0) menu.botWin();

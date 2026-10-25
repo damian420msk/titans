@@ -5,7 +5,7 @@ import { Battle, type GameEvent } from '../shared/battle.ts';
 import { cellsValid } from './validate.ts';
 import { MemoryStore, type Store } from './store.ts';
 import { PHRASES, REMATCH_S, snapshot, mirrorSnap, mirrorEvents, type C2S, type S2C, type RoomInfo, type RoomView, type Seat, type ErrCode, type MyProfile } from '../shared/net.ts';
-import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayIndex, rewardBot, botRatingDelta, applyOnline, recordQuest, pushRecent, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
+import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, claimTrained, dayIndex, rewardBot, botRatingDelta, applyOnline, recordQuest, pushRecent, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
 
 export interface Conn { send(m: S2C): void }
 type Client = {
@@ -90,6 +90,7 @@ export class Lobby {
       case 'buy': return this.buy(c, m.kind, String(m.id));
       case 'equip': return this.doEquip(c, String(m.id));
       case 'claim': return this.claim(c);
+      case 'trained': return this.trained(c);
       case 'top': return this.sendTop(c);
       case 'result': return this.botResult(c, m.level, !!m.won);
       case 'bonus': return this.bonus(c);
@@ -136,6 +137,7 @@ export class Lobby {
   }
   private doEquip(c: Client, id: string) { const p = c.profile; if (!p) return; const r = equip(p, id); if (r.ok) this.persist(p); this.sendProfile(c); if (!r.ok) this.shop(c, false, r.error); }
   private claim(c: Client) { const p = c.profile; if (!p) return; const g = claimDaily(p, dayIndex(this.now())); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Подарок дня: +${g} монет` : 'Подарок уже получен сегодня'); }
+  private trained(c: Client) { const p = c.profile; if (!p) return; const g = claimTrained(p); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Обучение пройдено: +${g} монет` : 'Награда за обучение уже получена'); }
   private botResult(c: Client, level: unknown, won: boolean) {
     const p = c.profile; if (!p || !['easy', 'normal', 'hard'].includes(level as string)) return;
     if (this.now() - c.lastResult < BOT_RESULT_GAP_MS) return this.shop(c, false, 'Награда за слишком быстрый бой не засчитана');
@@ -148,7 +150,7 @@ export class Lobby {
   }
   private async sendTop(c: Client) {
     try {
-      if (!this.topCache || this.now() - this.topCache.at > TOP_TTL_MS) this.topCache = { at: this.now(), list: await this.store.top(50) };
+      if (!this.topCache || this.now() - this.topCache.at > TOP_TTL_MS) this.topCache = { at: this.now(), list: await this.store.top(100) };
       const list = this.topCache.list, i = c.profile ? list.findIndex(e => e.nick === c.profile!.nick && e.rating === c.profile!.rating) : -1;
       c.conn.send({ t: 'top', list, rank: i >= 0 ? i + 1 : null });
     } catch (e) { console.error('top failed', e); c.conn.send({ t: 'top', list: [], rank: null }); }
@@ -167,7 +169,7 @@ export class Lobby {
   }
 
   private create(c: Client, name: unknown, pass: unknown, ranked: boolean) {
-    if (c.room) return this.err(c, 'busy', 'Сначала выйди из текущей комнаты');
+    if (c.room) return this.err(c, 'busy', 'Сначала выйди с текущего сервера');
     if (this.rooms.size >= MAX_ROOMS) return this.err(c, 'busy', 'Сервер переполнен, попробуй позже');
     this.dequeue(c);
     const room = this.makeRoom(clean(name, 24) || `Комната ${c.nick}`, clean(pass, 16), ranked, false);
@@ -176,10 +178,10 @@ export class Lobby {
   }
 
   private join(c: Client, id: unknown, pass: unknown) {
-    if (c.room) return this.err(c, 'busy', 'Сначала выйди из текущей комнаты');
+    if (c.room) return this.err(c, 'busy', 'Сначала выйди с текущего сервера');
     const room = this.rooms.get(String(id));
     if (!room || room.hidden) { this.err(c, 'gone', 'Комната закрыта'); return void c.conn.send({ t: 'rooms', rooms: this.list() }); }
-    if (room.players[1] || room.phase === 'playing') return this.err(c, 'full', 'В комнате уже двое');
+    if (room.players[1] || room.phase === 'playing') return this.err(c, 'full', 'На сервере уже двое');
     if (room.pass && room.pass !== clean(pass, 16)) return this.err(c, 'wrong_pass', 'Неверный пароль');
     this.dequeue(c);
     room.players[1] = c; room.ready = [false, false]; c.room = room; c.seat = 1;

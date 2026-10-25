@@ -89,3 +89,10 @@ test('recent fights: junk is dropped, long lists are cut, pushRecent keeps newes
   assert.equal(q.recent.length, RECENT_KEEP); assert.equal(q.recent[0].nick, '11');
   assert.deepEqual(sanitizeProfile(undefined, 'z').recent, []);
 });
+
+test('lungs and thrift upgrades change the stamina mods', () => {
+  const p = newProfile('x'); p.coins = 5000;
+  assert.equal(modsFor(p).stam, 1); assert.equal(modsFor(p).thrift, 1);
+  buyUpgrade(p, 'lungs'); buyUpgrade(p, 'thrift'); buyUpgrade(p, 'thrift');
+  const m = modsFor(p); assert.ok(Math.abs(m.stam - 1.15) < 1e-9); assert.ok(Math.abs(m.thrift - .8) < 1e-9);
+});

@@ -2,7 +2,7 @@
 import { makeMods, type Mods } from './battle.ts';
 import type { Difficulty } from './bot.ts';
 
-export type UpgradeId = 'bag' | 'hands' | 'legs' | 'quarry' | 'mender';
+export type UpgradeId = 'bag' | 'hands' | 'legs' | 'quarry' | 'mender' | 'lungs' | 'thrift';
 export type CosmeticKind = 'skin' | 'tiles' | 'stone';
 export type Upgrade = { id: UpgradeId; name: string; desc: string; costs: number[]; icon: string };
 export type Cosmetic = { id: string; kind: CosmeticKind; name: string; cost: number; color: string | null };
@@ -12,6 +12,8 @@ export const UPGRADES: Upgrade[] = [
   { id: 'hands', name: 'Быстрые руки', desc: 'откат между бросками короче на 7% за уровень', costs: [150, 350, 700], icon: '✋' },
   { id: 'legs', name: 'Резвые ноги', desc: 'ходьба быстрее на 4% за уровень', costs: [120, 300, 600], icon: '👟' },
   { id: 'quarry', name: 'Добытчик', desc: 'камни у кучи набираются на 12% быстрее за уровень', costs: [100, 250, 550], icon: '⛏' },
+  { id: 'lungs', name: 'Глубокое дыхание', desc: 'запас выносливости больше на 15% за уровень', costs: [120, 300, 600], icon: '🫁' },
+  { id: 'thrift', name: 'Лёгкая поступь', desc: 'бег и прыжки тратят выносливость на 10% меньше за уровень', costs: [150, 350, 700], icon: '🍃' },
   { id: 'mender', name: 'Мастер ремонта', desc: 'ремонт плит быстрее на 15% за уровень', costs: [200, 450, 800], icon: '🛠' },
 ];
 
@@ -36,6 +38,8 @@ export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { skin: 'skin_classic
 export type Profile = {
   id: string; nick: string; rating: number; wins: number; losses: number; games: number; coins: number;
   up: Record<UpgradeId, number>; own: string[]; eq: Record<CosmeticKind, string>; daily: number; quest: Quest; recent: Recent[];
+  /** The training checklist was finished and its one-time reward paid. */
+  trained: boolean;
 };
 /** One line of the fight history shown on the rating screen (newest first, 8 kept). */
 export type Recent = { nick: string; won: boolean | null; delta: number; online: boolean };
@@ -60,7 +64,7 @@ export function recordQuest(p: Profile, day: number, r: { won: boolean; ranked: 
 export const START_RATING = 1000;
 export const newProfile = (id: string, nick = 'Игрок'): Profile => ({
   id, nick, rating: START_RATING, wins: 0, losses: 0, games: 0, coins: 100,
-  up: { bag: 0, hands: 0, legs: 0, quarry: 0, mender: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1, quest: freshQuest(-1), recent: [],
+  up: { bag: 0, hands: 0, legs: 0, quarry: 0, mender: 0, lungs: 0, thrift: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1, quest: freshQuest(-1), recent: [], trained: false,
 });
 
 const num = (v: unknown, d: number, lo = 0, hi = 1e9) => typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : d;
@@ -75,6 +79,7 @@ export function sanitizeProfile(raw: any, id: string): Profile {
   p.own = [...new Set([...p.own, ...(Array.isArray(r.own) ? r.own.filter((x: unknown) => typeof x === 'string' && known.has(x)) : [])])];
   for (const k of ['skin', 'tiles', 'stone'] as CosmeticKind[]) { const e = r.eq?.[k]; p.eq[k] = typeof e === 'string' && p.own.includes(e) && COSMETICS.find(c => c.id === e)?.kind === k ? e : DEFAULT_EQUIP[k]; }
   const q = r.quest; if (q && typeof q === 'object') p.quest = { day: num(q.day, -1, -1), played: num(q.played, 0, 0, 99), won: num(q.won, 0, 0, 99), online: num(q.online, 0, 0, 99), paid: [0, 1, 2].map(i => q.paid?.[i] === true) as Quest['paid'] };
+  p.trained = r.trained === true;
   if (Array.isArray(r.recent)) p.recent = r.recent.slice(0, RECENT_KEEP).filter((x: any) => x && typeof x.nick === 'string').map((x: any): Recent => ({ nick: x.nick.slice(0, 14), won: x.won === true ? true : x.won === false ? false : null, delta: num(x.delta, 0, -999, 999), online: x.online === true }));
   return p;
 }
@@ -82,7 +87,7 @@ export function sanitizeProfile(raw: any, id: string): Profile {
 /** Battle tuning that a profile's upgrades give. */
 export function modsFor(p: Pick<Profile, 'up'>): Mods {
   const m = makeMods(), up = (k: UpgradeId) => { const v = p.up?.[k]; return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(v, UPGRADES.find(u => u.id === k)!.costs.length)) : 0; };
-  m.capacity += up('bag'); m.cooldown *= 1 - .07 * up('hands'); m.walk *= 1 + .04 * up('legs'); m.refill *= 1 - .12 * up('quarry'); m.repair *= 1 - .15 * up('mender');
+  m.capacity += up('bag'); m.cooldown *= 1 - .07 * up('hands'); m.walk *= 1 + .04 * up('legs'); m.refill *= 1 - .12 * up('quarry'); m.repair *= 1 - .15 * up('mender'); m.stam *= 1 + .15 * up('lungs'); m.thrift *= 1 - .1 * up('thrift');
   return m;
 }
 
@@ -108,6 +113,9 @@ export function equip(p: Profile, id: string): Result {
 export const BOT_REWARD: Record<Difficulty, { win: number; loss: number }> = { easy: { win: 20, loss: 5 }, normal: { win: 35, loss: 10 }, hard: { win: 60, loss: 15 } };
 export const ONLINE_REWARD = { win: 60, loss: 20, draw: 30 };
 export const DAILY_BONUS = 50;
+/** One-time coins for finishing the training checklist. No rating and no bot-fight rewards come from training. */
+export const TRAIN_REWARD = 100;
+export function claimTrained(p: Profile): number { if (p.trained) return 0; p.trained = true; p.coins += TRAIN_REWARD; return TRAIN_REWARD; }
 /** Day number since the epoch in Moscow time; one daily bonus per day. */
 export const dayIndex = (ms: number) => Math.floor((ms + 3 * 3600e3) / 86400e3);
 

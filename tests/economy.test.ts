@@ -184,3 +184,10 @@ test('fight history: online and bot fights land in profile.recent (newest first,
   const r = prof(a).recent; assert.equal(r.length, 8); assert.equal(r[0].nick, 'ИИ · лёгкий'); assert.equal(r[0].online, false); assert.equal(r[0].won, false); assert.equal(r[1].won, true);
   lobby.disconnect(a); const a2 = player(lobby, 'Аня'); assert.deepEqual(prof(a2).recent, r);
 });
+test('training reward: paid once, never gives rating, survives reconnect', () => {
+  const store = new MemoryStore(), lobby = new Lobby(store, () => Date.UTC(2026, 9, 25, 12)), a = player(lobby, 'Аня');
+  assert.equal(prof(a).trained, false); lobby.handle(a, { t: 'trained' });
+  assert.equal(a.last('shop')!.ok, true); assert.equal(prof(a).coins, 200); assert.equal(prof(a).trained, true); assert.equal(prof(a).rating, 1000); assert.equal(prof(a).games, 0);
+  lobby.handle(a, { t: 'trained' }); assert.equal(a.last('shop')!.ok, false); assert.equal(prof(a).coins, 200, 'second claim pays nothing');
+  lobby.disconnect(a); const a2 = player(lobby, 'Аня'); assert.equal(prof(a2).trained, true); assert.equal(prof(a2).coins, 200);
+});

@@ -49,8 +49,8 @@ export function cellsFor(kind: Kind, target: Cell): Cell[] {
 }
 
 /** Per-player tuning that upgrades change. Everything else comes from rules_v01.json. */
-export type Mods = { capacity: number; cooldown: number; refill: number; walk: number; tileHp: number; repair: number };
-export const DEFAULT_MODS: Mods = { capacity: rules.inventory.capacity, cooldown: rules.shot.min_release_interval_s, refill: rules.interaction.refill_per_stone_s, walk: 1, tileHp: rules.arena.start_normal_cell_hp, repair: 1 };
+export type Mods = { capacity: number; cooldown: number; refill: number; walk: number; tileHp: number; repair: number; stam: number; thrift: number };
+export const DEFAULT_MODS: Mods = { capacity: rules.inventory.capacity, cooldown: rules.shot.min_release_interval_s, refill: rules.interaction.refill_per_stone_s, walk: 1, tileHp: rules.arena.start_normal_cell_hp, repair: 1, stam: 1, thrift: 1 };
 export const makeMods = (m?: Partial<Mods>): Mods => ({ ...DEFAULT_MODS, ...m });
 
 export class Battle {
@@ -76,7 +76,7 @@ export class Battle {
   }
 
   private newActor(side: Side, at: Cell = START_CELL): Actor {
-    return { pos: cellCentre(at, side), y: 0, vy: 0, falling: false, lives: LIVES, stones: this.mods[side].capacity, cooldown: 0, stun: 0, slide: null, air: 0, jumpCd: 0, stamina: SPRINT.stamina_s, winded: false, sprintWait: 0, running: false };
+    return { pos: cellCentre(at, side), y: 0, vy: 0, falling: false, lives: LIVES, stones: this.mods[side].capacity, cooldown: 0, stun: 0, slide: null, air: 0, jumpCd: 0, stamina: SPRINT.stamina_s * this.mods[side].stam, winded: false, sprintWait: 0, running: false };
   }
   private resetFloors() {
     for (const side of [0, 1] as Side[]) {
@@ -120,11 +120,14 @@ export class Battle {
     this.repairs[side] = null; this.charges[side] = { t: 0, target: null }; return true;
   }
   setSprint(side: Side, on: boolean) { this.sprint[side] = on; }
+  /** Stamina one hop costs (upgrades make it cheaper) and the size of the stamina pool, in seconds of running. */
+  jumpCost(side: Side) { return JUMP.stamina_cost_s * this.mods[side].thrift; }
+  staminaMax(side: Side) { return SPRINT.stamina_s * this.mods[side].stam; }
   /** Hop: a short airborne arc. Floor is ignored while in the air (cross a hole, land on the far side) and shots that land meanwhile miss. */
   jump(side: Side) {
     const a = this.actors[side];
-    if (!this.canAct(side) || a.air > 0 || a.jumpCd > 0 || this.charges[side] || a.stamina < JUMP.stamina_cost_s) return false;
-    a.stamina -= JUMP.stamina_cost_s; a.sprintWait = SPRINT.regen_delay_s; // no timer: every hop costs stamina (shared with sprint), so hopping stays steady but cannot be endless
+    if (!this.canAct(side) || a.air > 0 || a.jumpCd > 0 || this.charges[side] || a.stamina < this.jumpCost(side)) return false;
+    a.stamina -= this.jumpCost(side); a.sprintWait = SPRINT.regen_delay_s; // no timer: every hop costs stamina (shared with sprint), so hopping stays steady but cannot be endless
     this.repairs[side] = null; a.air = JUMP.duration_s; this.events.push({ type: 'jump', side }); return true;
   }
   setTarget(side: Side, c: Cell | null) { const ch = this.charges[side]; if (ch) ch.target = valid(c) ? { ...c } : null; }
@@ -173,8 +176,8 @@ export class Battle {
     const m0 = this.input[side], moving = Math.hypot(m0.x, m0.z) > .1;
     if (a.winded && a.stamina >= SPRINT.min_to_start_s) a.winded = false;
     a.running = this.sprint[side] && moving && !this.charges[side] && !this.repairs[side] && a.stun <= 0 && !a.slide && !a.winded && a.stamina > 0;
-    if (a.running && a.air <= 0) { a.stamina = Math.max(0, a.stamina - SPRINT.drain_per_s * dt); a.sprintWait = SPRINT.regen_delay_s; if (a.stamina <= 0) a.winded = true; }
-    else if (!a.running) { a.sprintWait = Math.max(0, a.sprintWait - dt); if (a.sprintWait <= 0) a.stamina = Math.min(SPRINT.stamina_s, a.stamina + SPRINT.regen_per_s * dt); }
+    if (a.running && a.air <= 0) { a.stamina = Math.max(0, a.stamina - SPRINT.drain_per_s * this.mods[side].thrift * dt); a.sprintWait = SPRINT.regen_delay_s; if (a.stamina <= 0) a.winded = true; }
+    else if (!a.running) { a.sprintWait = Math.max(0, a.sprintWait - dt); if (a.sprintWait <= 0) a.stamina = Math.min(this.staminaMax(side), a.stamina + SPRINT.regen_per_s * dt); }
     let dx = 0, dz = 0;
     if (a.slide) { const s = Math.min(dt, a.slide.t), k = s / SLIDE_S; dx += a.slide.dx * k; dz += a.slide.dz * k; a.slide.t -= s; if (a.slide.t <= 1e-9) a.slide = null; }
     else if (a.stun <= 0) { const v = this.speed(side), m = this.input[side]; dx = m.x * v * dt; dz = m.z * v * dt; }
