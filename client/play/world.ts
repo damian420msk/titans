@@ -24,6 +24,8 @@ import { createEnvironment } from '../environment';
 import { TitanRig, readClips, CLIP } from './rig';
 import { QualityPolicy, renderScale } from './quality';
 import { PlatformRenderer } from './platform';
+import { assetUrl } from './assets';
+import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { rules, map, size, cellCentre, type Cell, type Point, type Side } from '../../shared/world';
 import { Battle, cellKey, cellsFor, kindForHold, shotPosition, sideOther, type GameEvent, type Kind } from '../../shared/battle';
 
@@ -44,6 +46,7 @@ export class World {
   private sun!: DirectionalLight;
   readonly policy = new QualityPolicy(matchMedia('(pointer: coarse)').matches);
   private clouds: Mesh[] = [];
+  private farIslands: Mesh[] = [];
   private chipTemplates = new Map<StandardMaterial, Mesh>();
   private trailAt = new Map<number, number>();
   private casters: Mesh[] = [];
@@ -137,7 +140,27 @@ export class World {
     sky.setVerticesData('color', col);
     const cloud = s.getMaterialByName('soft cloud banks') as StandardMaterial; cloud.alpha = .9;
     for (let i = 0; i < 70; i++) { const a = i * 2.39996, r = 8 + (i % 10) * 9 + (i * 7 % 13); const m = MeshBuilder.CreatePlane('cloudsea', { width: 26 + (i % 4) * 8, height: 13 + (i % 3) * 4 }, s); m.position.set(Math.sin(a) * r, -9 - (i % 5) * 3.2, Math.cos(a) * r); m.billboardMode = Mesh.BILLBOARDMODE_ALL; m.material = cloud; m.isPickable = false; this.clouds.push(m); }
+    this.buildFarIslands();
     for (const m of s.meshes) if (m.name.startsWith('far rock') || m.name.startsWith('mountain template')) m.setEnabled(false);
+  }
+  /** Distant floating islands from public/art/bg-v01: flat sprites far behind the enemy island and at the sides (cheap, one quad each). */
+  private buildFarIslands() {
+    // [sprite, x, y, z, height in metres], ordered so the first ones (kept on phones) frame the view
+    const spots: [string, number, number, number, number][] = [
+      ['island_02', -34, 1, 70, 20], ['island_05', 44, 2, 82, 20], ['island_07', 4, 7, 112, 14], ['island_04', -66, -2, 62, 18],
+      ['island_06', 70, -3, 64, 16], ['island_12', -14, 10, 135, 16], ['island_16', 24, 8, 150, 20], ['island_17', -90, 4, 90, 22],
+    ];
+    spots.forEach(([name, x, y, z, h], i) => {
+      const tex = new Texture(assetUrl(`art/bg-v01/${name}.png`), this.scene, false, true, Texture.TRILINEAR_SAMPLINGMODE);
+      tex.hasAlpha = true;
+      const mat = new StandardMaterial(`farIsle_${name}`, this.scene);
+      mat.diffuseTexture = tex; mat.emissiveTexture = tex; mat.useAlphaFromDiffuseTexture = true; mat.disableLighting = true; mat.backFaceCulling = false;
+      mat.emissiveColor = new Color3(.92, .86, .98); mat.alpha = .96; mat.fogEnabled = false;
+      const plane = MeshBuilder.CreatePlane(`farisle${i}`, { width: h, height: h }, this.scene);
+      plane.scaling.x = .72; tex.onLoadObservable.addOnce(() => { const sz = tex.getBaseSize(); if (sz.height) plane.scaling.x = sz.width / sz.height; });
+      plane.position.set(x, y, z); plane.billboardMode = Mesh.BILLBOARDMODE_Y; plane.material = mat; plane.isPickable = false; plane.alphaIndex = 5;
+      this.farIslands.push(plane);
+    });
   }
   private glow!: GlowLayer;
   private cast<T extends Mesh>(m: T) { this.casters.push(m); m.receiveShadows = true; return m; }
@@ -278,7 +301,7 @@ export class World {
   applyQuality() {
     const q = this.policy.current, c = this.engine.getRenderingCanvas(), r = c?.getBoundingClientRect(), w = r?.width || innerWidth, h = r?.height || innerHeight;
     this.engine.setHardwareScalingLevel(1 / renderScale(w, h, q, window.devicePixelRatio || 1)); this.engine.resize();
-    this.clouds.forEach((m, i) => m.setEnabled(i < q.clouds));
+    this.clouds.forEach((m, i) => m.setEnabled(i < q.clouds)); this.farIslands.forEach((m, i) => m.setEnabled(i < q.farIslands));
     this.sun.shadowEnabled = q.shadows; this.shadows.getShadowMap()!.refreshRate = q.shadowEvery;
     this.glow.isEnabled = q.glow; this.platform.setFragmentBudget(q.tilePieces);
   }

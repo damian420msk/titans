@@ -19,7 +19,7 @@ test('budgets are smaller on phones and shrink with degradation', () => {
   const m = settings(true), d = settings(false), m2 = settings(true, 2);
   assert.ok(m.clouds < d.clouds && m.particles < d.particles && m.fragments < d.fragments && m.trailEvery > d.trailEvery && d.trailEvery === 0);
   assert.equal(m.glow, true); assert.equal(settings(true, 1).glow, false);
-  assert.equal(m2.shadows, false); assert.ok(m2.clouds < m.clouds);
+  assert.ok(m.farIslands < d.farIslands && m2.farIslands < m.farIslands && m2.farIslands >= 3); assert.equal(m2.shadows, false); assert.ok(m2.clouds < m.clouds);
   assert.equal(d.shadows && d.glow, true); assert.equal(settings(false, 3).shadows, true, 'desktop keeps shadows');
 });
 
