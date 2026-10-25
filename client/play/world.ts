@@ -18,6 +18,7 @@ import type { AssetContainer } from '@babylonjs/core/assetContainer';
 import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 import type { Material } from '@babylonjs/core/Materials/material';
 import { COSMETICS, type CosmeticKind } from '../../shared/progress';
+import { TITANS, TITAN_IDS, otherTitan, type TitanId } from '../../shared/titans';
 import '@babylonjs/core/Culling/ray';
 import '@babylonjs/loaders/glTF/2.0';
 import { createEnvironment } from '../environment';
@@ -34,7 +35,7 @@ const TEAM = ['#2BB8AA', '#E8634E'];
 /** Size of the game stone in the titan's hand relative to the 0.7 m cube (the model's hand is small). */
 const STONE_HAND = .5;
 const STONE_COLOR: Record<Kind, string> = { normal: '#C9C3B6', spin: '#E3A862', heavy: '#8E80C4' };
-type TitanView = { mats: Material[]; holder: TransformNode; body: TransformNode; rig: TitanRig; stone: Mesh; ring: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
+type TitanView = { id: TitanId; mats: Material[]; holder: TransformNode; body: TransformNode; rig: TitanRig; stone: Mesh; ring: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
   cheer: number; flail: number; cheerTarget: boolean; squash: number };
 /** Local rotation offset from Euler angles in degrees (x, y, z). */
 const rot = (x: number, y: number, z: number) => Quaternion.RotationYawPitchRoll(y * Math.PI / 180, x * Math.PI / 180, z * Math.PI / 180);
@@ -52,6 +53,7 @@ export class World {
   private casters: Mesh[] = [];
   private platform!: PlatformRenderer;
   private titans: [TitanView, TitanView] = [] as unknown as [TitanView, TitanView];
+  private views = {} as Record<TitanId, TitanView>;
   private shotMeshes = new Map<number, Mesh>();
   private warns = new Map<string, Mesh>();
   private particles: Particle[] = [];
@@ -190,30 +192,45 @@ export class World {
     cube(0, 2.3, 0, .2);
   }
 
+  /** Loads every titan model once (the file is in metres, about 3.2 m tall). A match always shows two different models, so each owns its materials and the tint is per side. */
   private async buildTitans() {
-    for (const side of [0, 1] as Side[]) {
-      const c = await LoadAssetContainerAsync(`${import.meta.env.BASE_URL}art/titans-v04/titan_turquoise_v04_web.glb`, this.scene, { pluginExtension: '.glb' });
-      for (const l of c.lights) l.setEnabled(false);
-      c.addAllToScene();
-      const holder = new TransformNode('titan' + side, this.scene), body = new TransformNode('body' + side, this.scene); body.parent = holder;
-      // the file is in metres (about 3.2 m tall): no extra scale
-      const root = c.meshes[0]; root.parent = body;
-      // the props that ship inside the file (a test rock in the hand) are dropped: the game owns the stone in the hand
-      for (const m of [...c.meshes]) if (m.name.startsWith('HandStone')) { m.dispose(); }
-      for (const m of c.meshes) if (m.getTotalVertices() && !m.isDisposed()) { this.cast(m as Mesh); m.alwaysSelectAsActiveMesh = true; }
-      const clips = readClips(c.animationGroups);
-      for (const g of c.animationGroups) { g.stop(); g.dispose(); }
-      for (const n of Object.values(CLIP)) if (!clips.has(n)) console.warn('titan clip missing:', n);
-      const nodes = new Map<string, TransformNode>(); for (const n of c.transformNodes) nodes.set(n.name, n);
-      const rig = new TitanRig(nodes, clips);
-      const hand = nodes.get('RightHand'), socket = new TransformNode('stoneSocket' + side, this.scene);
-      if (hand) { socket.parent = hand; socket.position.set(-.028, .13, .112); } else socket.parent = holder;
-      const stone = this.stoneCube(.7, this.mats['stone_normal' + side], 'held'); stone.parent = socket; stone.setEnabled(false);
-      // both sides use the same model: a ring in the team colour under the feet tells them apart (the cosmetics tint does not touch it)
-      const ring = MeshBuilder.CreateTorus('ring' + side, { diameter: 2.9, thickness: .17, tessellation: 40 }, this.scene), rm = new StandardMaterial('ringMat' + side, this.scene);
-      rm.disableLighting = true; rm.emissiveColor = Color3.FromHexString(TEAM[side]!); rm.alpha = .9; ring.material = rm; ring.parent = holder; ring.position.y = .07; ring.scaling.y = .35; ring.isPickable = false;
-      this.titans[side] = { mats: c.materials.filter(m => !m.name.startsWith('HandStone')), holder, body, rig, stone, ring, yaw: side === 0 ? 0 : Math.PI, lean: 0, lie: 0, moving: false, cheer: 0, flail: 0, cheerTarget: false, squash: 0 };
-    }
+    for (const id of TITAN_IDS) this.views[id] = await this.loadTitan(id);
+    this.assignTitans(TITAN_IDS[0]!, TITAN_IDS[1]!);
+  }
+
+  private async loadTitan(id: TitanId): Promise<TitanView> {
+    const c = await LoadAssetContainerAsync(assetUrl(TITANS[id].file), this.scene, { pluginExtension: '.glb' });
+    for (const l of c.lights) l.setEnabled(false);
+    c.addAllToScene();
+    const holder = new TransformNode('titan_' + id, this.scene), body = new TransformNode('body_' + id, this.scene); body.parent = holder;
+    const root = c.meshes[0]; root.parent = body;
+    // the props that ship inside the file (a test rock in the hand) are dropped: the game owns the stone in the hand
+    for (const m of [...c.meshes]) if (m.name.startsWith('HandStone')) { m.dispose(); }
+    for (const m of c.meshes) if (m.getTotalVertices() && !m.isDisposed()) { this.cast(m as Mesh); m.alwaysSelectAsActiveMesh = true; }
+    const clips = readClips(c.animationGroups);
+    for (const g of c.animationGroups) { g.stop(); g.dispose(); }
+    for (const n of Object.values(CLIP)) if (!clips.has(n)) console.warn('titan clip missing:', id, n);
+    const nodes = new Map<string, TransformNode>(); for (const n of c.transformNodes) nodes.set(n.name, n);
+    const rig = new TitanRig(nodes, clips);
+    const hand = nodes.get('RightHand'), socket = new TransformNode('stoneSocket_' + id, this.scene);
+    if (hand) { socket.parent = hand; socket.position.set(-.028, .13, .112); } else socket.parent = holder;
+    const stone = this.stoneCube(.7, this.mats.stone_normal0, 'held'); stone.parent = socket; stone.setEnabled(false);
+    // a ring in the team colour under the feet tells the sides apart even when both look alike (the cosmetics tint does not touch it)
+    const ring = MeshBuilder.CreateTorus('ring_' + id, { diameter: 2.9, thickness: .17, tessellation: 40 }, this.scene), rm = new StandardMaterial('ringMat_' + id, this.scene);
+    rm.disableLighting = true; rm.alpha = .9; ring.material = rm; ring.parent = holder; ring.position.y = .07; ring.scaling.y = .35; ring.isPickable = false;
+    return { id, mats: c.materials.filter(m => !m.name.startsWith('HandStone')), holder, body, rig, stone, ring, yaw: 0, lean: 0, lie: 0, moving: false, cheer: 0, flail: 0, cheerTarget: false, squash: 0 };
+  }
+
+  /** Which model stands on which side for the coming match (side 0 is always the local player). Call before resetMatch/setLook. */
+  assignTitans(model0: TitanId, model1: TitanId) {
+    if (model0 === model1) model1 = otherTitan(model0);
+    const pair: [TitanView, TitanView] = [this.views[model0]!, this.views[model1]!];
+    pair.forEach((t, side) => {
+      t.yaw = side === 0 ? 0 : Math.PI; t.stone.material = this.mats['stone_normal' + side]!;
+      (t.ring.material as StandardMaterial).emissiveColor = Color3.FromHexString(TEAM[side]!);
+    });
+    this.titans = pair;
+    for (const t of pair) t.holder.setEnabled(true);
   }
 
   private stoneMat(kind: Kind, side: Side) { return kind === 'normal' ? this.mats['stone_normal' + side] : this.mats['stone_' + kind]; }
