@@ -5,7 +5,7 @@ import { Battle } from '../shared/battle.ts';
 
 test('new profile: 1000 rating, starter coins, free cosmetics equipped', () => {
   const p = newProfile('x'); assert.equal(p.rating, 1000); assert.equal(p.coins, 100);
-  assert.deepEqual(p.eq, { titan: 'titan_blue', skin: 'skin_classic', tiles: 'tiles_sand', stone: 'stone_grey' });
+  assert.deepEqual(p.eq, { titan: 'titan_blue', tiles: 'tiles_sand', stone: 'stone_grey' });
 });
 test('upgrades cost coins, stack to their cap and change the battle mods', () => {
   const p = newProfile('x'); p.coins = 9000;
@@ -17,9 +17,9 @@ test('upgrades cost coins, stack to their cap and change the battle mods', () =>
 });
 test('cannot overspend, buying a cosmetic equips it, equip needs ownership', () => {
   const p = newProfile('x'); p.coins = 100;
-  assert.equal(buyCosmetic(p, 'skin_gold').ok, false); assert.equal(p.coins, 100);
-  p.coins = 400; assert.equal(buyCosmetic(p, 'skin_gold').ok, true); assert.equal(p.eq.skin, 'skin_gold'); assert.equal(p.coins, 50);
-  assert.equal(buyCosmetic(p, 'skin_gold').ok, false); assert.equal(equip(p, 'skin_classic').ok, true); assert.equal(equip(p, 'skin_frost').ok, false); assert.equal(equip(p, 'nope').ok, false);
+  assert.equal(buyCosmetic(p, 'tiles_granite').ok, false); assert.equal(p.coins, 100);
+  p.coins = 400; assert.equal(buyCosmetic(p, 'tiles_granite').ok, true); assert.equal(p.eq.tiles, 'tiles_granite'); assert.equal(p.coins, 150);
+  assert.equal(buyCosmetic(p, 'tiles_granite').ok, false); assert.equal(equip(p, 'tiles_sand').ok, true); assert.equal(equip(p, 'tiles_dusk').ok, false); assert.equal(equip(p, 'nope').ok, false);
 });
 test('Elo: equal players move by about half K, upsets pay more, the sum is zero for equal K', () => {
   assert.deepEqual(elo(1000, 1000, 1), [14, -14]); const [up] = elo(1000, 1400, 1), [fav] = elo(1400, 1000, 1); assert.ok(up > fav * 3);
@@ -33,10 +33,10 @@ test('daily bonus once per day, rewards by difficulty, leagues', () => {
   assert.equal(league(900).name, 'Бронза'); assert.equal(league(1250).name, 'Золото'); assert.equal(league(3000).name, 'Алмаз');
 });
 test('sanitizeProfile repairs garbage and never grants unowned items', () => {
-  const p = sanitizeProfile({ nick: 5, rating: 'x', coins: -50, up: { bag: 99, legs: 1.6 }, own: ['skin_gold', 'bogus', 7], eq: { skin: 'skin_frost', tiles: 'skin_gold', stone: 'stone_grey' } }, 'id1');
+  const p = sanitizeProfile({ nick: 5, rating: 'x', coins: -50, up: { bag: 99, legs: 1.6 }, own: ['tiles_moss', 'bogus', 7], eq: { tiles: 'stone_ice', stone: 'stone_grey' } }, 'id1');
   assert.equal(p.id, 'id1'); assert.equal(p.nick, 'Игрок'); assert.equal(p.rating, 1000); assert.equal(p.coins, 0); assert.equal(p.up.bag, 2); assert.equal(p.up.legs, 2);
-  assert.ok(p.own.includes('skin_gold') && !p.own.includes('bogus')); assert.equal(p.eq.skin, 'skin_classic'); assert.equal(p.eq.tiles, 'tiles_sand');
-  assert.equal(COSMETICS.filter(c => c.cost === 0).length, 5); assert.equal(p.eq.titan, 'titan_blue');
+  assert.ok(p.own.includes('tiles_moss') && !p.own.includes('bogus')); assert.equal(p.eq.tiles, 'tiles_sand');
+  assert.equal(COSMETICS.filter(c => c.cost === 0).length, 4); assert.equal(p.eq.titan, 'titan_blue');
 });
 
 test('mender shortens repairs for its owner only', () => {
@@ -110,11 +110,17 @@ test('gift calendar: seven days, a missed day or a finished week restarts the ru
 test('titan choice is free, validated and old profiles get the default', async () => {
   const t = await import('../shared/titans.ts');
   const p = newProfile('t'); assert.ok(p.own.includes('titan_red') && p.own.includes('titan_blue')); assert.equal(equip(p, 'titan_red').ok, true); assert.equal(p.eq.titan, 'titan_red');
-  const old = sanitizeProfile({ eq: { skin: 'skin_classic', tiles: 'tiles_sand', stone: 'stone_grey' } }, 'o'); assert.equal(old.eq.titan, 'titan_blue');
+  const old = sanitizeProfile({ eq: { tiles: 'tiles_sand', stone: 'stone_grey' } }, 'o'); assert.equal(old.eq.titan, 'titan_blue');
   assert.equal(sanitizeProfile({ eq: { titan: 'titan_red' } }, 'x').eq.titan, 'titan_red');
-  assert.equal(sanitizeProfile({ eq: { titan: 'skin_gold' }, own: ['skin_gold'] }, 'x').eq.titan, 'titan_blue');
+  assert.equal(sanitizeProfile({ eq: { titan: 'tiles_moss' }, own: ['tiles_moss'] }, 'x').eq.titan, 'titan_blue');
   assert.equal(t.titanOf('titan_red'), 'red'); assert.equal(t.titanOf(undefined), 'blue'); assert.equal(t.titanOf('junk'), 'blue');
   // opponents never look alike: a bot gets the other model, a human with the same pick is shown as the other one
   assert.equal(t.botTitan('blue', Math.random), 'red'); assert.equal(t.botTitan('red', Math.random), 'blue');
   assert.equal(t.foeTitan('blue', 'blue'), 'red'); assert.equal(t.foeTitan('red', 'red'), 'blue'); assert.equal(t.foeTitan('blue', 'red'), 'red');
+});
+
+test('retired titan tints are refunded once when an old profile is loaded and are gone afterwards', () => {
+  const old = sanitizeProfile({ coins: 10, own: ['skin_classic', 'skin_gold', 'skin_frost', 'tiles_moss'], eq: { skin: 'skin_gold', tiles: 'tiles_moss' } }, 'r');
+  assert.equal(old.coins, 10 + 350 + 400); assert.ok(!old.own.some(x => x.startsWith('skin_'))); assert.equal(old.eq.tiles, 'tiles_moss');
+  assert.equal(sanitizeProfile(JSON.parse(JSON.stringify(old)), 'r').coins, old.coins, 'a saved profile is not refunded again');
 });

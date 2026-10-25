@@ -119,7 +119,7 @@ export class Lobby {
     const done = (p: Profile | null) => {
       if (this.clients.get(c.conn) !== c) return;
       const known = this.profiles.get(pid); const prof = known ?? p ?? newProfile(pid, c.nick);
-      this.profiles.set(pid, prof); c.profile = prof; if (!p && !known) this.persist(prof);
+      this.profiles.set(pid, prof); c.profile = prof; if (!known) this.persist(prof); // also rewrites a profile that was migrated on load (e.g. a refund)
       if (prof.nick !== c.nick) { prof.nick = c.nick; this.persist(prof); }
       this.resume(c); this.sendProfile(c); if (c.room) this.pushRoom(c.room);
     };

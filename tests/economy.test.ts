@@ -23,7 +23,7 @@ test('a token gives a profile with defaults; without a valid token the profile i
 });
 test('shop: refused without coins, daily gift once a day, purchases persist across reconnect', () => {
   let t = Date.UTC(2026, 9, 25, 12); const store = new MemoryStore(), lobby = new Lobby(store, () => t), a = player(lobby, 'Аня');
-  lobby.handle(a, { t: 'buy', kind: 'item', id: 'skin_gold' }); assert.equal(a.last('shop')!.ok, false); assert.equal(prof(a).coins, 100);
+  lobby.handle(a, { t: 'buy', kind: 'item', id: 'tiles_moss' }); assert.equal(a.last('shop')!.ok, false); assert.equal(prof(a).coins, 100);
   assert.equal(prof(a).dailyReady, true); lobby.handle(a, { t: 'claim' }); assert.equal(prof(a).coins, 150); assert.equal(prof(a).dailyReady, false);
   lobby.handle(a, { t: 'claim' }); assert.equal(a.last('shop')!.ok, false); assert.equal(prof(a).coins, 150);
   lobby.handle(a, { t: 'buy', kind: 'up', id: 'legs' }); assert.equal(a.last('shop')!.ok, true); assert.equal(prof(a).up.legs, 1); assert.equal(prof(a).coins, 30);

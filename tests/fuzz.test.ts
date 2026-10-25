@@ -26,7 +26,7 @@ test('fuzz: random intents, drops and reconnects never break the server or the b
     else if (r < .17) lobby.handle(p.conn, { t: 'leave' });
     else if (r < .19) { lobby.disconnect(p.conn); players[players.indexOf(p)] = mk(p.n); }
     else if (r < .21) lobby.handle(p.conn, junk());
-    else if (r < .23) lobby.handle(p.conn, { t: 'buy', kind: pick(['up', 'item'] as const), id: pick(['bag', 'hands', 'skin_gold', 'tiles_moss', 'nope']) });
+    else if (r < .23) lobby.handle(p.conn, { t: 'buy', kind: pick(['up', 'item'] as const), id: pick(['bag', 'hands', 'tiles_granite', 'tiles_moss', 'nope']) });
     else if (r < .25) lobby.handle(p.conn, { t: 'result', level: pick(['easy', 'normal', 'hard'] as const), won: rnd() < .5 });
     else if (r < .27) lobby.handle(p.conn, { t: 'emote', id: Math.floor(rnd() * 5) });
     else if (r < .5) lobby.handle(p.conn, { t: 'move', x: rnd() * 2 - 1, z: rnd() * 2 - 1 });

@@ -182,6 +182,7 @@ export function initMenu(h: MenuHooks) {
     root.querySelectorAll<HTMLElement>('#shop-tabs [data-tab]').forEach(b => b.classList.toggle('sel', b.dataset.tab === tab));
     const el = $('shop-list'), p = prof, coins = p?.coins ?? 0;
     if (!p) { el.innerHTML = '<div class="empty">Магазин работает с сервером. Подключаемся…</div>'; return; }
+    el.classList.remove('gallery');
     if (tab === 'up') {
       el.innerHTML = UPGRADES.map(u => {
         const lv = p.up[u.id], max = u.costs.length, cost = lv < max ? u.costs[lv] : null;
@@ -190,11 +191,39 @@ export function initMenu(h: MenuHooks) {
       }).join('');
       return;
     }
-    el.innerHTML = COSMETICS.filter(c => c.kind === tab).map(c => {
-      const own = p.own.includes(c.id), on = p.eq[c.kind] === c.id;
-      const btn = on ? '<span class="maxed">ВЫБРАНО</span>' : own ? `<button class="buy ok" data-eq="${c.id}">Выбрать</button>` : `<button class="buy" data-kind="item" data-buy="${c.id}" ${coins < c.cost ? 'disabled' : ''}><i class="coin"></i> ${c.cost}</button>`;
-      return `<div class="item${on ? ' eq' : ''}"><span class="sw" style="background:${c.color ?? 'linear-gradient(135deg,#fff,#aab)'}"></span><div class="tx"><b>${esc(c.name)}</b></div>${btn}</div>`;
+    renderGallery(el, p, coins);
+  }
+  /** Titans, plates and projectiles: a horizontal slider of picture cards with one big action button under it. */
+  const sel: Partial<Record<CosmeticKind, number>> = {};
+  function renderGallery(el: HTMLElement, p: MyProfile, coins: number) {
+    const kind = tab as CosmeticKind, items = COSMETICS.filter(c => c.kind === kind);
+    if (sel[kind] === undefined) sel[kind] = Math.max(0, items.findIndex(c => c.id === p.eq[kind]));
+    const base = import.meta.env.BASE_URL;
+    const cards = items.map((c, i) => {
+      const own = p.own.includes(c.id), on = p.eq[kind] === c.id;
+      return `<div class="card${on ? ' eq' : ''}" data-i="${i}"><img src="${base}art/ui/shop/${c.id}.webp" alt="" draggable="false"><span class="tag ${on ? 'on' : own ? '' : 'buy'}">${on ? '✓ Выбрано' : own ? 'Есть' : `<i class="coin"></i> ${c.cost}`}</span><b>${esc(c.name)}</b></div>`;
     }).join('');
+    el.classList.add('gallery');
+    el.innerHTML = `<div class="gal"><button class="nav" data-nav="-1" aria-label="Назад">‹</button><div class="strip">${cards}</div><button class="nav" data-nav="1" aria-label="Вперёд">›</button></div><button class="act" id="shop-act"></button>`;
+    const strip = el.querySelector<HTMLElement>('.strip')!, act = el.querySelector<HTMLButtonElement>('#shop-act')!, cardEls = [...strip.children] as HTMLElement[];
+    const paintAct = () => {
+      const i = sel[kind]!, c = items[i]!, own = p.own.includes(c.id), on = p.eq[kind] === c.id;
+      cardEls.forEach((x, k) => x.classList.toggle('cur', k === i));
+      act.removeAttribute('data-eq'); act.removeAttribute('data-buy'); act.removeAttribute('data-kind'); act.disabled = false; act.className = 'act';
+      if (on) { act.textContent = '✓ ВЫБРАНО'; act.disabled = true; act.classList.add('on'); }
+      else if (own) { act.textContent = 'ВЫБРАТЬ'; act.dataset.eq = c.id; act.classList.add('ok'); }
+      else { act.innerHTML = `КУПИТЬ <i class="coin"></i> ${c.cost}`; act.dataset.kind = 'item'; act.dataset.buy = c.id; act.disabled = coins < c.cost; }
+    };
+    const go = (i: number, smooth = true) => { const n = Math.max(0, Math.min(items.length - 1, i)); const c = cardEls[n]!; strip.scrollTo({ left: c.offsetLeft - (strip.clientWidth - c.offsetWidth) / 2, behavior: smooth ? 'smooth' : 'auto' }); sel[kind] = n; paintAct(); };
+    let t = 0;
+    strip.addEventListener('scroll', () => { window.clearTimeout(t); t = window.setTimeout(() => {
+      const mid = strip.scrollLeft + strip.clientWidth / 2; let best = 0, d = 1e9;
+      cardEls.forEach((c, k) => { const dd = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (dd < d) { d = dd; best = k; } });
+      if (best !== sel[kind]) { sel[kind] = best; paintAct(); }
+    }, 60); }, { passive: true });
+    cardEls.forEach((c, k) => c.addEventListener('click', () => go(k)));
+    el.querySelectorAll<HTMLElement>('[data-nav]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); go(sel[kind]! + +b.dataset.nav!); }));
+    paintAct(); requestAnimationFrame(() => go(sel[kind]!, false));
   }
   function setTop(list: PublicEntry[], rank: number | null) { top = list; topRank = rank; if (current === 'rating') renderTop(); }
   function renderTop() {

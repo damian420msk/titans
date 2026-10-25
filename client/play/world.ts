@@ -235,7 +235,7 @@ export class World {
 
   private stoneMat(kind: Kind, side: Side) { return kind === 'normal' ? this.mats['stone_normal' + side] : this.mats['stone_' + kind]; }
 
-  /** Cosmetics: tint the titan, the island plates and the plain stones of one side. A null colour restores the original look. */
+  /** Cosmetics: tint the island plates and the plain stones (projectiles) of one side. A null colour restores the original look. */
   setLook(side: Side, look: Record<CosmeticKind, string>) {
     const color = (kind: CosmeticKind) => COSMETICS.find(c => c.id === look[kind])?.color ?? null;
     // a tint multiplies the colour the model came with (plate edges and cracks are not white); no tint restores exactly that colour
@@ -246,7 +246,7 @@ export class World {
         pbr.albedoColor = hex ? base.multiply(Color3.FromHexString(hex).toLinearSpace()) : base.clone();
       }
     };
-    tint(this.titans[side].mats, color('skin')); tint(this.tileMats[side], color('tiles'));
+    tint(this.tileMats[side], color('tiles'));
     const sm = this.mats['stone_normal' + side], hex = color('stone') ?? STONE_COLOR.normal;
     sm.diffuseColor = Color3.FromHexString(hex).toLinearSpace(); sm.emissiveColor = Color3.FromHexString(hex).scale(.12);
   }

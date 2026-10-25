@@ -3,7 +3,7 @@ import { makeMods, type Mods } from './battle.ts';
 import type { Difficulty } from './bot.ts';
 
 export type UpgradeId = 'bag' | 'hands' | 'legs' | 'quarry' | 'mender' | 'lungs' | 'thrift';
-export type CosmeticKind = 'titan' | 'skin' | 'tiles' | 'stone';
+export type CosmeticKind = 'titan' | 'tiles' | 'stone';
 export type Upgrade = { id: UpgradeId; name: string; desc: string; costs: number[]; icon: string };
 export type Cosmetic = { id: string; kind: CosmeticKind; name: string; cost: number; color: string | null };
 
@@ -21,12 +21,6 @@ export const COSMETICS: Cosmetic[] = [
   // which titan model you play (free); the colour is only the shop swatch, the tint kinds below recolour the model
   { id: 'titan_blue', kind: 'titan', name: 'Бирюзовый', cost: 0, color: '#2BB8AA' },
   { id: 'titan_red', kind: 'titan', name: 'Красный', cost: 0, color: '#E8634E' },
-  { id: 'skin_classic', kind: 'skin', name: 'Классика', cost: 0, color: null },
-  { id: 'skin_ember', kind: 'skin', name: 'Уголёк', cost: 200, color: '#ff9a7a' },
-  { id: 'skin_gold', kind: 'skin', name: 'Золото', cost: 350, color: '#ffe08a' },
-  { id: 'skin_violet', kind: 'skin', name: 'Фиалка', cost: 300, color: '#c9a8ff' },
-  { id: 'skin_jade', kind: 'skin', name: 'Нефрит', cost: 300, color: '#8af0b8' },
-  { id: 'skin_frost', kind: 'skin', name: 'Иней', cost: 400, color: '#a8dcff' },
   { id: 'tiles_sand', kind: 'tiles', name: 'Песчаник', cost: 0, color: null },
   { id: 'tiles_granite', kind: 'tiles', name: 'Гранит', cost: 250, color: '#b9bfd0' },
   { id: 'tiles_moss', kind: 'tiles', name: 'Мох', cost: 250, color: '#b9dca0' },
@@ -36,7 +30,9 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'stone_lava', kind: 'stone', name: 'Лава', cost: 200, color: '#ff8a4a' },
   { id: 'stone_gold', kind: 'stone', name: 'Золотой', cost: 300, color: '#ffd24a' },
 ];
-export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { titan: 'titan_blue', skin: 'skin_classic', tiles: 'tiles_sand', stone: 'stone_grey' };
+/** Titan tints were removed from the shop (the red titan replaced them): what players paid for them is returned once, when the profile is loaded. */
+export const RETIRED_COSMETICS: Record<string, number> = { skin_ember: 200, skin_gold: 350, skin_violet: 300, skin_jade: 300, skin_frost: 400 };
+export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { titan: 'titan_blue', tiles: 'tiles_sand', stone: 'stone_grey' };
 
 export type Profile = {
   id: string; nick: string; rating: number; wins: number; losses: number; games: number; coins: number;
@@ -78,9 +74,10 @@ export function sanitizeProfile(raw: any, id: string): Profile {
   p.rating = num(r.rating, p.rating, 0, 9999); p.wins = num(r.wins, 0); p.losses = num(r.losses, 0); p.games = num(r.games, 0); p.coins = num(r.coins, p.coins); p.daily = num(r.daily, -1, -1); p.streak = num(r.streak, 0, 0, 7);
   for (const u of UPGRADES) p.up[u.id] = num(r.up?.[u.id], 0, 0, u.costs.length);
   if (num(r.up?.plates, 0) > 0) p.coins += 800; // the old 'plates' upgrade was removed (too strong): refund it
+  if (Array.isArray(r.own)) for (const id of new Set(r.own)) if (typeof id === 'string' && RETIRED_COSMETICS[id]) p.coins += RETIRED_COSMETICS[id]!;
   const known = new Set(COSMETICS.map(c => c.id));
   p.own = [...new Set([...p.own, ...(Array.isArray(r.own) ? r.own.filter((x: unknown) => typeof x === 'string' && known.has(x)) : [])])];
-  for (const k of ['titan', 'skin', 'tiles', 'stone'] as CosmeticKind[]) { const e = r.eq?.[k]; p.eq[k] = typeof e === 'string' && p.own.includes(e) && COSMETICS.find(c => c.id === e)?.kind === k ? e : DEFAULT_EQUIP[k]; }
+  for (const k of ['titan', 'tiles', 'stone'] as CosmeticKind[]) { const e = r.eq?.[k]; p.eq[k] = typeof e === 'string' && p.own.includes(e) && COSMETICS.find(c => c.id === e)?.kind === k ? e : DEFAULT_EQUIP[k]; }
   const q = r.quest; if (q && typeof q === 'object') p.quest = { day: num(q.day, -1, -1), played: num(q.played, 0, 0, 99), won: num(q.won, 0, 0, 99), online: num(q.online, 0, 0, 99), paid: [0, 1, 2].map(i => q.paid?.[i] === true) as Quest['paid'] };
   p.trained = r.trained === true;
   if (Array.isArray(r.recent)) p.recent = r.recent.slice(0, RECENT_KEEP).filter((x: any) => x && typeof x.nick === 'string').map((x: any): Recent => ({ nick: x.nick.slice(0, 14), won: x.won === true ? true : x.won === false ? false : null, delta: num(x.delta, 0, -999, 999), online: x.online === true }));
