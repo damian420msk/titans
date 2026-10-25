@@ -5,7 +5,7 @@ import { PHRASES } from '../../shared/net';
 import type { RoomView } from '../../shared/net';
 import { touchAim, magnet } from '../../shared/aim';
 import { Battle, kindForHold, cellKey, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
-import { Training, STEPS, type StepId } from './training';
+import { Training, STEPS, DIRS, type StepId } from './training';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
 import { initMenu } from './menu';
@@ -169,7 +169,8 @@ async function boot() {
   const paintTrain = () => {
     const tr = training; $('train').hidden = !tr;
     if (!tr) return;
-    trainList.innerHTML = STEPS.map(s => `<li class="${tr.done.has(s.id) ? 'ok' : tr.current === s ? 'now' : ''}"><i>${tr.done.has(s.id) ? '✓' : ''}</i>${s.text}</li>`).join('');
+    const arrows = (s: typeof STEPS[number]) => s.id === 'move' && !tr.done.has('move') ? ` <span class="dirs">${DIRS.map(d => `<b class="${tr.dirs.has(d) ? 'on' : ''}">${{ up: '↑', left: '←', down: '↓', right: '→' }[d]}</b>`).join('')}</span>` : '';
+    trainList.innerHTML = STEPS.map(s => `<li class="${tr.done.has(s.id) ? 'ok' : tr.current === s ? 'now' : ''}"><i>${tr.done.has(s.id) ? '✓' : ''}</i><span>${s.text}${arrows(s)}</span></li>`).join('');
     $('train-n').textContent = `${tr.done.size}/${STEPS.length}`;
     const cur = tr.current; trainHint.hidden = !(tr.nudge && cur); if (cur) trainHint.textContent = touchDevice ? cur.touch : cur.pc;
   };

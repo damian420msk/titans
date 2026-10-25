@@ -313,3 +313,9 @@ body.touch .step .pc,body:not(.touch) .step .tc{display:none}
 .trow.me{margin-top:8px;border-top:2px dashed rgba(255,255,255,.35);border-radius:0 0 12px 12px;padding-top:12px}
 .trow.me[hidden]{display:none}
 .rc-place{margin:8px 0 2px;font-size:13px;font-weight:800;color:#ffe08a}
+
+/* UI frame: on a wide window the menu stays inside a 16:9 frame so corner controls are not far from the middle; sections sit in the middle under their header */
+.scr{padding-left:max(24px,env(safe-area-inset-left),calc((100vw - 177.78vh) / 2));padding-right:max(24px,env(safe-area-inset-right),calc((100vw - 177.78vh) / 2))}
+.scr > .top + *{margin-top:auto}
+.scr > :last-child{margin-bottom:auto}
+.top{width:100%}

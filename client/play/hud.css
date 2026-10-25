@@ -60,6 +60,8 @@ button.big{display:block;margin:12px auto 4px;padding:14px 46px;font-size:24px;f
 #train li i{flex:none;width:15px;height:15px;border-radius:50%;border:2px solid rgba(255,255,255,.55);font:800 10px/11px Rubik,system-ui;font-style:normal;text-align:center;color:#073a18}
 #train li.now{opacity:1;font-weight:700}#train li.now i{border-color:#ffd25a}
 #train li.ok{opacity:.6;text-decoration:line-through}#train li.ok i{background:#6be28f;border-color:#6be28f}
+#train .dirs{display:inline-flex;gap:3px;margin-left:4px}#train .dirs b{font-size:12px;padding:0 4px;border-radius:5px;background:rgba(255,255,255,.14);opacity:.7}#train .dirs b.on{background:#6be28f;color:#073a18;opacity:1}
+#train-done{pointer-events:auto}
 #train-hint{margin-top:7px;padding:6px 8px;border-radius:10px;background:rgba(255,210,90,.28);border:1px solid rgba(255,210,90,.6);font-size:12px;animation:pop .25s ease-out}
 #train-hint[hidden]{display:none}
 @media (max-height:480px){#train{top:max(96px,calc(env(safe-area-inset-top) + 90px));width:min(210px,32vw);font-size:11px;padding:6px 8px}#train li i{width:12px;height:12px;font-size:9px;line-height:8px}#train-hint{font-size:11px}}

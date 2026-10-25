@@ -72,7 +72,7 @@ td.n,th.n{font-variant-numeric:tabular-nums;white-space:nowrap}
 #lb{position:fixed;inset:0;background:#0a0818ee;display:none;place-items:center;z-index:20;padding:16px}
 #lb.on{display:grid}
 #lb img{max-width:100%;max-height:100%;border-radius:10px;border:1px solid var(--line)}
-@media (max-width:820px){.lanes,.cols2{grid-template-columns:1fr}.tools{margin-left:0}}
+@media (max-width:820px){.lanes,.cols2{grid-template-columns:1fr}.tools{margin-left:0;flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:2px}.chip{white-space:nowrap}.legend{font-size:11px;gap:4px 10px}.hint{display:none}h1{font-size:18px}header{padding-block:8px 6px}}
 @media (prefers-reduced-motion:no-preference){.node{transition:opacity .15s}}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 </style>
@@ -111,28 +111,28 @@ const S = {ok:['ok','✓'],wip:['wip','~'],todo:['todo','○'],q:['q','?']};
 /* node: id, title, col,row (grid), status, version, shot key (or null), note, parent(s), soft (concept card) */
 const N = [
  {id:'main',t:'Главная',c:0,r:2.2,s:'ok',v:'v10',k:'main',n:'Профиль и монеты слева, 🏆 и ⚙ справа, ИГРАТЬ, плитки внизу.'},
- {id:'gift',t:'Подарок дня: серия 7 дней',c:0,r:3.9,s:'todo',v:'v10',soft:1,from:'main',n:'Окно со сундуком и календарём, иконка если закрыл. Сейчас простая разовая награда.'},
- {id:'base',t:'Моя база',c:0,r:4.75,s:'todo',v:'v20',soft:1,from:'main',n:'Плитка «скоро». Остров игрока, постройки, рейды.'},
- {id:'camp',t:'Кампания',c:0,r:5.6,s:'todo',v:'v20',soft:1,from:'main',n:'Плитка «скоро». Сюжетные миссии с ботами-боссами.'},
+ {id:'gift',t:'Подарок дня: серия 7 дней',c:0,r:3.55,s:'todo',v:'v10',soft:1,from:'main',n:'Окно со сундуком и календарём, иконка если закрыл. Сейчас простая разовая награда.'},
+ {id:'base',t:'Моя база',c:0,r:4.5,s:'todo',v:'v20',soft:1,from:'main',n:'Плитка «скоро». Остров игрока, постройки, рейды.'},
+ {id:'camp',t:'Кампания',c:0,r:5.45,s:'todo',v:'v20',soft:1,from:'main',n:'Плитка «скоро». Сюжетные миссии с ботами-боссами.'},
  {id:'play',t:'Играть',c:1,r:1.4,s:'ok',v:'v10',k:'play',from:'main',n:'Онлайн, бой с ботом, тренировка (мелкая плашка), «Как играть».'},
- {id:'shop',t:'Магазин',c:1,r:5.0,s:'ok',v:'v10',k:'shop',from:'main',n:'7 улучшений (в т.ч. выносливость). Цены ждут проверки.'},
- {id:'quests',t:'Задания дня',c:1,r:6.0,s:'wip',v:'v10',k:'quests',from:'main',n:'Три задания. До релиза: три сложности ботов. В 1.1: недельные.'},
- {id:'rating',t:'Рейтинг',c:1,r:7.0,s:'ok',v:'v10',k:'rating',from:'main',n:'Топ 100, своё место, последние бои. В 1.1: сезоны и награды за лигу.'},
- {id:'settings',t:'Настройки',c:1,r:8.0,s:'ok',v:'v10',k:'settings',from:'main',n:'Ник, звук, вибрация, чувствительность прицела.'},
- {id:'online',t:'Онлайн',c:2,r:0.5,s:'q',v:'v10',k:'online',from:'play',n:'Закрыт до первой победы над ботом. Нужно решить судьбу списка серверов.'},
+ {id:'shop',t:'Магазин',c:1,r:3.6,s:'ok',v:'v10',k:'shop',from:'main',n:'7 улучшений (в т.ч. выносливость). Цены ждут проверки.'},
+ {id:'quests',t:'Задания дня',c:1,r:4.6,s:'wip',v:'v10',k:'quests',from:'main',n:'Три задания. До релиза: три сложности ботов. В 1.1: недельные.'},
+ {id:'rating',t:'Рейтинг',c:1,r:5.6,s:'ok',v:'v10',k:'rating',from:'main',n:'Топ 100, своё место, последние бои. В 1.1: сезоны и награды за лигу.'},
+ {id:'settings',t:'Настройки',c:1,r:6.6,s:'ok',v:'v10',k:'settings',from:'main',n:'Ник, звук, вибрация, чувствительность прицела.'},
+ {id:'online',t:'Онлайн',c:2,r:0.4,s:'q',v:'v10',k:'online',from:'play',n:'Закрыт до первой победы над ботом. Нужно решить судьбу списка серверов.'},
  {id:'search',t:'Быстрая игра: поиск',c:3,r:0,s:'wip',v:'v10',k:'quick',from:'online',n:'Нужны потолок разницы рейтинга ~400 и бот через 20 с.'},
  {id:'create',t:'Новый сервер',c:3,r:1.0,s:'q',v:'v10',k:'create',from:'online',n:'Название, пароль, рейтинговая. Приватные серверы под вопросом.'},
  {id:'room',t:'Ожидание на сервере',c:4,r:1.0,s:'q',v:'v10',from:'create',n:'Два места, «Готов», отсчёт, ссылка «Позвать друга» (в Яндексе внешние ссылки нельзя).'},
- {id:'bot',t:'Бой с ботом: уровни',c:2,r:2.3,s:'ok',v:'v10',k:'bot',from:'play',n:'Гром, Боргар, Торвальд. В 1.1 можно добавить боссов.'},
- {id:'fight',t:'Бой',c:3,r:2.3,s:'wip',v:'v10',k:'fight',from:'bot',n:'Бот не прыгает и не бегает. Запасные позы прыжка и падения. Фон неба без параллакса.'},
- {id:'end',t:'Конец боя',c:4,r:2.3,s:'wip',v:'v10',k:'end',from:'fight',n:'Добавить строку «Ближайшая цель». Есть удвоение награды рекламой.'},
- {id:'train',t:'Тренировка',c:2,r:3.6,s:'ok',v:'v10',from:'play',n:'Плашка на экране «Играть», золотая пока не пройдена; «✓ пройдено» после.'},
- {id:'trainfight',t:'Тренировка: чек-лист',c:3,r:3.6,s:'ok',v:'v10',k:'training',from:'train',n:'7 заданий, неподвижный враг, без рейтинга, +100 монет один раз.'},
- {id:'pause',t:'Пауза',c:4,r:3.6,s:'ok',v:'v10',k:'pause',from:'trainfight',n:'Выйти можно в любой момент, прогресс заданий сохраняется.'},
- {id:'howto',t:'Как играть',c:2,r:4.7,s:'ok',v:'v10',k:'howto',from:'play',n:'Шесть карточек. Перевод на английский в 1.1.'},
- {id:'skins',t:'Магазин: косметика',c:2,r:5.8,s:'wip',v:'v11',k:'shop_skins',from:'shop',n:'Мало предметов. В 1.1 новые скины титана, плиты, камни.'},
+ {id:'bot',t:'Бой с ботом: уровни',c:2,r:2.15,s:'ok',v:'v10',k:'bot',from:'play',n:'Гром, Боргар, Торвальд. В 1.1 можно добавить боссов.'},
+ {id:'fight',t:'Бой',c:3,r:2.15,s:'wip',v:'v10',k:'fight',from:'bot',n:'Бот не прыгает и не бегает. Запасные позы прыжка и падения. Фон неба без параллакса.'},
+ {id:'end',t:'Конец боя',c:4,r:2.15,s:'wip',v:'v10',k:'end',from:'fight',n:'Добавить строку «Ближайшая цель». Есть удвоение награды рекламой.'},
+ {id:'train',t:'Тренировка',c:2,r:3.3,s:'ok',v:'v10',k:'play',from:'play',n:'Плашка на экране «Играть», золотая пока не пройдена; «✓ пройдено» после.'},
+ {id:'trainfight',t:'Тренировка: чек-лист',c:3,r:3.3,s:'ok',v:'v10',k:'training',from:'train',n:'7 заданий, неподвижный враг, без рейтинга, +100 монет один раз.'},
+ {id:'pause',t:'Пауза',c:4,r:3.3,s:'ok',v:'v10',k:'pause',from:'trainfight',n:'Выйти можно в любой момент, прогресс заданий сохраняется.'},
+ {id:'howto',t:'Как играть',c:2,r:4.45,s:'ok',v:'v10',k:'howto',from:'play',n:'Шесть карточек. Перевод на английский в 1.1.'},
+ {id:'skins',t:'Магазин: косметика',c:2,r:5.6,s:'wip',v:'v11',k:'shop_skins',from:'shop',n:'Мало предметов. В 1.1 новые скины титана, плиты, камни.'},
 ];
-const W=300,H=222,GX=400,GY=262,X0=40,Y0=30;
+const W=300,H=222,GX=390,GY=258,X0=40,Y0=30;
 const pos = n => ({x:X0+n.c*GX, y:Y0+n.r*GY, h:n.soft?112:H});
 let dev='ph', filt='all';
 const plane=document.getElementById('plane'), lines=document.getElementById('lines');
@@ -165,7 +165,7 @@ function build(){
 /* pan and zoom */
 const map=document.getElementById('map'); let sc=1,tx=0,ty=0; const pts=new Map(); let pinch=0;
 const apply=()=>{plane.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`};
-function fit(){const r=map.getBoundingClientRect(),w=+plane.dataset.w,h=+plane.dataset.h; sc=Math.min(r.width/w,r.height/h); sc=Math.max(.12,Math.min(sc,1)); if(r.width<700) sc=Math.max(sc,.34); tx=Math.max(8,(r.width-w*sc)/2); ty=8; apply();}
+function fit(){const r=map.getBoundingClientRect(),w=+plane.dataset.w,h=+plane.dataset.h; sc=Math.min(r.width/w,1); sc=Math.max(sc,.3); if(r.width>900) sc=Math.max(sc,Math.min(r.height/h,1));  tx=Math.max(8,(r.width-w*sc)/2); ty=8; apply();}
 function zoomAt(f,cx,cy){const ns=Math.max(.12,Math.min(2.2,sc*f)); tx=cx-(cx-tx)*(ns/sc); ty=cy-(cy-ty)*(ns/sc); sc=ns; apply();}
 map.addEventListener('wheel',e=>{e.preventDefault(); const r=map.getBoundingClientRect(); if(e.ctrlKey||Math.abs(e.deltaY)>0&&!e.shiftKey) zoomAt(e.deltaY<0?1.12:1/1.12,e.clientX-r.left,e.clientY-r.top);},{passive:false});
 map.addEventListener('pointerdown',e=>{pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); map.setPointerCapture(e.pointerId); map.classList.add('drag'); pinch=0; map._moved=0;});
@@ -185,7 +185,7 @@ document.getElementById('tools').addEventListener('click',e=>{const b=e.target.c
   if(b.dataset.f){filt=b.dataset.f; document.querySelectorAll('[data-f]').forEach(x=>x.setAttribute('aria-pressed',x===b)); build();}});
 document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('.tab'); if(!b) return;
   document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected',x===b)); document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));
-  document.getElementById('tools').style.visibility=b.dataset.v==='map'?'visible':'hidden'; if(b.dataset.v==='map') fit();});
+  document.getElementById('tools').style.display=b.dataset.v==='map'?'flex':'none'; if(b.dataset.v==='map') fit();});
 /* versions */
 const li=(s,t)=>`<li><i class="st ${S[s][0]}">${S[s][1]}</i><span>${t}</span></li>`;
 const LANES=[
