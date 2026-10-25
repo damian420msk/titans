@@ -4,18 +4,18 @@ import { createHash } from 'node:crypto';
 import { Battle, type GameEvent } from '../shared/battle.ts';
 import { cellsValid } from './validate.ts';
 import { MemoryStore, type Store } from './store.ts';
-import { snapshot, mirrorSnap, mirrorEvents, type C2S, type S2C, type RoomInfo, type RoomView, type Seat, type ErrCode, type MyProfile } from '../shared/net.ts';
+import { PHRASES, REMATCH_S, snapshot, mirrorSnap, mirrorEvents, type C2S, type S2C, type RoomInfo, type RoomView, type Seat, type ErrCode, type MyProfile } from '../shared/net.ts';
 import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayIndex, rewardBot, botRatingDelta, applyOnline, recordQuest, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
 
 export interface Conn { send(m: S2C): void }
 type Client = {
   conn: Conn; id: string; nick: string; room: Room | null; seat: 0 | 1;
-  pid: string | null; profile: Profile | null; queuedAt: number | null; lastResult: number; away: number | null; lastEmote: number; lastGain: number;
+  pid: string | null; profile: Profile | null; queuedAt: number | null; lastResult: number; away: number | null; lastEmote: number; lastSay: number; lastGain: number;
 };
 type Phase = 'lobby' | 'count' | 'playing';
 type Room = {
   id: string; name: string; pass: string; ranked: boolean; hidden: boolean; players: [Client | null, Client | null]; ready: [boolean, boolean];
-  phase: Phase; count: number; countLeft: number; battle: Battle | null; acc: number; sinceSnap: number; pending: GameEvent[];
+  until: number; phase: Phase; count: number; countLeft: number; battle: Battle | null; acc: number; sinceSnap: number; pending: GameEvent[];
 };
 
 const STEP = 1 / 60, SNAP_EVERY = 3, COUNT_FROM = 3, MAX_ROOMS = 60, BOT_RESULT_GAP_MS = 25000, FARM_LIMIT = 6, TOP_TTL_MS = 10000, GRACE_MS = 15000;
@@ -41,7 +41,7 @@ export class Lobby {
 
   connect(conn: Conn) {
     const id = `p${(++this.seq).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-    this.clients.set(conn, { conn, id, nick: 'Игрок', room: null, seat: 0, pid: null, profile: null, queuedAt: null, lastResult: 0, away: null, lastEmote: 0, lastGain: 0 });
+    this.clients.set(conn, { conn, id, nick: 'Игрок', room: null, seat: 0, pid: null, profile: null, queuedAt: null, lastResult: 0, away: null, lastEmote: -1e9, lastSay: -1e9, lastGain: 0 });
     conn.send({ t: 'welcome', id }); conn.send({ t: 'rooms', rooms: this.list() });
   }
 
@@ -96,6 +96,11 @@ export class Lobby {
         const room = c.room, id = Number(m.id);
         if (!room || room.phase !== 'playing' || !Number.isInteger(id) || id < 0 || id > 3 || this.now() - c.lastEmote < 1500) return;
         c.lastEmote = this.now(); room.players[c.seat === 0 ? 1 : 0]?.conn.send({ t: 'emote', id }); return;
+      }
+      case 'say': {
+        const room = c.room, id = Number(m.id), other = room && room.players[c.seat === 0 ? 1 : 0];
+        if (!room || !other || room.phase === 'playing' || !Number.isInteger(id) || id < 0 || id >= PHRASES.length || this.now() - c.lastSay < 1000) return;
+        c.lastSay = this.now(); other.conn.send({ t: 'say', id }); return;
       }
       case 'ping': conn.send({ t: 'pong', n: Number(m.n) || 0 }); return;
       default: return this.intent(c, m);
@@ -156,7 +161,7 @@ export class Lobby {
   private broadcastList() { const rooms = this.list(); for (const c of this.clients.values()) if (!c.room) c.conn.send({ t: 'rooms', rooms }); }
   private err(c: Client, code: ErrCode, text: string) { c.conn.send({ t: 'err', code, text }); }
   private makeRoom(name: string, pass: string, ranked: boolean, hidden: boolean): Room {
-    const room: Room = { id: Math.random().toString(36).slice(2, 7), name, pass, ranked, hidden, players: [null, null], ready: [false, false], phase: 'lobby', count: 0, countLeft: 0, battle: null, acc: 0, sinceSnap: 0, pending: [] };
+    const room: Room = { id: Math.random().toString(36).slice(2, 7), name, pass, ranked, hidden, players: [null, null], ready: [false, false], until: 0, phase: 'lobby', count: 0, countLeft: 0, battle: null, acc: 0, sinceSnap: 0, pending: [] };
     this.rooms.set(room.id, room); return room;
   }
 
@@ -282,6 +287,10 @@ export class Lobby {
   tick(dt: number) {
     if (this.queue.length > 1) this.matchmake();
     for (const room of [...this.rooms.values()]) {
+      if (room.hidden && room.until && room.phase === 'lobby' && this.now() > room.until) {
+        for (const p of room.players) if (p) { p.room = null; p.conn.send({ t: 'room', room: null }); }
+        this.rooms.delete(room.id); continue;
+      }
       if (room.phase === 'count') {
         room.countLeft -= dt;
         while (room.phase === 'count' && room.countLeft <= 0) { room.count--; room.countLeft += 1; if (room.count <= 0) this.startMatch(room); else this.pushRoom(room); }
@@ -314,8 +323,10 @@ export class Lobby {
     p1.conn.send({ t: 'end', winner: b.winner === null ? null : b.winner === 0 ? 1 : 0, reason: 'over', gain: res.g[1] });
     this.sendProfile(p0); this.sendProfile(p1);
     room.phase = 'lobby'; room.battle = null; room.ready = [false, false]; room.pending = [];
-    if (room.hidden) { for (const p of [p0, p1]) { p.room = null; p.conn.send({ t: 'room', room: null }); } this.rooms.delete(room.id); }
-    else { for (const p of [p0, p1]) if (p.away !== null) { p.away = null; this.leave(p); } if (this.rooms.has(room.id)) this.pushRoom(room); }
+    // both kinds of room stay open for a rematch; a quick-match room closes by itself after REMATCH_S seconds
+    room.until = room.hidden ? this.now() + REMATCH_S * 1000 : 0;
+    for (const p of [p0, p1]) if (p.away !== null) { p.away = null; this.leave(p); }
+    if (this.rooms.has(room.id)) this.pushRoom(room);
     this.broadcastList();
   }
 }

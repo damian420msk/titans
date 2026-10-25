@@ -1,6 +1,8 @@
 import { World } from './world';
 import { Sfx } from './audio';
 import { Controls } from './controls';
+import { PHRASES } from '../../shared/net';
+import type { RoomView } from '../../shared/net';
 import { touchAim, mouseAim, type Pt } from '../../shared/aim';
 import { Battle, kindForHold, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
@@ -46,6 +48,7 @@ const srvEvents: GameEvent[] = [];
 let pendingSnap: { s: Snap; at: number } | null = null;
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
 let seenAimHint = (() => { try { return localStorage.getItem('titans.aimhint') === '1'; } catch { return false; } })();
+let roomView: RoomView | null = null;
 let mouseT: Pt | null = null, mouseLast: { x: number; y: number } | null = null;
 let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1, userPause = false, anchorCell: Cell | null = null;
 const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
@@ -93,6 +96,7 @@ async function boot() {
     switch (m.t) {
       case 'rooms': menu.setRooms(m.rooms); break;
       case 'room':
+        roomView = m.room; updateRematch();
         if (m.room) { menu.renderRoom(m.room); if (!menu.hidden && (menu.screen === 'online' || menu.screen === 'create' || (inviteWait && menu.screen !== 'room'))) { inviteWait = false; menu.open('room'); } }
         else { menu.clearRoom(); if (!menu.hidden && menu.screen === 'room') menu.open('online'); }
         break;
@@ -106,6 +110,7 @@ async function boot() {
       case 'shop': if (mode === 'over') { $('end-gain').textContent = m.text; if (m.ok && /^\+\d+ монет/.test(m.text)) offerDouble(); } else menu.notice(m.text); if (m.ok) sfx.repaired(); break;
       case 'queue': quickWanted = m.on; menu.setQueue(m.on); break;
       case 'emote': showBubble(1, m.id); break;
+      case 'say': { const t = `${roomView?.seats[roomView.me === 0 ? 1 : 0]?.nick ?? 'Соперник'}: «${PHRASES[m.id] ?? ''}»`; if (mode === 'over') $('end-foe').textContent = t; else if (!menu.hidden) menu.notice(t); break; }
       case 'away': if (online) toast(m.on ? 'Соперник потерял связь. Ждём…' : 'Соперник вернулся'); break;
       case 'start': quickWanted = false; if (online && mode === 'playing') { reconnectAt = 0; $('reconn').hidden = true; toast('Связь восстановлена'); break; } lastQuick = !!m.quick; startMatch(m.foe, { mods: m.mods, look: m.look, rating: m.foeRating, ranked: m.ranked }); break;
       case 'snap': if (online) { pendingSnap = { s: m.s, at: performance.now() / 1000 }; srvEvents.push(...m.ev); } break;
@@ -122,9 +127,22 @@ async function boot() {
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
   const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
-  $('again').onclick = () => { if (online && lastQuick) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show('quick'); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else { void ya.interstitial().then(() => startMatch()); } };
+  $('again').onclick = () => { if (online && lastQuick) { online = false; net.send({ t: 'leave' }); $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show('quick'); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else { void ya.interstitial().then(() => startMatch()); } };
   const toMenu = () => { ya.gameplay(false); if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
   $('to-menu').onclick = toMenu;
+  // rematch = "ready" in the room that is still open after the fight
+  function updateRematch() {
+    const btn = $('rematch') as HTMLButtonElement, v = roomView, foe = v?.seats[v.me === 0 ? 1 : 0] ?? null, mine = v?.seats[v.me] ?? null;
+    const on = online && mode === 'over';
+    btn.hidden = !on || !foe; $('end-say').hidden = !on || !foe;
+    if (!on) return;
+    btn.classList.toggle('on', !!mine?.ready); btn.textContent = mine?.ready ? 'ЖДЁМ СОПЕРНИКА…' : 'РЕВАНШ';
+    if (!foe) { if (!$('end-text').textContent.includes('вышел')) $('end-foe').textContent = 'Соперник ушёл'; }
+    else if (foe.ready && !mine?.ready) $('end-foe').textContent = `${foe.nick} просит реванш!`;
+  }
+  $('rematch').onclick = () => { const mine = roomView?.seats[roomView.me]; net.send({ t: 'ready', on: !mine?.ready }); };
+  let lastSay = 0;
+  for (const el of [$('end-say'), $('room-say')]) PHRASES.forEach((text, id) => { const b = document.createElement('button'); b.textContent = text; b.onclick = () => { if (performance.now() - lastSay < 1000) return; lastSay = performance.now(); net.send({ t: 'say', id }); if (el.id === 'end-say') $('end-foe').textContent = `Ты: «${text}»`; else menu.notice(`Ты: «${text}»`); }; el.appendChild(b); });
   $('double').onclick = async () => { $('double').hidden = true; if (await ya.rewarded()) net.send({ t: 'bonus' }); };
   const offerDouble = () => { if (ya.available && net.state === 'on') $('double').hidden = false; };
   $('loading').hidden = true;
@@ -192,7 +210,7 @@ async function boot() {
   const resize = () => world.engine.resize();
   window.addEventListener('resize', resize); window.visualViewport?.addEventListener('resize', resize); window.addEventListener('orientationchange', () => setTimeout(resize, 250));
   const paused = () => !online && (document.hidden || userPause || (controls.touch && innerWidth < innerHeight));
-  Object.assign(window, { titans: { battle, world, net, controls, setPause, state: () => ({ quality: world.qualityStep, mode, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
+  Object.assign(window, { titans: { battle, world, net, controls, setPause, state: () => ({ quality: world.qualityStep, mode, online, room: roomView, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
 
   world.engine.runRenderLoop(() => {
     const rawDt = world.engine.getDeltaTime() / 1000, dt = Math.min(rawDt, .05), isPaused = paused();
@@ -302,7 +320,7 @@ async function boot() {
     $('end-title').textContent = winner === 0 ? 'ПОБЕДА' : winner === 1 ? 'ПОРАЖЕНИЕ' : 'НИЧЬЯ';
     $('end-text').textContent = why === 'left' ? 'Соперник вышел из боя. Победа твоя.' : why === 'conn' ? 'Связь с сервером потеряна.' : winner === 0 ? 'Враг рухнул вниз. Небесные камни твои.' : winner === 1 ? 'Тебя сбросили с острова. Попробуй ещё раз.' : 'Время вышло, силы равны.';
     $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'В КОМНАТУ') : 'ЕЩЁ РАЗ';
-    $('end-gain').textContent = online ? endGain : '';
+    $('end-gain').textContent = online ? endGain : ''; $('end-foe').textContent = ''; $('rematch').hidden = $('end-say').hidden = true; if (online && !why) setTimeout(updateRematch, 0);
     if (!online && why !== 'conn') {
       pendingResult = { level, won: winner === 0 };
       if (net.state === 'on') { hello(); net.send({ t: 'result', level, won: winner === 0 }); pendingResult = null; } else net.connect();

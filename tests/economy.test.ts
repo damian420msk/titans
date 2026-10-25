@@ -138,3 +138,39 @@ test('the end message says why rating did not change: same account, friendly roo
   lobby.handle(b, { t: 'ready', on: true }); lobby.handle(c, { t: 'ready', on: true }); lobby.tick(3.1); finish(lobby, c);
   assert.match(b.last('end')!.gain!.note!, /Дружеский/);
 });
+
+const playOut = (lobby: Lobby, t: { v: number }) => { for (let i = 0; i < 1500; i++) { t.v += 250; lobby.tick(.25); if ([...(lobby as any).rooms.values()].every((r: any) => r.phase === "lobby")) break; } };
+
+test('rematch: a quick-match room stays open after the fight, both press ready → new match; otherwise it closes after 40 s', () => {
+  const t = { v: Date.UTC(2026, 9, 25, 12) }, lobby = new Lobby(new MemoryStore(), () => t.v), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
+  lobby.handle(a, { t: 'quick', on: true }); lobby.handle(b, { t: 'quick', on: true }); lobby.tick(.1); lobby.tick(3.1);
+  assert.equal(a.last('start')!.quick, true); const starts = a.log.filter(m => m.t === 'start').length;
+  playOut(lobby, t); assert.ok(a.last('end'), 'match over');
+  assert.notEqual(a.last('room')!.room, null, 'room is still there for a rematch'); assert.equal(a.last('room')!.room!.seats[1]!.nick, 'Боря');
+  lobby.handle(a, { t: 'ready', on: true }); assert.equal(b.last('room')!.room!.seats[0]!.ready, true, 'the rival sees the rematch request');
+  lobby.handle(b, { t: 'ready', on: true }); lobby.tick(3.1);
+  assert.equal(a.log.filter(m => m.t === 'start').length, starts + 1); assert.equal(b.last('start')!.quick, true);
+  // second fight ends, nobody asks again: room closes
+  playOut(lobby, t); assert.notEqual(b.last('room')!.room, null);
+  t.v += 41000; lobby.tick(.1); assert.equal(a.last('room')!.room, null); assert.equal(b.last('room')!.room, null); assert.equal((lobby as any).rooms.size, 0);
+});
+
+test('rematch: leaving the room tells the rival (room closes) and a listed room keeps both players inside', () => {
+  const t = { v: Date.UTC(2026, 9, 25, 12) }, lobby = new Lobby(new MemoryStore(), () => t.v), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
+  lobby.handle(a, { t: 'quick', on: true }); lobby.handle(b, { t: 'quick', on: true }); lobby.tick(.1); lobby.tick(3.1); playOut(lobby, t);
+  lobby.handle(b, { t: 'leave' }); assert.equal(a.last('room')!.room, null);
+  const c = player(lobby, 'Вера'), d = player(lobby, 'Гоша'); startRanked(lobby, c, d, false); t.v += 1; playOut(lobby, t);
+  assert.notEqual(c.last('room')!.room, null); assert.notEqual(d.last('room')!.room, null); t.v += 120000; lobby.tick(.1); assert.notEqual(c.last('room')!.room, null, 'listed rooms do not expire');
+});
+
+test('say: a lobby phrase reaches only the rival, is rate limited, and is refused for bad ids or mid-match', () => {
+  const t = { v: 1e6 }, lobby = new Lobby(new MemoryStore(), () => t.v), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
+  lobby.handle(a, { t: 'say', id: 1 }); assert.equal(b.log.filter(m => m.t === 'say').length, 0, 'no room, no phrase');
+  lobby.handle(a, { t: 'create', name: 'R', pass: '' }); lobby.handle(a, { t: 'say', id: 1 }); assert.equal(b.log.filter(m => m.t === 'say').length, 0, 'alone in the room');
+  lobby.handle(b, { t: 'join', id: roomId(b), pass: '' });
+  lobby.handle(a, { t: 'say', id: 1 }); assert.deepEqual(b.last('say'), { t: 'say', id: 1 }); assert.equal(a.log.filter(m => m.t === 'say').length, 0);
+  lobby.handle(a, { t: 'say', id: 2 }); assert.equal(b.log.filter(m => m.t === 'say').length, 1, 'rate limit 1 s');
+  t.v += 1100; for (const id of [-1, 99, 1.5, 'x']) lobby.handle(a, { t: 'say', id } as any); assert.equal(b.log.filter(m => m.t === 'say').length, 1);
+  lobby.handle(a, { t: 'ready', on: true }); lobby.handle(b, { t: 'ready', on: true }); lobby.tick(3.1); t.v += 1100;
+  lobby.handle(a, { t: 'say', id: 0 }); assert.equal(b.log.filter(m => m.t === 'say').length, 1, 'not during a match');
+});

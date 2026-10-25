@@ -32,8 +32,13 @@ export type C2S =
   | { t: 'cancel' }
   | { t: 'repair'; on: boolean }
   | { t: 'emote'; id: number }
+  | { t: 'say'; id: number }
   | { t: 'bonus' }
   | { t: 'ping'; n: number };
+
+/** Quick lobby phrases (no free text: nothing to moderate). */
+export const PHRASES = ['Привет!', 'Готов?', 'Ещё разок!', 'Хорошая игра!', 'Минутку…', 'Спасибо!'];
+export const REMATCH_S = 40;
 
 export type ErrCode = 'wrong_pass' | 'full' | 'gone' | 'busy' | 'bad';
 export type S2C =
@@ -50,6 +55,7 @@ export type S2C =
   | { t: 'end'; winner: Side | null; reason: 'over' | 'left'; gain: { rating: number; coins: number; ranked: boolean; note?: string } | null }
   | { t: 'away'; on: boolean }
   | { t: 'emote'; id: number }
+  | { t: 'say'; id: number }
   | { t: 'pong'; n: number };
 
 type V2 = [number, number];

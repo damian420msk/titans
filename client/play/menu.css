@@ -229,3 +229,19 @@ body.touch .step .pc,body:not(.touch) .step .tc{display:none}
 .item.quest em{font-style:normal;font-size:12px;opacity:.8}
 .bar{display:block;height:8px;border-radius:5px;background:rgba(255,255,255,.2);margin:5px 0 2px;overflow:hidden}.bar i{display:block;height:100%;background:#ffd25a;border-radius:5px}
 .rw{font-weight:800;color:#ffe08a;font-size:14px;min-width:92px;text-align:center}
+
+.say{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0}
+.say[hidden]{display:none}
+.say button{padding:6px 10px;border-radius:14px;font-size:13px;font-weight:700;min-height:0;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.35)}
+.say button:active{background:rgba(255,255,255,.35)}
+#rematch.on{background:#6e6a8f}
+/* the fight-end panel carries rematch + phrases now: keep it inside short landscape phones */
+#end .panel{max-height:96vh;overflow-y:auto}
+@media (max-height:430px){
+  #end .panel{padding-top:10px;padding-bottom:10px}
+  #end .panel h1{font-size:30px;margin:0 0 2px}
+  #end .panel .big{padding:8px 18px;font-size:17px;margin:2px auto}
+  #end .say{margin:2px 0;gap:4px}
+  #end .say button{padding:4px 8px;font-size:12px}
+  #end .gain{margin:0 0 4px;min-height:0;font-size:14px}
+}
