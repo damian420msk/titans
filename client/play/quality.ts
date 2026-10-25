@@ -5,7 +5,7 @@ export type QualitySettings = {
   scale: number;        // render pixels per CSS pixel on phones (desktop: multiplier on top of the device pixel ratio)
   maxDpr: number;       // device pixel ratio actually used: phones 1, desktops up to 2
   maxPixels: number; maxEdge: number;
-  clouds: number; particles: number; fragments: number; trailEvery: number;
+  clouds: number; particles: number; fragments: number; tilePieces: number; trailEvery: number;
   shadows: boolean; shadowEvery: 1 | 2; glow: boolean;
 };
 
@@ -14,7 +14,7 @@ export function settings(mobile: boolean, degradation = 0): QualitySettings {
   return {
     scale: Math.pow(.85, d),
     maxDpr: mobile ? 1 : 2, maxPixels: mobile ? 921600 : 3686400, maxEdge: mobile ? 1280 : 3000,
-    clouds: mobile ? (d >= 2 ? 16 : 30) : 70, particles: mobile ? 56 : 128, fragments: mobile ? 24 : 64, trailEvery: mobile ? .05 : 0,
+    clouds: mobile ? (d >= 2 ? 16 : 30) : 70, particles: mobile ? 56 : 128, fragments: mobile ? 24 : 64, tilePieces: mobile ? 24 : 64, trailEvery: mobile ? .05 : 0,
     shadows: !mobile || d < 2, shadowEvery: mobile ? 2 : 1, glow: !mobile || d < 1,
   };
 }

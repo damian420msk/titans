@@ -23,6 +23,7 @@ import '@babylonjs/loaders/glTF/2.0';
 import { createEnvironment } from '../environment';
 import { TitanRig, readClips, CLIP } from './rig';
 import { QualityPolicy, renderScale } from './quality';
+import { PlatformRenderer } from './platform';
 import { rules, map, size, cellCentre, type Cell, type Point, type Side } from '../../shared/world';
 import { Battle, cellKey, cellsFor, kindForHold, shotPosition, sideOther, type GameEvent, type Kind } from '../../shared/battle';
 
@@ -31,7 +32,6 @@ const TEAM = ['#2BB8AA', '#E8634E'];
 /** Size of the game stone in the titan's hand relative to the 0.7 m cube (the model's hand is small). */
 const STONE_HAND = .5;
 const STONE_COLOR: Record<Kind, string> = { normal: '#C9C3B6', spin: '#E3A862', heavy: '#8E80C4' };
-type CellView = { root: TransformNode[]; intact: TransformNode; cracked: TransformNode; foundation: Mesh; shown: 'intact' | 'cracked' | 'hole'; fall: number; base: Vector3[] };
 type TitanView = { mats: Material[]; holder: TransformNode; body: TransformNode; rig: TitanRig; stone: Mesh; ring: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
   cheer: number; flail: number; cheerTarget: boolean; squash: number };
 /** Local rotation offset from Euler angles in degrees (x, y, z). */
@@ -47,7 +47,7 @@ export class World {
   private chipTemplates = new Map<StandardMaterial, Mesh>();
   private trailAt = new Map<number, number>();
   private casters: Mesh[] = [];
-  private cells: [Map<string, CellView>, Map<string, CellView>] = [new Map(), new Map()];
+  private platform!: PlatformRenderer;
   private titans: [TitanView, TitanView] = [] as unknown as [TitanView, TitanView];
   private shotMeshes = new Map<number, Mesh>();
   private warns = new Map<string, Mesh>();
@@ -69,11 +69,7 @@ export class World {
   freezeCamera = false;
   /** Hard reset of everything a finished match can leave behind: plates mid-fall, camera pose, leftover titan posture. */
   resetMatch() {
-    for (const side of [0, 1] as Side[]) for (const v of this.cells[side].values()) {
-      v.fall = 0; v.shown = 'intact';
-      for (const n of [v.intact, v.cracked]) { n.position.y = 0; n.rotation.x = n.rotation.z = 0; }
-      v.intact.setEnabled(true); v.cracked.setEnabled(false); v.foundation.setEnabled(true);
-    }
+    this.platform.clearEffects(); this.platform.update(new Battle().floors, 0);
     for (const m of this.shotMeshes.values()) m.dispose(); this.shotMeshes.clear();
     for (const p of this.particles) p.mesh.dispose(); this.particles.length = 0; this.trailAt.clear();
     this.aimFrozen = false; this.snapCamera = true;
@@ -81,6 +77,8 @@ export class World {
     this.resetPoses();
   }
   private snapCamera = false;
+  /** Which physical island this client sits on (the guest sees the arena mirrored): tile styles stay tied to the physical island. */
+  configurePlatform(seat: Side) { this.platform.configurePhysicalSeat(seat); }
   resetPoses() { this.foeVis.ok = false; for (const t of this.titans) { t.cheerTarget = false; t.cheer = t.flail = t.squash = 0; t.rig.reset(); } }
 
   private constructor(canvas: HTMLCanvasElement) {
@@ -145,34 +143,10 @@ export class World {
   private cast<T extends Mesh>(m: T) { this.casters.push(m); m.receiveShadows = true; return m; }
 
   private async buildIslands() {
-    // one set of tile containers per island: tinting a material then only changes that side's plates
-    const tilesBySide: [Map<string, AssetContainer>, Map<string, AssetContainer>] = [new Map(), new Map()];
-    for (const sd of [0, 1] as Side[]) for (const v of ['a', 'b', 'c']) for (const k of ['intact', 'cracked']) { const ct = await LoadAssetContainerAsync(`${import.meta.env.BASE_URL}art/blocks-abc-v03/tile_${v}_${k}.glb`, this.scene, { pluginExtension: '.glb' }); tilesBySide[sd].set(`${v}/${k}`, ct); this.tileMats[sd].push(...ct.materials); }
-    const S = size;
-    const collar = MeshBuilder.CreateBox('collar', { width: S, height: .25, depth: S }, this.scene); collar.position.y = -.525;
-    const rock = MeshBuilder.CreateCylinder('hang', { diameterTop: S, diameterBottom: 1.9, height: 1.0, tessellation: 8, subdivisions: 2 }, this.scene); rock.position.y = -1.15;
-    collar.material = rock.material = this.mats.rock;
-    const foundation = Mesh.MergeMeshes([collar, rock], true, true)!; foundation.convertToFlatShadedMesh(); foundation.isVisible = false;
+    // plates, cracks, fragments, under-rocks and team edges: platform-v05 (presentation only, instanced, budgeted)
+    this.platform = await PlatformRenderer.create(this.scene, map.cells, cellCentre, size);
+    this.tileMats = [this.platform.materials(0), this.platform.materials(1)];
     for (const side of [0, 1] as Side[]) {
-      const root = new TransformNode('island' + side, this.scene);
-      for (const c of map.cells) {
-        const key = cellKey(c), p = cellCentre(c, side), v = 'abc'[(c.x * 7 + c.z * 3 + side) % 3], rot = ((c.x + c.z * 3) % 4) * Math.PI / 2;
-        const make = (kind: string) => {
-          const inst = tilesBySide[side].get(`${v}/${kind}`)!.instantiateModelsToScene(n => `${side}/${key}/${kind}/${n}`, false);
-          const group = new TransformNode(`tile${side}/${key}/${kind}`, this.scene); group.position.set(p.x, 0, p.z); group.rotation.y = rot; group.parent = root;
-          for (const n of inst.rootNodes) { const t = n as TransformNode; t.parent = group; for (const m of t.getChildMeshes()) { m.receiveShadows = true; } }
-          return group;
-        };
-        const intact = make('intact'), cracked = make('cracked');
-        const f = foundation.createInstance(`f${side}/${key}`); f.position.set(p.x, 0, p.z); f.rotation.y = ((c.x * 3 + c.z) % 4) * Math.PI / 2; f.parent = root;
-        cracked.setEnabled(false);
-        this.cells[side].set(key, { root: [], intact, cracked, foundation: f as unknown as Mesh, shown: 'intact', fall: 0, base: [] });
-      }
-      // team trim along the front edge
-      for (let x = 0; x < rules.arena.width_cells; x++) {
-        const p = cellCentre({ x, z: rules.arena.depth_cells - 1 }, side), dir = side === 0 ? 1 : -1;
-        const strip = MeshBuilder.CreateBox('trim', { width: S * .82, height: .14, depth: .22 }, this.scene); strip.material = this.mats['trim' + side]; strip.position.set(p.x, -.08, p.z + dir * (S / 2 - .05)); strip.parent = root;
-      }
       // arsenal: pile of sky stones
       const a = cellCentre({ x: rules.arena.arsenal_cell[0], z: rules.arena.arsenal_cell[1] }, side);
       const base = this.cast(MeshBuilder.CreateCylinder('arsenal base', { diameterTop: 2.2, diameterBottom: 2.6, height: .5, tessellation: 8 }, this.scene)); base.material = this.mats.stoneDark; base.position.set(a.x, .25, a.z);
@@ -306,7 +280,7 @@ export class World {
     this.engine.setHardwareScalingLevel(1 / renderScale(w, h, q, window.devicePixelRatio || 1)); this.engine.resize();
     this.clouds.forEach((m, i) => m.setEnabled(i < q.clouds));
     this.sun.shadowEnabled = q.shadows; this.shadows.getShadowMap()!.refreshRate = q.shadowEvery;
-    this.glow.isEnabled = q.glow;
+    this.glow.isEnabled = q.glow; this.platform.setFragmentBudget(q.tilePieces);
   }
   /** Called with every frame time while a match runs; steps the picture down for good if frames stay slow. */
   adaptQuality(frame: number) { if (this.policy.sample(frame * 1000)) this.applyQuality(); }
@@ -334,21 +308,7 @@ export class World {
     this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, k));
   }
 
-  private updateCells(b: Battle, dt: number) {
-    for (const side of [0, 1] as Side[]) for (const [key, v] of this.cells[side]) {
-      const hp = b.floors[side].get(key) ?? 0, want = hp >= 2 ? 'intact' : hp === 1 ? 'cracked' : 'hole';
-      if (want !== v.shown) {
-        if (want === 'hole') { v.fall = 1.1; v.cracked.setEnabled(true); v.intact.setEnabled(false); v.foundation.setEnabled(false); }
-        else { v.fall = 0; v.intact.position.y = v.cracked.position.y = 0; v.intact.setEnabled(want === 'intact'); v.cracked.setEnabled(want === 'cracked'); v.foundation.setEnabled(true); }
-        v.shown = want;
-      }
-      if (v.fall > 0) {
-        v.fall -= dt; const t = 1.1 - v.fall;
-        v.cracked.position.y = -t * t * 9; v.cracked.rotation.z = t * .6; v.cracked.rotation.x = t * .4;
-        if (v.fall <= 0) { v.cracked.setEnabled(false); v.cracked.position.y = 0; v.cracked.rotation.x = v.cracked.rotation.z = 0; }
-      }
-    }
-  }
+  private updateCells(b: Battle, dt: number) { this.platform.update(b.floors, dt); }
 
   private updateTitans(b: Battle, dt: number) {
     for (const side of [0, 1] as Side[]) {
@@ -494,5 +454,6 @@ export class World {
   }
   /** Used by tests / diagnostics. */
   meshCount() { return this.scene.meshes.length; }
+  platformDiagnostics() { return this.platform.diagnostics(); }
   isReady() { return this.scene.isReady(); }
 }

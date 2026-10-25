@@ -1,0 +1,33 @@
+{
+  "version": "platform-v05.1",
+  "seed": 251025,
+  "cellSize": 2.8,
+  "thickness": 0.4,
+  "surfaces": [
+    "a",
+    "b",
+    "c"
+  ],
+  "fractures": [
+    "f0",
+    "f1",
+    "f2"
+  ],
+  "palettes": [
+    "teal",
+    "coral",
+    "sand"
+  ],
+  "ornaments": {
+    "a": "none",
+    "b": "shallow-diamond",
+    "c": "none"
+  },
+  "underrocks": [
+    1,
+    2,
+    3
+  ],
+  "assetRoot": "art/platform-v05/",
+  "texture": "stone_grain.png"
+}
