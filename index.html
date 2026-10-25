@@ -103,10 +103,20 @@
 
   <section class="scr" data-scr="rating" hidden>
     <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Рейтинг</h2><span class="pill" id="rate-pill"><i></i><span>лучшие игроки</span></span></header>
-    <div class="glass table">
-      <div class="trow th"><span>#</span><span>Игрок</span><span>Победы</span><span>Очки</span></div>
-      <div id="top-list" class="top-list"></div>
-      <div class="trow me" id="top-me"><span>—</span><span id="rate-me">Игрок</span><span id="rate-wins">0</span><span id="rate-pts">1000</span></div>
+    <div class="rate-grid">
+      <div class="rate-side">
+        <div class="glass rate-card">
+          <div class="rc-top"><b id="rc-league">Бронза</b><span id="rc-pts">1000</span></div>
+          <div class="bar"><i id="rc-bar"></i></div>
+          <div class="rc-sub"><span id="rc-next"></span><span id="rc-wl"></span></div>
+        </div>
+        <div class="glass recent"><h3>Последние бои</h3><div id="recent-list"></div></div>
+      </div>
+      <div class="glass table">
+        <div class="trow th"><span>#</span><span>Игрок</span><span>Победы</span><span>Очки</span></div>
+        <div id="top-list" class="top-list"></div>
+        <div class="trow me" id="top-me"><span>—</span><span id="rate-me">Игрок</span><span id="rate-wins">0</span><span id="rate-pts">1000</span></div>
+      </div>
     </div>
   </section>
 

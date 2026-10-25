@@ -5,7 +5,7 @@ import { Battle, type GameEvent } from '../shared/battle.ts';
 import { cellsValid } from './validate.ts';
 import { MemoryStore, type Store } from './store.ts';
 import { PHRASES, REMATCH_S, snapshot, mirrorSnap, mirrorEvents, type C2S, type S2C, type RoomInfo, type RoomView, type Seat, type ErrCode, type MyProfile } from '../shared/net.ts';
-import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayIndex, rewardBot, botRatingDelta, applyOnline, recordQuest, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
+import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dayIndex, rewardBot, botRatingDelta, applyOnline, recordQuest, pushRecent, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
 
 export interface Conn { send(m: S2C): void }
 type Client = {
@@ -20,6 +20,7 @@ type Room = {
 
 const STEP = 1 / 60, SNAP_EVERY = 3, COUNT_FROM = 3, MAX_ROOMS = 60, BOT_RESULT_GAP_MS = 25000, FARM_LIMIT = 6, TOP_TTL_MS = 10000, GRACE_MS = 15000;
 const clean = (s: unknown, max: number) => (typeof s === 'string' ? s : '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, max);
+const BOT_NAMES = { easy: 'ИИ · лёгкий', normal: 'ИИ · средний', hard: 'ИИ · сложный' };
 const FRIENDLY = { win: 30, loss: 10, draw: 15 };
 
 export class Lobby {
@@ -138,7 +139,7 @@ export class Lobby {
   private botResult(c: Client, level: unknown, won: boolean) {
     const p = c.profile; if (!p || !['easy', 'normal', 'hard'].includes(level as string)) return;
     if (this.now() - c.lastResult < BOT_RESULT_GAP_MS) return this.shop(c, false, 'Награда за слишком быстрый бой не засчитана');
-    c.lastResult = this.now(); const dr = botRatingDelta(p, level as any, won); p.rating += dr; const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0; this.shop(c, true, `+${r} монет · ${dr > 0 ? '+' : ''}${dr} рейтинг` + (qc ? ` · задание +${qc}` : ''));
+    c.lastResult = this.now(); const dr = botRatingDelta(p, level as any, won); p.rating += dr; pushRecent(p, { nick: BOT_NAMES[level as 'easy' | 'normal' | 'hard'], won, delta: dr, online: false }); const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0; this.shop(c, true, `+${r} монет · ${dr > 0 ? '+' : ''}${dr} рейтинг` + (qc ? ` · задание +${qc}` : ''));
   }
   /** Rewarded-ad bonus: repeats the last reward once. The server cannot see the ad, so it only trusts one claim per match. */
   private bonus(c: Client) {
@@ -196,6 +197,7 @@ export class Lobby {
       this.onResult?.({ names, winner: seat === 0 ? 1 : 0, reason: 'left', ranked: gains?.ranked ?? false });
       rival?.conn.send({ t: 'end', winner: 0, reason: 'left', gain: gains ? gains.g[seat === 0 ? 1 : 0] : null });
       if (rival) this.sendProfile(rival);
+      this.sendProfile(c); // the one who left lost the fight: show the new rating at once
     }
     room.phase = 'lobby'; room.battle = null; room.pending = [];
     if (room.hidden) { if (rival) { rival.room = null; rival.conn.send({ t: 'room', room: null }); } this.rooms.delete(room.id); }
@@ -262,6 +264,7 @@ export class Lobby {
       const give = (p: Profile, won: boolean | null) => { const coins = won === null ? FRIENDLY.draw : won ? FRIENDLY.win : FRIENDLY.loss; p.coins += coins; return { rating: 0, coins, ranked: false, note }; };
       g = [give(pa, winner === null ? null : winner === 0), give(pb, winner === null ? null : winner === 1)];
     }
+    pushRecent(pa, { nick: b.nick, won: winner === null ? null : winner === 0, delta: g[0].rating, online: true }); pushRecent(pb, { nick: a.nick, won: winner === null ? null : winner === 1, delta: g[1].rating, online: true });
     const day = dayIndex(this.now());
     g[0].coins += recordQuest(pa, day, { won: winner === 0, ranked }); g[1].coins += recordQuest(pb, day, { won: winner === 1, ranked });
     if (a.pid) a.lastGain = g[0].coins; if (b.pid) b.lastGain = g[1].coins;

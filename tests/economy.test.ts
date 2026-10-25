@@ -174,3 +174,13 @@ test('say: a lobby phrase reaches only the rival, is rate limited, and is refuse
   lobby.handle(a, { t: 'ready', on: true }); lobby.handle(b, { t: 'ready', on: true }); lobby.tick(3.1); t.v += 1100;
   lobby.handle(a, { t: 'say', id: 0 }); assert.equal(b.log.filter(m => m.t === 'say').length, 1, 'not during a match');
 });
+
+test('fight history: online and bot fights land in profile.recent (newest first, 8 kept) and survive a reload', () => {
+  const t = { v: Date.UTC(2026, 9, 25, 12) }, store = new MemoryStore(), lobby = new Lobby(store, () => t.v), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
+  startRanked(lobby, a, b); finish(lobby, b);
+  assert.deepEqual(prof(a).recent[0], { nick: 'Боря', won: true, delta: prof(a).rating - 1000, online: true });
+  assert.equal(prof(b).recent[0].won, false); assert.equal(prof(b).recent[0].nick, 'Аня'); assert.ok(prof(b).recent[0].delta < 0);
+  for (let i = 0; i < 10; i++) { t.v += 30000; lobby.handle(a, { t: 'result', level: 'easy', won: i % 2 === 0 }); }
+  const r = prof(a).recent; assert.equal(r.length, 8); assert.equal(r[0].nick, 'ИИ · лёгкий'); assert.equal(r[0].online, false); assert.equal(r[0].won, false); assert.equal(r[1].won, true);
+  lobby.disconnect(a); const a2 = player(lobby, 'Аня'); assert.deepEqual(prof(a2).recent, r);
+});

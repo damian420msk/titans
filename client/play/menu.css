@@ -245,3 +245,22 @@ body.touch .step .pc,body:not(.touch) .step .tc{display:none}
   #end .say button{padding:4px 8px;font-size:12px}
   #end .gain{margin:0 0 4px;min-height:0;font-size:14px}
 }
+
+.rate-grid{display:grid;grid-template-columns:minmax(210px,.8fr) 1.2fr;gap:12px;max-width:760px;width:100%}
+.rate-side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.rate-card{padding:10px 14px}
+.rc-top{display:flex;justify-content:space-between;align-items:baseline;font-weight:800}
+.rc-top b{font-size:22px}.rc-top span{font-size:20px}
+.bar{height:8px;border-radius:6px;background:rgba(255,255,255,.18);overflow:hidden;margin:6px 0}
+.bar i{display:block;height:100%;border-radius:6px;transition:width .4s}
+.rc-sub{display:flex;justify-content:space-between;font-size:12px;opacity:.8;gap:8px}
+.recent{padding:8px 12px}.recent h3{margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.65}
+#recent-list{display:flex;flex-direction:column;gap:2px;max-height:26vh;overflow:auto}
+.rrow{display:grid;grid-template-columns:76px 1fr 38px;gap:6px;font-size:13px;padding:3px 6px;border-radius:8px;align-items:center}
+.rrow b{font-size:12px}.rrow.w b{color:#7be495}.rrow.l b{color:#ff8f8f}.rrow.d b{color:#ffd25a}
+.rrow em{font-style:normal;text-align:right;font-weight:800}
+.rrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-list .trow.mine{background:rgba(255,210,90,.22)!important;border-radius:10px;font-weight:700}
+.ld{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+@media (max-width:640px){.rate-grid{grid-template-columns:1fr}}
+@media (max-height:430px){.top-list{max-height:36vh}#recent-list{max-height:27vh}}

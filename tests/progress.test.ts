@@ -79,3 +79,13 @@ test('bot fights move rating, half as much as a live player; a win always gives 
   assert.equal(botRatingDelta({ rating: 2000, games: 50 }, 'easy', true), 1); assert.ok(botRatingDelta({ rating: 2000, games: 50 }, 'easy', false) <= -1);
   assert.equal(botRatingDelta({ rating: 0, games: 50 }, 'hard', false), 0, 'never below zero');
 });
+
+import { pushRecent, RECENT_KEEP, newProfile as np } from '../shared/progress.ts';
+test('recent fights: junk is dropped, long lists are cut, pushRecent keeps newest first', () => {
+  const p = sanitizeProfile({ recent: [{ nick: 'x'.repeat(40), won: 'yes', delta: 1e9, online: 1 }, 5, null, { nick: 3 }, ...Array(20).fill({ nick: 'ok', won: true, delta: 3, online: true })] }, 'id');
+  assert.equal(p.recent.length, RECENT_KEEP - 3, 'junk entries are dropped from the first 8');
+  assert.equal(p.recent[0].nick.length, 14); assert.equal(p.recent[0].won, null); assert.equal(p.recent[0].delta, 999); assert.equal(p.recent[0].online, false);
+  const q = np('q'); for (let i = 0; i < 12; i++) pushRecent(q, { nick: String(i), won: true, delta: i, online: true });
+  assert.equal(q.recent.length, RECENT_KEEP); assert.equal(q.recent[0].nick, '11');
+  assert.deepEqual(sanitizeProfile(undefined, 'z').recent, []);
+});

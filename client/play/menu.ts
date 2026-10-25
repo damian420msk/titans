@@ -5,7 +5,7 @@ import type { Sfx } from './audio';
 import type { NetState } from './online';
 
 import type { RoomInfo, RoomView, MyProfile } from '../../shared/net';
-import { UPGRADES, COSMETICS, QUESTS, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
+import { UPGRADES, COSMETICS, QUESTS, LEAGUES, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
 export type { RoomInfo, RoomView };
 export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick' | 'quests';
 
@@ -159,10 +159,17 @@ export function initMenu(h: MenuHooks) {
   }
   function setTop(list: PublicEntry[], rank: number | null) { top = list; topRank = rank; if (current === 'rating') renderTop(); }
   function renderTop() {
-    const el = $('top-list');
-    el.innerHTML = top.length ? top.map((e, i) => `<div class="trow"><span>${i + 1}</span><span style="color:${league(e.rating).color}">${esc(e.nick)}</span><span>${e.wins}</span><span>${e.rating}</span></div>`).join('') : '<div class="empty">Рейтинг пока пуст. Сыграй рейтинговый бой.</div>';
-    $('top-me').children[0].textContent = topRank ? String(topRank) : '—';
-    $('rate-me').textContent = nick(); $('rate-pts').textContent = String(prof?.rating ?? 1000); $('rate-wins').textContent = String(prof?.wins ?? 0);
+    const el = $('top-list'), r = prof?.rating ?? 1000, mineRow = (e: PublicEntry) => !!prof && e.nick === prof.nick && e.rating === prof.rating;
+    el.innerHTML = top.length ? top.map((e, i) => `<div class="trow${mineRow(e) ? ' mine' : ''}"><span>${i + 1}</span><span><i class="ld" style="background:${league(e.rating).color}"></i>${esc(e.nick)}</span><span>${e.wins}</span><span>${e.rating}</span></div>`).join('') : '<div class="empty">Рейтинг пока пуст. Сыграй рейтинговый бой.</div>';
+    $('top-me').children[0].textContent = topRank ? String(topRank) : (prof?.games && top.length ? '50+' : '—');
+    $('rate-me').textContent = nick(); $('rate-pts').textContent = String(r); $('rate-wins').textContent = String(prof?.wins ?? 0);
+    // own league card: progress to the next league
+    const cur = league(r), idx = LEAGUES.findIndex(l => l.min === cur.min), next = LEAGUES[idx + 1];
+    const lg = $('rc-league'); lg.textContent = cur.name; lg.style.color = cur.color; $('rc-pts').textContent = String(r);
+    $('rc-bar').style.width = next ? `${Math.max(4, Math.min(100, (r - cur.min) / (next.min - cur.min) * 100))}%` : '100%'; $('rc-bar').style.background = cur.color;
+    $('rc-next').textContent = next ? `до лиги «${next.name}»: ${next.min - r}` : 'высшая лига';
+    const w = prof?.wins ?? 0, l = prof?.losses ?? 0; $('rc-wl').textContent = `${w} поб · ${l} пор${w + l ? ` · ${Math.round(w / (w + l) * 100)}%` : ''}`;
+    $('recent-list').innerHTML = prof?.recent?.length ? prof.recent.map(x => `<div class="rrow ${x.won === true ? 'w' : x.won === false ? 'l' : 'd'}"><b>${x.won === true ? 'Победа' : x.won === false ? 'Поражение' : 'Ничья'}</b><span>${x.online ? '' : '🤖 '}${esc(x.nick)}</span><em>${x.delta ? (x.delta > 0 ? '+' : '') + x.delta : '·'}</em></div>`).join('') : '<div class="empty">Здесь появятся твои последние бои</div>';
   }
   const setQueue = (on: boolean) => { if (!on && current === 'quick') open('main'); if (on && current !== 'quick') open('quick'); };
 
