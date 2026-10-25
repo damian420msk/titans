@@ -8,13 +8,13 @@ export type Upgrade = { id: UpgradeId; name: string; desc: string; costs: number
 export type Cosmetic = { id: string; kind: CosmeticKind; name: string; cost: number; color: string | null };
 
 export const UPGRADES: Upgrade[] = [
-  { id: 'bag', name: 'Вместительный мешок', desc: '+1 камень в запасе за уровень', costs: [150, 400], icon: '🎒' },
-  { id: 'hands', name: 'Быстрые руки', desc: 'откат между бросками короче на 7% за уровень', costs: [150, 350, 700], icon: '✋' },
-  { id: 'legs', name: 'Резвые ноги', desc: 'ходьба быстрее на 4% за уровень', costs: [120, 300, 600], icon: '👟' },
-  { id: 'quarry', name: 'Добытчик', desc: 'камни у кучи набираются на 12% быстрее за уровень', costs: [100, 250, 550], icon: '⛏' },
-  { id: 'lungs', name: 'Глубокое дыхание', desc: 'запас выносливости больше на 15% за уровень', costs: [120, 300, 600], icon: '🫁' },
-  { id: 'thrift', name: 'Лёгкая поступь', desc: 'бег и прыжки тратят выносливость на 10% меньше за уровень', costs: [150, 350, 700], icon: '🍃' },
-  { id: 'mender', name: 'Мастер ремонта', desc: 'ремонт плит быстрее на 15% за уровень', costs: [200, 450, 800], icon: '🛠' },
+  { id: 'bag', name: 'Вместительный мешок', desc: '+1 камень в запасе за уровень', costs: [150, 400], icon: 'bag' },
+  { id: 'hands', name: 'Быстрые руки', desc: 'откат между бросками короче на 7% за уровень', costs: [150, 350, 700], icon: 'bolt' },
+  { id: 'legs', name: 'Резвые ноги', desc: 'ходьба быстрее на 4% за уровень', costs: [120, 300, 600], icon: 'boot' },
+  { id: 'quarry', name: 'Добытчик', desc: 'камни у кучи набираются на 12% быстрее за уровень', costs: [100, 250, 550], icon: 'pick' },
+  { id: 'lungs', name: 'Глубокое дыхание', desc: 'запас выносливости больше на 15% за уровень', costs: [120, 300, 600], icon: 'wind' },
+  { id: 'thrift', name: 'Лёгкая поступь', desc: 'бег и прыжки тратят выносливость на 10% меньше за уровень', costs: [150, 350, 700], icon: 'feather' },
+  { id: 'mender', name: 'Мастер ремонта', desc: 'ремонт плит быстрее на 15% за уровень', costs: [200, 450, 800], icon: 'tools' },
 ];
 
 export const COSMETICS: Cosmetic[] = [

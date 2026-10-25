@@ -8,7 +8,7 @@
 </head><body>
 <canvas id="game"></canvas>
 <svg id="icon-defs" width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-  <linearGradient id="ig-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff8dc"/><stop offset=".55" stop-color="#ffd978"/><stop offset="1" stop-color="#f5a73a"/></linearGradient>
+  <linearGradient id="ig-gold" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="32"><stop offset="0" stop-color="#fff8dc"/><stop offset=".55" stop-color="#ffd978"/><stop offset="1" stop-color="#f5a73a"/></linearGradient>
   <linearGradient id="ig-heart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8d9a"/><stop offset="1" stop-color="#e5304c"/></linearGradient>
   <radialGradient id="ig-face" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#fff3b8"/><stop offset="1" stop-color="#f6b441"/></radialGradient>
 </defs></svg>
@@ -46,19 +46,19 @@
         <span class="pill gold coins-pill"><i class="coin"></i> <b id="coins-label">0</b></span>
       </div>
       <div class="hub-act">
-        <button class="round" id="gift-btn" aria-label="Подарок дня">🎁<i class="dot" hidden></i></button>
-        <button class="round" data-go="rating" aria-label="Рейтинг">🏆</button>
-        <button class="round" data-go="settings" aria-label="Настройки">⚙</button>
+        <button class="round" id="gift-btn" aria-label="Подарок дня"><span data-icon="gift"></span><i class="dot" hidden></i></button>
+        <button class="round" data-go="rating" aria-label="Рейтинг"><span data-icon="trophy"></span></button>
+        <button class="round" data-go="settings" aria-label="Настройки"><span data-icon="gear"></span></button>
       </div>
     </header>
     <div class="hub-center">
       <h1 class="logo">ТИТАНЫ<small>БРОСКИ С НЕБЕСНЫХ ОСТРОВОВ</small></h1>
       <button class="big play-btn" data-go="play" id="play-btn">ИГРАТЬ</button>
       <nav class="hub-bottom">
-        <button class="tile" data-go="shop"><span>🛒</span><b>Магазин</b></button>
-        <button class="tile" id="quests-btn" data-go="quests"><span>📋</span><b>Задания</b><em id="quests-count">0/3</em></button>
-        <button class="tile soon" data-soon="Моя база появится в одном из следующих обновлений"><span>🏰</span><b>Моя база</b><em>скоро</em></button>
-        <button class="tile soon" data-soon="Кампания появится в одном из следующих обновлений"><span>🗺</span><b>Кампания</b><em>скоро</em></button>
+        <button class="tile" data-go="shop"><span data-icon="cart"></span><b>Магазин</b></button>
+        <button class="tile" id="quests-btn" data-go="quests"><span data-icon="tasks"></span><b>Задания</b><em id="quests-count">0/3</em></button>
+        <button class="tile soon" data-soon="Моя база появится в одном из следующих обновлений"><span data-icon="castle"></span><b>Моя база</b><em>скоро</em></button>
+        <button class="tile soon" data-soon="Кампания появится в одном из следующих обновлений"><span data-icon="map"></span><b>Кампания</b><em>скоро</em></button>
       </nav>
     </div>
   </section>
@@ -67,10 +67,10 @@
     <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Играть</h2><span></span></header>
     <div class="body-c">
       <div class="modes">
-        <button class="mode" id="online-btn" data-go="online"><span class="mi">🌐</span><b>Онлайн</b><em>быстрая игра с живым соперником или свой сервер</em><i class="lockmark">🔒</i></button>
-        <button class="mode" data-go="bot"><span class="mi">🤖</span><b>Бой с ботом</b><em>три уровня сложности</em></button>
+        <button class="mode" id="online-btn" data-go="online"><span class="mi" data-icon="globe"></span><b>Онлайн</b><em>быстрая игра с живым соперником или свой сервер</em><i class="lockmark" data-icon="lock"></i></button>
+        <button class="mode" data-go="bot"><span class="mi" data-icon="robot"></span><b>Бой с ботом</b><em>три уровня сложности</em></button>
       </div>
-      <button class="train" id="train-btn"><span class="mi">🎯</span><b>Тренировка</b><em id="train-state">выполни задания и получи награду</em></button>
+      <button class="train" id="train-btn"><span class="mi" data-icon="target"></span><b>Тренировка</b><em id="train-state">выполни задания и получи награду</em></button>
       <button class="ghost small" data-go="howto">Как играть</button>
     </div>
   </section>
@@ -89,7 +89,7 @@
 
   <section class="scr" data-scr="online" hidden>
     <header class="top"><button class="back" data-go="play">‹ Назад</button><h2>Онлайн</h2><span class="pill" id="net-pill"><i></i><span>сервер не подключён</span></span></header>
-    <div class="actions"><button id="quick-btn" class="big blue"><b>⚡ БЫСТРАЯ ИГРА</b><i>соперник из твоей лиги</i></button><button class="big" data-go="create"><b>СОЗДАТЬ СЕРВЕР</b><i>свой, можно с паролем</i></button><button id="refresh" class="ghost">Обновить</button></div>
+    <div class="actions"><button id="quick-btn" class="big blue"><b><span data-icon="bolt"></span> БЫСТРАЯ ИГРА</b><i>соперник из твоей лиги</i></button><button class="big" data-go="create"><b>СОЗДАТЬ СЕРВЕР</b><i>свой, можно с паролем</i></button><button id="refresh" class="ghost">Обновить</button></div>
     <div class="glass list-wrap">
       <div class="list-head"><span>Сервер</span><span>Хозяин</span><span>Игроки</span><span></span></div>
       <div id="rooms" class="rooms"></div>
@@ -110,7 +110,7 @@
     <header class="top"><button class="back" id="leave">‹ Выйти</button><h2 id="room-title">Комната</h2><span class="pill" id="room-lock"></span></header>
     <div class="duel">
       <div class="seat blue" id="seat0"><span class="face blue">1</span><b class="nm"></b><em class="rt"></em><i class="st"></i></div>
-      <div class="mid"><div class="vs">VS</div><button id="ready" class="big" disabled>ГОТОВ</button><button id="invite" class="ghost">🔗 Позвать друга</button><div id="count" class="count"></div><div id="room-say" class="say"></div></div>
+      <div class="mid"><div class="vs">VS</div><button id="ready" class="big" disabled>ГОТОВ</button><button id="invite" class="ghost"><span data-icon="link"></span> Позвать друга</button><div id="count" class="count"></div><div id="room-say" class="say"></div></div>
       <div class="seat red" id="seat1"><span class="face coral">2</span><b class="nm"></b><em class="rt"></em><i class="st"></i></div>
     </div>
   </section>
@@ -175,13 +175,13 @@
   <section class="scr" data-scr="howto" hidden>
     <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Как играть</h2><span></span></header>
     <div class="steps">
-      <div class="step"><span class="n">1</span><span class="ic">🏔</span><b>Цель</b><p>Сбрось титана врага с острова. У каждого 3 жизни, бой идёт 3 минуты. Кто упал, тот теряет жизнь.</p></div>
-      <div class="step"><span class="n">2</span><span class="ic">🚶</span><b>Ходьба</b><p><span class="pc">WASD или стрелки. Shift: бег (полторы скорости, выносливость 2 секунды). Пробел: прыжок.</span><span class="tc">Левый палец: джойстик появляется там, где коснулся. Потяни за край круга: бег. Кнопка ⤒: прыжок.</span></p></div>
-      <div class="step"><span class="n">3</span><span class="ic">🪨</span><b>Бросок</b><p><span class="pc">Зажми ЛКМ на острове врага и отпусти.</span><span class="tc">Нажми правой половиной, сдвинь палец, чтобы навести, и отпусти.</span> Отмена: <span class="pc">ПКМ или Esc.</span><span class="tc">отведи палец на ✕.</span></p></div>
-      <div class="step"><span class="n">4</span><span class="ic">⏱</span><b>Сила</b><p>Чем дольше держишь, тем сильнее камень.</p>
+      <div class="step"><span class="n">1</span><span class="ic" data-icon="mountain"></span><b>Цель</b><p>Сбрось титана врага с острова. У каждого 3 жизни, бой идёт 3 минуты. Кто упал, тот теряет жизнь.</p></div>
+      <div class="step"><span class="n">2</span><span class="ic" data-icon="walk"></span><b>Ходьба</b><p><span class="pc">WASD или стрелки. Shift: бег (полторы скорости, выносливость 2 секунды). Пробел: прыжок.</span><span class="tc">Левый палец: джойстик появляется там, где коснулся. Потяни за край круга: бег. Кнопка ⤒: прыжок.</span></p></div>
+      <div class="step"><span class="n">3</span><span class="ic" data-icon="stone"></span><b>Бросок</b><p><span class="pc">Зажми ЛКМ на острове врага и отпусти.</span><span class="tc">Нажми правой половиной, сдвинь палец, чтобы навести, и отпусти.</span> Отмена: <span class="pc">ПКМ или Esc.</span><span class="tc">отведи палец на ✕.</span></p></div>
+      <div class="step"><span class="n">4</span><span class="ic" data-icon="clock"></span><b>Сила</b><p>Чем дольше держишь, тем сильнее камень.</p>
         <div class="kinds"><span style="--c:#FFF3B0">обычный</span><span style="--c:#FFB050">кручёный 0,9 с</span><span style="--c:#C08CFF">мощный 2,6 с</span></div></div>
-      <div class="step"><span class="n">5</span><span class="ic">🧱</span><b>Камни и плиты</b><p>Камни берут у кучи на своём острове. Плиты трескаются, потом проваливаются. Если плита под титаном пропала, он падает.</p></div>
-      <div class="step"><span class="n">6</span><span class="ic">🛠</span><b>Прыжок и ремонт</b><p><span class="pc">Прыжок перелетает через дыру (с разбегом через одну клетку) и уворачивается от камня, если он падает под ногами; в воздухе не бросить и не чинить. E: починить плиту рядом (1 камень).</span><span class="tc">Кнопка РЕМОНТ чинит плиту рядом (1 камень).</span></p></div>
+      <div class="step"><span class="n">5</span><span class="ic" data-icon="stone"></span><b>Камни и плиты</b><p>Камни берут у кучи на своём острове. Плиты трескаются, потом проваливаются. Если плита под титаном пропала, он падает.</p></div>
+      <div class="step"><span class="n">6</span><span class="ic" data-icon="tools"></span><b>Прыжок и ремонт</b><p><span class="pc">Прыжок перелетает через дыру (с разбегом через одну клетку) и уворачивается от камня, если он падает под ногами; в воздухе не бросить и не чинить. E: починить плиту рядом (1 камень).</span><span class="tc">Кнопка РЕМОНТ чинит плиту рядом (1 камень).</span></p></div>
     </div>
   </section>
 
@@ -190,7 +190,7 @@
   <div id="pwd" class="modal" hidden><form class="glass form"><h3 id="pwd-title">Пароль</h3><input id="pwd-in" maxlength="16" placeholder="Пароль сервера" autocomplete="off"><div class="err" id="pwd-err"></div><div class="row2"><button type="button" class="ghost" id="pwd-cancel">Отмена</button><button class="big" type="submit">ВОЙТИ</button></div></form></div>
 </div>
 <div id="chat" aria-live="polite"></div>
-<div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><div id="end-gain" class="gain"></div><button id="double" class="ghost" hidden>🎬 Удвоить награду</button><div id="end-foe" class="gain"></div><button id="rematch" class="big" hidden>РЕВАНШ</button><div id="end-say" class="say" hidden></div><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>
+<div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><div id="end-gain" class="gain"></div><button id="double" class="ghost" hidden><span data-icon="film"></span> Удвоить награду</button><div id="end-foe" class="gain"></div><button id="rematch" class="big" hidden>РЕВАНШ</button><div id="end-say" class="say" hidden></div><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>
 <div id="pause" class="overlay" hidden><div class="panel"><h1>ПАУЗА</h1><button id="resume" class="big">ПРОДОЛЖИТЬ</button><button id="pause-menu">Выйти в меню</button></div></div>
 <div id="portrait" class="overlay" hidden><div class="panel"><div class="rot" aria-hidden="true"><i></i></div><h1>Поверните телефон</h1><p id="portrait-text">Игра идёт в горизонтальном режиме. Бой на паузе.</p></div></div>
 <div id="loading" class="overlay"><div class="panel"><h1>Загрузка…</h1></div></div>

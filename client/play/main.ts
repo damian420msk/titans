@@ -15,7 +15,7 @@ import { initMenu } from './menu';
 import { Online } from './online';
 import { ya } from './yandex';
 import type { Snap, MyProfile, Look } from '../../shared/net';
-import { icon, EMOTE_ICONS } from './icons';
+import { icon, EMOTE_ICONS, hydrateIcons } from './icons';
 import { titanOf, foeTitan, botTitan } from '../../shared/titans';
 import { modsFor, newProfile, sanitizeProfile, DEFAULT_EQUIP } from '../../shared/progress';
 import type { Mods } from '../../shared/battle';
@@ -206,6 +206,7 @@ async function boot() {
   };
   const toast = (t: string) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); toastTimer = 1.4; };
   const hearts = (n: number) => icon('heart').repeat(n) + icon('heartEmpty').repeat(LIVES - n);
+  hydrateIcons();
   // static HUD buttons get their glyphs here (one icon set, one grid)
   $('pause-btn').innerHTML = icon('pause'); $('fs-btn').innerHTML = icon('full'); $('emote-btn').innerHTML = icon('chat'); $('cancel').innerHTML = icon('cancel');
   $('jump').firstElementChild!.innerHTML = icon('jump'); $('repair').firstElementChild!.innerHTML = icon('repair');

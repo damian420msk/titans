@@ -8,7 +8,7 @@ import type { RoomInfo, RoomView, MyProfile } from '../../shared/net';
 import { checkNick, checkText } from '../../shared/names';
 import { QUICK_SEARCH_S } from '../../shared/quick';
 import { DAILY_REWARDS } from '../../shared/progress';
-import { icon } from './icons';
+import { icon, ico, hydrateIcons, type IconName } from './icons';
 import { UPGRADES, COSMETICS, QUESTS, LEAGUES, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
 export type { RoomInfo, RoomView };
 export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick' | 'quests' | 'play';
@@ -110,7 +110,7 @@ export function initMenu(h: MenuHooks) {
   function setRooms(list: RoomInfo[]) {
     rooms = list; const el = $('rooms');
     if (!list.length) { el.innerHTML = `<div class="empty">${netState === 'on' ? 'Пока нет серверов. Нажми «Быстрая игра» или создай свой.' : netState === 'connecting' ? (slow ? 'Бесплатный сервер просыпается после простоя, это занимает до минуты. Подожди немного.' : 'Подключаемся к серверу…') : 'Не удалось подключиться к серверу. Проверь интернет и нажми «Обновить».'}</div>`; return; }
-    el.innerHTML = list.map(r => `<div class="room${r.players >= 2 ? ' full' : ''}"><b>${r.locked ? '🔒 ' : ''}${r.ranked ? '🏆 ' : ''}${esc(r.name)}</b><span>${esc(r.host)}</span><span>${r.players}/2</span><button data-join="${esc(r.id)}" ${r.players >= 2 ? 'disabled' : ''}>${r.playing ? 'Идёт бой' : r.players >= 2 ? 'Занято' : 'Войти'}</button></div>`).join('');
+    el.innerHTML = list.map(r => `<div class="room${r.players >= 2 ? ' full' : ''}"><b>${r.locked ? ico('lock') + ' ' : ''}${r.ranked ? ico('trophy') + ' ' : ''}${esc(r.name)}</b><span>${esc(r.host)}</span><span>${r.players}/2</span><button data-join="${esc(r.id)}" ${r.players >= 2 ? 'disabled' : ''}>${r.playing ? 'Идёт бой' : r.players >= 2 ? 'Занято' : 'Войти'}</button></div>`).join('');
   }
   let joining: RoomInfo | null = null;
   $('rooms').addEventListener('click', e => {
@@ -135,7 +135,7 @@ export function initMenu(h: MenuHooks) {
   // waiting room
   function renderRoom(v: RoomView) {
     view = v; $('room-title').textContent = v.name;
-    const lock = $('room-lock'); lock.textContent = (v.locked ? '🔒 с паролем' : 'открытая') + (v.ranked ? ' · 🏆 на рейтинг' : ' · дружеская'); lock.classList.add('pill');
+    const lock = $('room-lock'); lock.innerHTML = (v.locked ? ico('lock') + ' с паролем' : 'открытая') + (v.ranked ? ' · ' + ico('trophy') + ' на рейтинг' : ' · дружеская'); lock.classList.add('pill');
     v.seats.forEach((s, i) => {
       const el = $(`seat${i}`); el.classList.toggle('empty-seat', !s); el.classList.toggle('ready', !!s?.ready);
       el.querySelector('.nm')!.textContent = s ? s.nick + (i === v.me ? ' (ты)' : '') : '—';
@@ -155,7 +155,7 @@ export function initMenu(h: MenuHooks) {
   let giftAuto = false;
   function renderGift() {
     const st = prof?.streak ?? 0, ready = !!prof?.dailyReady, today = ready ? st + 1 : 0;
-    $('gift-days').innerHTML = DAILY_REWARDS.map((g, i) => { const d = i + 1, cls = d <= st ? 'done' : d === today ? 'today' : d === st + 1 ? 'tom' : ''; return `<div class="day ${cls}${d === 7 ? ' big7' : ''}"><b>День ${d}</b><span class="gi">${d === 7 ? '🎁' : '<i class="coin"></i>'}</span><em>+${g}</em>${d <= st ? '<u>✓</u>' : ''}</div>`; }).join('');
+    $('gift-days').innerHTML = DAILY_REWARDS.map((g, i) => { const d = i + 1, cls = d <= st ? 'done' : d === today ? 'today' : d === st + 1 ? 'tom' : ''; return `<div class="day ${cls}${d === 7 ? ' big7' : ''}"><b>День ${d}</b><span class="gic">${d === 7 ? ico('gift') : '<i class="coin"></i>'}</span><em>+${g}</em>${d <= st ? '<u>✓</u>' : ''}</div>`; }).join('');
     $('gift-sub').textContent = ready ? 'Заходи каждый день: награда растёт, на 7-й день самая большая.' : 'Сегодняшний подарок уже у тебя. Следующий завтра: пропустишь день, и серия начнётся заново.';
     const cl = $<HTMLButtonElement>('gift-claim'); cl.hidden = !ready; cl.disabled = false; cl.textContent = `ЗАБРАТЬ +${DAILY_REWARDS[Math.min(st, 6)]}`;
     $('gift-close').textContent = ready ? 'Позже' : 'Закрыть';
@@ -175,7 +175,7 @@ export function initMenu(h: MenuHooks) {
   };
   function renderQuests() {
     const q = prof?.quest;
-    $('quests-list').innerHTML = QUESTS.map((d, i) => { const v = Math.min(d.goal, q?.[d.key] ?? 0), done = !!q?.paid[i]; return `<div class="item quest${done ? ' eq' : ''}"><span class="ic">${done ? '✅' : ['🎮', '🏆', '🌐'][i] ?? '🎯'}</span><div class="tx"><b>${esc(d.text)}</b><span class="bar"><i style="width:${100 * v / d.goal}%"></i></span><em>${v} / ${d.goal}</em></div><span class="${done ? 'maxed' : 'rw'}">${done ? 'ГОТОВО' : '+' + d.reward + ' <i class="coin"></i>'}</span></div>`; }).join('');
+    $('quests-list').innerHTML = QUESTS.map((d, i) => { const v = Math.min(d.goal, q?.[d.key] ?? 0), done = !!q?.paid[i]; return `<div class="item quest${done ? ' eq' : ''}"><span class="ic">${ico(done ? 'check' : (['target', 'trophy', 'globe'] as IconName[])[i] ?? 'star')}</span><div class="tx"><b>${esc(d.text)}</b><span class="bar"><i style="width:${100 * v / d.goal}%"></i></span><em>${v} / ${d.goal}</em></div><span class="${done ? 'maxed' : 'rw'}">${done ? 'ГОТОВО' : '+' + d.reward + ' <i class="coin"></i>'}</span></div>`; }).join('');
   }
   function setProfile(p: MyProfile) { prof = p; paintProfile(); if (current === 'quests') renderQuests(); if (current === 'shop') renderShop(); if (current === 'rating') renderTop(); }
   function renderShop() {
@@ -187,7 +187,7 @@ export function initMenu(h: MenuHooks) {
       el.innerHTML = UPGRADES.map(u => {
         const lv = p.up[u.id], max = u.costs.length, cost = lv < max ? u.costs[lv] : null;
         const pips = Array.from({ length: max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
-        return `<div class="item"><span class="ic">${u.icon}</span><div class="tx"><b>${esc(u.name)}</b><em>${esc(u.desc)}</em><span class="pips">${pips}</span></div>${cost === null ? '<span class="maxed">МАКС</span>' : `<button class="buy" data-kind="up" data-buy="${u.id}" ${coins < cost ? 'disabled' : ''}><i class="coin"></i> ${cost}</button>`}</div>`;
+        return `<div class="item"><span class="ic">${ico(u.icon as IconName)}</span><div class="tx"><b>${esc(u.name)}</b><em>${esc(u.desc)}</em><span class="pips">${pips}</span></div>${cost === null ? '<span class="maxed">МАКС</span>' : `<button class="buy" data-kind="up" data-buy="${u.id}" ${coins < cost ? 'disabled' : ''}><i class="coin"></i> ${cost}</button>`}</div>`;
       }).join('');
       return;
     }

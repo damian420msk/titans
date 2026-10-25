@@ -105,25 +105,30 @@ body:not(.touch) #jump{display:none}
 @media (max-height:480px){#repairhud{top:max(44px,calc(env(safe-area-inset-top) + 40px));padding:5px 12px}#repairhud b{font-size:13px}}
 
 /* ---- HUD icons: one set, one grid, menu look (violet glass, white rim, gold glyph) ---- */
-.ic{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 1.5px 0 rgba(20,8,60,.55))}
+.gi{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 1.5px 0 rgba(20,8,60,.55))}
 #tools{gap:8px}
 #tools button,#emotes button{margin:0;padding:6px;border-radius:14px;background:linear-gradient(rgba(96,70,190,.9),rgba(58,40,130,.92));border:2px solid rgba(255,255,255,.55);box-shadow:0 3px 0 rgba(40,20,100,.55);display:grid;place-items:center}
 #tools button{width:44px;height:44px}
 #tools button:active,#emotes button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(40,20,100,.55)}
 #emotes button{width:46px;height:46px;border-radius:50%;padding:5px}
 .hearts{display:flex;gap:2px;font-size:0;letter-spacing:0;line-height:0;text-shadow:none}
-.hearts .ic{width:22px;height:22px}
+.hearts .gi{width:22px;height:22px}
 .slot{background:linear-gradient(rgba(96,70,190,.75),rgba(58,40,130,.8));border:2px solid rgba(255,255,255,.5);box-shadow:0 2px 0 rgba(40,20,100,.5);padding:3px}
-.slot .ic{filter:none}.slot.e .ic{opacity:.22;filter:grayscale(1)}
+.slot .gi{filter:none}.slot.e .gi{opacity:.22;filter:grayscale(1)}
 #jump,#repair,#cancel{background:linear-gradient(rgba(96,70,190,.92),rgba(58,40,130,.95));border:3px solid rgba(255,255,255,.75);box-shadow:0 4px 0 rgba(40,20,100,.6)}
 #jump span{display:block;width:30px;height:30px;font-size:0}
 #jump i{margin-top:-1px;color:#fff}
 #jump.hold{background:linear-gradient(#ffd25a,#f08a1c)}
 #repair{background:linear-gradient(#58c97f,#23944a);border-color:#eaffef;box-shadow:0 4px 0 #0f5a2b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0}
 #repair .ri{display:block;width:34px;height:34px}#repair i{font:800 9px Rubik,system-ui;font-style:normal;letter-spacing:.06em;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4);margin-top:-2px}
-#cancel{font-size:0}#cancel .ic{width:46px;height:46px}
+#cancel{font-size:0}#cancel .gi{width:46px;height:46px}
 #cancel.over{background:linear-gradient(#ff7b6e,#d9433b)}
 /* reactions sit on both sides of the timer, so they never cover the tool buttons */
 .bubble{left:auto;right:calc(50% + 58px);top:max(10px,env(safe-area-inset-top));width:54px;height:54px;padding:6px;font-size:0;display:grid;place-items:center;border-radius:50%;background:linear-gradient(rgba(96,70,190,.95),rgba(58,40,130,.95));border:3px solid #fff}
 .bubble.r{right:auto;left:calc(50% + 58px)}
-@media (max-height:480px){#tools button{width:38px;height:38px;padding:5px}.hearts .ic{width:18px;height:18px}.slot .ic{width:100%}#jump span{width:26px;height:26px}#repair .ri{width:28px;height:28px}#cancel .ic{width:38px;height:38px}.bubble{width:46px;height:46px;top:max(8px,env(safe-area-inset-top))}}
+@media (max-height:480px){#tools button{width:38px;height:38px;padding:5px}.hearts .gi{width:18px;height:18px}.slot .gi{width:100%}#jump span{width:26px;height:26px}#repair .ri{width:28px;height:28px}#cancel .gi{width:38px;height:38px}.bubble{width:46px;height:46px;top:max(8px,env(safe-area-inset-top))}}
+
+[data-icon],.ico{display:inline-block;width:1em;height:1em;line-height:1;vertical-align:-.16em;flex:none}
+[data-icon] .gi,.ico .gi{width:100%;height:100%}
+.round{font-size:26px}.round [data-icon]{display:block}.tile>span{display:block;width:1em;height:1em}.mode .mi{display:block;margin:0 auto}
+#end .ghost [data-icon]{vertical-align:-.2em}
