@@ -37,6 +37,7 @@ let matchesPlayed = 0, endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 const pred = new Predictor();
+let backT = 0, miniKey = '';
 const forceHq = new URLSearchParams(location.search).has('hq');
 let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
 const srvEvents: GameEvent[] = [];
@@ -104,7 +105,7 @@ async function boot() {
     online = typeof foe === 'string'; try { (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}); } catch { /* needs fullscreen on most browsers */ } pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
     world.resetMatch(); const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity);
-    $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
+    miniKey = ''; $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
     $('foe-name').textContent = online ? foe! : NAMES[level]; $('foe-face').textContent = online ? foe!.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
@@ -142,6 +143,23 @@ async function boot() {
     else if (tut.step === 2 && (tut.throws >= 3 || tut.t > 14)) next();
     else if (tut.step === 3 && tut.t > 7) next();
     if (tut.t > 45 && tut.step < 2) next(); // a stuck player still sees the later tips
+  };
+  // mini map of the own island: plate state, the titan and the cells an incoming shot is about to hit
+  const mini = $<HTMLCanvasElement>('mini'), mctx = mini.getContext('2d')!, MW = rules.arena.width_cells, MD = rules.arena.depth_cells;
+  const drawMini = (b: Battle) => {
+    if (mode === 'menu') return;
+    const me = b.cellOf(0), danger = new Set<string>(); for (const s of b.shots) if (s.owner === 1) for (const c of s.cells) danger.add(`${c.x},${c.z}`);
+    let key = `${me?.x},${me?.z}|` + [...danger].join(';') + '|'; for (const v of b.floors[0].values()) key += v === Infinity ? 'i' : v;
+    if (key === miniKey) return; miniKey = key;
+    const w = mini.width / MW, h = mini.height / MD; mctx.clearRect(0, 0, mini.width, mini.height);
+    for (let x = 0; x < MW; x++) for (let z = 0; z < MD; z++) {
+      const hp = b.floors[0].get(`${x},${z}`); if (hp === undefined) continue;
+      const px = x * w, py = (MD - 1 - z) * h; // the own island is seen from behind: x grows to the right, z grows upward
+      mctx.fillStyle = hp === Infinity ? 'rgba(130,150,200,.85)' : hp >= 2 ? 'rgba(255,236,190,.9)' : hp === 1 ? '#ff9a3c' : 'rgba(0,0,0,.55)';
+      mctx.fillRect(px + 1, py + 1, w - 2, h - 2);
+      if (danger.has(`${x},${z}`)) { mctx.strokeStyle = '#ff3b3b'; mctx.lineWidth = 2; mctx.strokeRect(px + 1.5, py + 1.5, w - 3, h - 3); }
+    }
+    if (me) { mctx.fillStyle = '#19d3c5'; mctx.strokeStyle = '#fff'; mctx.lineWidth = 2; mctx.beginPath(); mctx.arc(me.x * w + w / 2, (MD - 1 - me.z) * h + h / 2, Math.min(w, h) * .38, 0, 7); mctx.fill(); mctx.stroke(); }
   };
   const toast = (t: string) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); toastTimer = 1.4; };
   const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
@@ -227,7 +245,12 @@ async function boot() {
     if (online && srvEvents.length) { battle.events.push(...srvEvents); srvEvents.length = 0; }
     const b = battle, ch = b.charges[0], kind: Kind | null = ch ? kindForHold(ch.t) : hover ? 'normal' : null;
     world.smoothFoe = online;
+    if (controls.lookHeld && controls.lookToggle && (performance.now() - controls.lookSince > 5000 || charging)) controls.clearLook();
+    // retreating: lift the camera a little so the own island behind the titan comes into view
+    backT = controls.move.z < -.4 && mode === 'playing' ? Math.min(1, backT + dt) : Math.max(0, backT - dt * 2);
+    world.autoLook = backT > .35 ? .55 : 0;
     world.lookBack = mode === 'playing' && controls.lookHeld && !charging;
+    drawMini(b);
     world.update(b, isPaused ? 0 : dt, { aiming: charging, kind, aimCell: ch ? ch.target : hover, cancel: controls.cancelled || controls.overCancel });
     tutorialTick(isPaused ? 0 : dt, b.events);
     for (const e of b.events) {

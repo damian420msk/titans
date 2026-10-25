@@ -55,6 +55,8 @@ export class World {
   aimBlend = 0;
   /** Set by the game while the player holds the look-back control: the camera swings over to show the own island. */
   lookBack = false; lookBlend = 0;
+  /** 0..1: partial overview the game asks for by itself (retreating, damaged plates behind). */
+  autoLook = 0;
   /** Online: ease the foe's drawn position between snapshots. */
   smoothFoe = false; foeVis = { x: 0, z: 0, ok: false };
   private aimHold = 0;
@@ -294,7 +296,8 @@ export class World {
     // pull out while holding a throw, return smoothly after a short delay
     if (aiming) { this.aimHold = .3; this.aimBlend = Math.min(1, this.aimBlend + dt / .25); }
     else if ((this.aimHold -= dt) <= 0) this.aimBlend = Math.max(0, this.aimBlend - dt / .4);
-    this.lookBlend = this.lookBack ? Math.min(1, this.lookBlend + dt / .22) : Math.max(0, this.lookBlend - dt / .3);
+    const lookGoal = this.lookBack ? 1 : this.autoLook;
+    this.lookBlend += Math.max(-dt / .35, Math.min(dt / .22, lookGoal - this.lookBlend));
     const e = this.aimBlend * this.aimBlend * (3 - 2 * this.aimBlend), me = b.actors[0].pos, lk = this.lookBlend * this.lookBlend * (3 - 2 * this.lookBlend);
     const px = me.x, pz = Math.max(me.z, -33), lerp = (a: number, c: number) => a + (c - a) * e, lerp2 = (a: number, c: number, t: number) => a + (c - a) * t;
     const portrait = this.engine.getRenderWidth() < this.engine.getRenderHeight();
