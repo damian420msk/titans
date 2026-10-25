@@ -3,7 +3,7 @@ import { Sfx } from './audio';
 import { Controls } from './controls';
 import { PHRASES } from '../../shared/net';
 import type { RoomView } from '../../shared/net';
-import { touchAim, mouseAim, magnet, type Pt } from '../../shared/aim';
+import { touchAim, magnet } from '../../shared/aim';
 import { Battle, kindForHold, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
@@ -40,7 +40,7 @@ let matchesPlayed = 0, endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 const pred = new Predictor();
-let backT = 0, createdPass = '';
+let createdPass = '';
 const inviteLink = (() => { const q = new URLSearchParams(location.search), id = q.get('join'); return id && /^[a-z0-9]{3,8}$/.test(id) ? { id, pw: (q.get('pw') ?? '').slice(0, 16) } : null; })();
 const forceHq = new URLSearchParams(location.search).has('hq');
 let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
@@ -50,14 +50,13 @@ let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1
 let seenAimHint = (() => { try { return localStorage.getItem('titans.aimhint') === '1'; } catch { return false; } })();
 let roomView: RoomView | null = null;
 let lastSprint = 0;
-let mouseT: Pt | null = null, mouseLast: { x: number; y: number } | null = null;
 let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1, userPause = false, anchorCell: Cell | null = null;
 const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
 
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
-  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт · C оглянуться';
+  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт';
   const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
   // a tap on a battle button is the only moment a browser allows fullscreen and the landscape lock; phones that cannot do it just ignore this
   const goFullscreen = () => { if (!touchDevice || document.fullscreenElement || !document.fullscreenEnabled || store.get('nofs') === '1') return; document.documentElement.requestFullscreen().then(() => (screen.orientation as any)?.lock?.('landscape')).catch(() => {}); };
@@ -196,7 +195,7 @@ async function boot() {
   const resize = () => world.engine.resize();
   window.addEventListener('resize', resize); window.visualViewport?.addEventListener('resize', resize); window.addEventListener('orientationchange', () => setTimeout(resize, 250));
   const paused = () => !online && (document.hidden || userPause || (controls.touch && innerWidth < innerHeight));
-  Object.assign(window, { titans: { battle, world, net, controls, setPause, state: () => ({ quality: world.qualityStep, mode, online, room: roomView, charging, aimBlend: world.aimBlend, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
+  Object.assign(window, { titans: { battle, world, net, controls, setPause, state: () => ({ quality: world.qualityStep, mode, online, room: roomView, charging, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
 
   world.engine.runRenderLoop(() => {
     const rawDt = world.engine.getDeltaTime() / 1000, dt = Math.min(rawDt, .05), isPaused = paused();
@@ -212,8 +211,7 @@ async function boot() {
     if (mode === 'playing' && !isPaused) {
       const b = battle, me = b.actors[0];
       // while looking back the view is turned around, so the stick is turned too
-      const flip = controls.lookHeld ? -1 : 1;
-      b.setMove(0, b.canAct(0) ? controls.move.x * flip : 0, b.canAct(0) ? controls.move.z * flip : 0);
+      b.setMove(0, b.canAct(0) ? controls.move.x : 0, b.canAct(0) ? controls.move.z : 0);
       if (online) {
         const mx = Math.round(b.input[0].x * 100) / 100, mz = Math.round(b.input[0].z * 100) / 100;
         if ((mx !== lastMove.x || mz !== lastMove.z) && nowS - lastMove.t > .04 || nowS - lastMove.t > 1) { lastMove = { x: mx, z: mz, t: nowS }; net.send({ t: 'move', x: mx, z: mz }); }
@@ -223,25 +221,19 @@ async function boot() {
       if (wantSprint !== b.sprint[0] || (online && wantSprint && nowS - lastSprint > 1)) { b.setSprint(0, wantSprint); if (online) { net.send({ t: 'sprint', on: wantSprint }); lastSprint = nowS; } }
       if (controls.jumpPressed) {
         controls.jumpPressed = false;
-        if (!controls.lookHeld && b.jump(0)) { pred.jumpAt = nowS; sfx.jump(); haptic(12); if (online) net.send({ t: 'jump' }); tut.jumped = true; }
+        if (b.jump(0)) { pred.jumpAt = nowS; sfx.jump(); haptic(12); if (online) net.send({ t: 'jump' }); tut.jumped = true; }
       }
       // Touch aiming is relative and works in cells, not screen pixels: perspective squeezes depth, so a pixel gain would be too twitchy.
       const unit = Math.max(.8, Math.min(1.6, innerHeight / 390));
       const touchCell = (): Cell => touchAim(anchorCell!, controls.touchDelta, TOUCH_PX_X / menu.sens() * unit, TOUCH_PX_Z / menu.sens() * unit, rules.arena.width_cells, rules.arena.depth_cells);
-      // Mouse: while a throw is held the camera pulls out and the cell under a still pointer changes, so the aimed point is carried through camera motion
-      const mouseCell = (): Cell | null => {
-        const a = controls.aim, now = world.pickPoint(a.x, a.y); if (!now) return null;
-        const last = mouseLast ?? a, atLast = world.pickPoint(last.x, last.y) ?? now;
-        mouseT = mouseAim(mouseT, atLast, now, Math.hypot(a.x - last.x, a.y - last.y)); mouseLast = { x: a.x, y: a.y };
-        return world.cellNear(mouseT, true);
-      };
+      // Mouse: the camera stands still while a throw is held, so the aimed cell is simply the one under the pointer (clamped to the island at its edge)
+      const mouseCell = (): Cell | null => { const p = world.pickPoint(controls.aim.x, controls.aim.y); return p && world.cellNear(p, true); };
       const pick = () => controls.touch && anchorCell ? touchCell() : charging ? mouseCell() : world.pick(controls.aim.x, controls.aim.y);
       if (!charging && b.charges[0]) { b.cancelCharge(0); if (online && nowS - pred.lastEnd > .6) { net.send({ t: 'cancel' }); pred.lastEnd = nowS; } }
       if (controls.pressed) {
         controls.pressed = false;
-        if (controls.lookHeld) { /* the aim camera is off while looking back */ }
-        else if (b.beginCharge(0)) {
-          charging = true; mouseT = null; mouseLast = null; if (online) { net.send({ t: 'begin' }); lastTarget = ''; }
+        if (b.beginCharge(0)) {
+          charging = true; if (online) { net.send({ t: 'begin' }); lastTarget = ''; }
           if (controls.touch) {
             const foe = b.cellOf(1), ok = foe && b.hp(foe, 1) > 0;
             anchorCell = ok ? foe : (anchorCell ?? { x: 4, z: 6 });
@@ -272,11 +264,6 @@ async function boot() {
     if (online && srvEvents.length) { battle.events.push(...srvEvents); srvEvents.length = 0; }
     const b = battle, ch = b.charges[0], kind: Kind | null = ch ? kindForHold(ch.t) : hover ? 'normal' : null;
     world.smoothFoe = online;
-    if (controls.lookHeld && controls.lookToggle && (performance.now() - controls.lookSince > 5000 || charging)) controls.clearLook();
-    // retreating: lift the camera a little so the own island behind the titan comes into view
-    backT = controls.move.z < -.4 && mode === 'playing' ? Math.min(1, backT + dt) : Math.max(0, backT - dt * 2);
-    world.autoLook = backT > .35 ? .55 : 0;
-    world.lookBack = mode === 'playing' && controls.lookHeld && !charging;
     world.update(b, isPaused ? 0 : dt, { aiming: charging, kind, aimCell: ch ? ch.target : hover, cancel: controls.cancelled || controls.overCancel });
     tutorialTick(isPaused ? 0 : dt, b.events);
     for (const e of b.events) {

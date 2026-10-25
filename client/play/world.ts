@@ -52,21 +52,12 @@ export class World {
   private baseAlbedo = new Map<Material, Color3>();
   private trailTemplate!: Mesh;
   private time = 0;
-  /** 0 = walking camera, 1 = aiming camera (both titan and enemy island in view). */
-  aimBlend = 0;
-  /** Set by the game while the player holds the look-back control: the camera swings over to show the own island. */
-  lookBack = false; lookBlend = 0;
-  /** 0..1: partial overview the game asks for by itself (retreating, damaged plates behind). */
-  autoLook = 0;
   /** Online: ease the foe's drawn position between snapshots. */
   smoothFoe = false; foeVis = { x: 0, z: 0, ok: false };
-  private aimHold = 0;
-  /** Titan position when the throw began: the camera stops following while aiming, so a cell under a still pointer stays under it. */
-  private aimAt: { x: number; z: number } | null = null;
   /** Camera follow point (smoothed titan position): a knock-back slide or a snapshot correction must not yank the view. */
-  private follow = { x: 0, z: -15.6, tau: .09 };
-  /** Look-ahead: the view slides a little the way the titan is running (smoothed), last position for the speed. */
-  private lead = { x: 0, z: 0 }; private lastMe = { x: 0, z: -15.6 };
+  private follow = { x: 0, z: -15.6, tau: .15 };
+  /** While a throw is held the camera stands still: the cell under a still pointer never changes. */
+  private aimFrozen = false;
   freezeCamera = false;
   /** Hard reset of everything a finished match can leave behind: plates mid-fall, camera pose, leftover titan posture. */
   resetMatch() {
@@ -77,7 +68,7 @@ export class World {
     }
     for (const m of this.shotMeshes.values()) m.dispose(); this.shotMeshes.clear();
     for (const p of this.particles) p.mesh.dispose(); this.particles.length = 0;
-    this.aimBlend = 0; this.aimHold = 0; this.aimAt = null; this.lookBlend = 0; this.lookBack = false; this.snapCamera = true;
+    this.aimFrozen = false; this.snapCamera = true;
     for (const t of this.titans) { t.lean = 0; t.lie = 0; t.body.rotation.x = 0; t.body.position.y = 0; }
     this.resetPoses();
   }
@@ -314,42 +305,24 @@ export class World {
   }
   get qualityStep() { return this.qStep; }
 
+  /** One steady frame: the camera keeps the same offset, height, tilt and zoom behind the titan and only slides with it
+   *  (no zoom, no tilt, no look-ahead). The own island, the titan and the enemy island are always in view. While a throw is held the
+   *  camera stands still, so the cell under the pointer is exactly the aimed cell. */
   private updateCamera(b: Battle, dt: number, aiming: boolean) {
     if (this.freezeCamera) return;
-    // pull out while holding a throw, return smoothly after a short delay
-    const a0 = b.actors[0];
-    if (aiming) { this.aimHold = .3; this.aimBlend = Math.min(1, this.aimBlend + dt / .25); }
-    else {
-      if (a0.stun > 0 || a0.slide) this.aimHold = Math.max(this.aimHold, .3); // knocked out of a throw: stay pulled out until back on the feet
-      if ((this.aimHold -= dt) <= 0) this.aimBlend = Math.max(0, this.aimBlend - dt / .7);
+    const a0 = b.actors[0], f0 = this.follow, hit = a0.stun > 0 || !!a0.slide;
+    this.aimFrozen = aiming && !hit;
+    if (!this.aimFrozen) {
+      // lazy while knocked about (the hit moves the titan, not the view), snappy otherwise
+      f0.tau += ((hit ? .6 : .15) - f0.tau) * Math.min(1, dt * 10);
+      if (this.snapCamera || Math.hypot(a0.pos.x - f0.x, a0.pos.z - f0.z) > 9 || a0.falling) { f0.x = a0.pos.x; f0.z = a0.pos.z; }
+      else { const kf = 1 - Math.exp(-dt / f0.tau); f0.x += (a0.pos.x - f0.x) * kf; f0.z += (a0.pos.z - f0.z) * kf; }
     }
-    // follow point: tight while walking, lazy while sliding or lying (the hit knocks the titan, not the camera)
-    const f0 = this.follow, jump = Math.hypot(a0.pos.x - f0.x, a0.pos.z - f0.z);
-    f0.tau += ((a0.stun > 0 || a0.slide ? .6 : .09) - f0.tau) * Math.min(1, dt * 10);
-    if (this.snapCamera || jump > 9 || a0.falling) { f0.x = a0.pos.x; f0.z = a0.pos.z; } else { const kf = 1 - Math.exp(-dt / f0.tau); f0.x += (a0.pos.x - f0.x) * kf; f0.z += (a0.pos.z - f0.z) * kf; }
-    // look-ahead along the real movement (not the stick): backing off shows the ground behind, running shows where you land
-    const lm = this.lastMe, vx = dt > 0 ? (a0.pos.x - lm.x) / dt : 0, vz = dt > 0 ? (a0.pos.z - lm.z) / dt : 0; lm.x = a0.pos.x; lm.z = a0.pos.z;
-    const still = a0.stun > 0 || !!a0.slide || a0.falling || this.snapCamera || jump > 9, cl = (v: number, m: number) => Math.max(-m, Math.min(m, v)), kl = 1 - Math.exp(-dt / .45);
-    this.lead.x += ((still ? 0 : cl(vx * .5, 2.4)) - this.lead.x) * kl; this.lead.z += ((still ? 0 : cl(vz * .6, 3.2)) - this.lead.z) * kl;
-    const lookGoal = this.lookBack ? 1 : this.autoLook;
-    this.lookBlend += Math.max(-dt / .35, Math.min(dt / .22, lookGoal - this.lookBlend));
-    const e = this.aimBlend * this.aimBlend * (3 - 2 * this.aimBlend), me = b.actors[0].pos, lk = this.lookBlend * this.lookBlend * (3 - 2 * this.lookBlend);
-    if (aiming && !this.aimAt) this.aimAt = { x: me.x, z: me.z }; else if (!aiming && this.aimHold <= 0) this.aimAt = null;
-    const fx = this.aimAt ? this.aimAt.x : f0.x + this.lead.x, fz = this.aimAt ? this.aimAt.z : f0.z + this.lead.z;
-    const px = fx, pz = Math.max(-34, Math.min(-2, fz)), lerp = (a: number, c: number) => a + (c - a) * e, lerp2 = (a: number, c: number, t: number) => a + (c - a) * t;
     const portrait = this.engine.getRenderWidth() < this.engine.getRenderHeight();
-    // One steady frame for the whole island: same distance, height and zoom everywhere, so walking never "breathes" the picture.
-    // Only near the rear edge the camera rises a little and looks down more, to show the cells under the feet.
-    const edge = Math.max(0, Math.min(1, (-23 - pz) / 8)), eg = edge * edge * (3 - 2 * edge);
-    this.camera.fov = (46 + (portrait ? 14 : 0)) * Math.PI / 180;
-    const pos = new Vector3(lerp(px * .8, px * .4), lerp(12 + 2.5 * eg, 19), lerp(pz - 14, pz - 21));
-    const target = new Vector3(lerp(px * .55, 0), lerp(.5, 0), lerp(pz + 15 - 3 * eg, 14));
-    if (lk > 0) { // look back: high, in front of the titan, looking down at the own island
-      pos.x = lerp2(pos.x, px * .3, lk); pos.y = lerp2(pos.y, 23, lk); pos.z = lerp2(pos.z, Math.min(pz + 13, 7), lk);
-      target.x = lerp2(target.x, px * .3, lk); target.y = lerp2(target.y, 0, lk); target.z = lerp2(target.z, -18, lk);
-      this.camera.fov = lerp2(this.camera.fov, 54 * Math.PI / 180, lk);
-    }
-    const k = this.snapCamera ? 1 : Math.min(1, dt * 8); this.snapCamera = false;
+    this.camera.fov = (48 + (portrait ? 14 : 0)) * Math.PI / 180;
+    const px = f0.x * .9, pz = f0.z;
+    const pos = new Vector3(px, 20, pz - 16), target = new Vector3(px, 0, pz + 13.1);
+    const k = this.snapCamera ? 1 : Math.min(1, dt * 12); this.snapCamera = false;
     this.camera.position.copyFrom(Vector3.Lerp(this.camera.position, pos, k));
     this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, k));
   }

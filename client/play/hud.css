@@ -20,7 +20,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:#b9b5d6;font-family:Ru
 #stick{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:3px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);opacity:0}
 #stick.on{opacity:1}#stick i{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.75)}
 #repair{position:absolute;pointer-events:auto;right:max(130px,calc(env(safe-area-inset-right) + 110px));bottom:max(36px,env(safe-area-inset-bottom));width:74px;height:74px;border-radius:50%;background:radial-gradient(#66d98a,#23944a);border:3px solid #eaffef;font:800 11px Rubik,system-ui;color:#0b3a1a;box-shadow:0 4px 0 #0f5a2b;touch-action:none}
-#look.hold{filter:brightness(1.3);transform:scale(.94)}
 #repair.hold{filter:brightness(1.25);transform:scale(.94)}
 #cancel{position:absolute;right:max(24px,env(safe-area-inset-right));bottom:max(24px,env(safe-area-inset-bottom));width:84px;height:84px;border-radius:50%;background:rgba(32,30,58,.8);border:3px solid rgba(255,255,255,.7);display:grid;place-items:center;font-size:36px;font-weight:800;transition:transform .1s}
 #cancel.over{background:#d9433b;transform:scale(1.18)}
@@ -63,11 +62,6 @@ button.big{display:block;margin:12px auto 4px;padding:14px 46px;font-size:24px;f
 .gain{white-space:pre-line}
 
 /* own-island overview button */
-#look{position:absolute;pointer-events:auto;right:max(14px,calc(env(safe-area-inset-right) + 8px));bottom:max(220px,calc(env(safe-area-inset-bottom) + 210px));width:64px;height:64px;border-radius:50%;background:rgba(32,30,58,.78);border:3px solid rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;gap:0;touch-action:none;box-shadow:0 4px 0 rgba(0,0,0,.28)}
-#look span{font-size:22px;line-height:1}#look i{font:800 9px Rubik,system-ui;font-style:normal;letter-spacing:.06em}
-#look.hold{background:linear-gradient(#5db6ff,#2f74e0);border-color:#fff}
-body:not(.touch) #look{display:none}
-@media (max-height:480px){#look{width:54px;height:54px;bottom:max(196px,calc(env(safe-area-inset-bottom) + 186px))}#look span{font-size:19px}}
 
 #stick.fast{border-color:#ffd25a;box-shadow:0 0 16px #ffd25a}
 #stamina{position:absolute;left:50%;bottom:max(44px,calc(env(safe-area-inset-bottom) + 24px));transform:translateX(-50%);width:min(190px,34vw);height:7px;border-radius:5px;background:rgba(32,30,58,.6);border:1px solid rgba(255,255,255,.35);overflow:hidden;opacity:0;transition:opacity .25s}
