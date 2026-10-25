@@ -1,4 +1,5 @@
 // Device adapters. Produce one set of intents; contain no combat rules.
+import { liftOff } from '../../shared/aim';
 export class Controls {
   move = { x: 0, z: 0 };
   /** Aim point in CSS px relative to the canvas (already offset above the finger on touch). */
@@ -22,6 +23,7 @@ export class Controls {
   /** Touch aiming is relative: finger movement since the press, in px. The game maps it onto the enemy island. */
   touchDelta = { x: 0, y: 0 };
   private touchStart = { x: 0, y: 0 };
+  private touchHist: { t: number; x: number; y: number }[] = [];
 
   constructor(private canvas: HTMLCanvasElement) {
     const opts = { passive: false } as AddEventListenerOptions;
@@ -64,7 +66,7 @@ export class Controls {
       this.stickEl.style.left = e.clientX + 'px'; this.stickEl.style.top = e.clientY + 'px'; this.stickEl.classList.add('on');
       (this.stickEl.firstElementChild as HTMLElement).style.transform = '';
     } else if (p.x >= p.w / 2 && this.aimId === null) {
-      this.aimId = e.pointerId; this.touchStart = { x: p.x, y: p.y }; this.touchDelta = { x: 0, y: 0 }; this.begin();
+      this.aimId = e.pointerId; this.touchStart = { x: p.x, y: p.y }; this.touchDelta = { x: 0, y: 0 }; this.touchHist = []; this.begin();
     }
   }
   private begin() { this.held = true; this.pressed = true; this.cancelled = false; this.overCancel = false; }
@@ -82,6 +84,7 @@ export class Controls {
     if (e.pointerId === this.aimId) {
       e.preventDefault();
       this.touchDelta = { x: p.x - this.touchStart.x, y: p.y - this.touchStart.y };
+      const now = performance.now(); this.touchHist.push({ t: now, ...this.touchDelta }); while (this.touchHist.length > 1 && now - this.touchHist[0].t > 400) this.touchHist.shift();
       const r = this.cancelEl.getBoundingClientRect(), pad = 14;
       this.overCancel = !this.cancelEl.hidden && e.clientX > r.left - pad && e.clientX < r.right + pad && e.clientY > r.top - pad && e.clientY < r.bottom + pad;
       this.cancelEl.classList.toggle('over', this.overCancel);
@@ -92,7 +95,10 @@ export class Controls {
     if (e.pointerType === 'mouse') { if (e.button === 0 && this.held) { this.held = false; this.released = true; } return; }
     if (this.stick && e.pointerId === this.stick.id) { this.stick = null; this.stickEl.classList.remove('on'); this.updateMove(); }
     if (e.pointerId === this.aimId) {
-      this.aimId = null; if (this.held) { this.held = false; this.released = true; if (cancelled || this.overCancel) this.cancelled = true; }
+      this.aimId = null;
+      // the fingertip rolls and slips as it lifts: aim where it was a moment before, not where the last jittery sample says
+      if (!cancelled) this.touchDelta = liftOff(this.touchHist, this.touchDelta, performance.now());
+      if (this.held) { this.held = false; this.released = true; if (cancelled || this.overCancel) this.cancelled = true; }
       this.cancelEl.classList.remove('over');
     }
     if (e.pointerId === this.repairId) { this.repairId = null; this.repairHeld = false; this.repairEl.classList.remove('hold'); }

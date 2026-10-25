@@ -28,7 +28,7 @@ export type C2S =
   | { t: 'move'; x: number; z: number }
   | { t: 'begin' }
   | { t: 'target'; x: number; z: number }
-  | { t: 'release'; x: number; z: number }
+  | { t: 'release'; x: number; z: number; k?: 'normal' | 'spin' | 'heavy' }
   | { t: 'cancel' }
   | { t: 'repair'; on: boolean }
   | { t: 'emote'; id: number }

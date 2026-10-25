@@ -272,7 +272,7 @@ export class Lobby {
       case 'move': if (num(m.x) && num(m.z)) { const g = s === 1 ? -1 : 1; b.setMove(s, g * Math.max(-1, Math.min(1, m.x)), g * Math.max(-1, Math.min(1, m.z))); } return;
       case 'begin': b.beginCharge(s); return;
       case 'target': if (cellsValid(m.x, m.z)) b.setTarget(s, { x: m.x, z: m.z }); return;
-      case 'release': if (cellsValid(m.x, m.z)) b.setTarget(s, { x: m.x, z: m.z }); b.releaseCharge(s); return;
+      case 'release': if (cellsValid(m.x, m.z)) b.setTarget(s, { x: m.x, z: m.z }); b.releaseCharge(s, m.k === 'spin' || m.k === 'heavy' ? m.k : undefined); return;
       case 'cancel': b.cancelCharge(s); return;
       case 'repair': if (m.on) { if (!b.charges[s]) b.beginRepair(s); } else b.cancelRepair(s); return;
     }

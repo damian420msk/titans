@@ -1,6 +1,7 @@
 import { World } from './world';
 import { Sfx } from './audio';
 import { Controls } from './controls';
+import { touchAim, mouseAim, type Pt } from '../../shared/aim';
 import { Battle, kindForHold, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
@@ -45,6 +46,7 @@ const srvEvents: GameEvent[] = [];
 let pendingSnap: { s: Snap; at: number } | null = null;
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
 let seenAimHint = (() => { try { return localStorage.getItem('titans.aimhint') === '1'; } catch { return false; } })();
+let mouseT: Pt | null = null, mouseLast: { x: number; y: number } | null = null;
 let charging = false, hover: Cell | null = null, acc = 0, toastTimer = 0, seed = 1, userPause = false, anchorCell: Cell | null = null;
 const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
 
@@ -214,17 +216,21 @@ async function boot() {
       }
       // Touch aiming is relative and works in cells, not screen pixels: perspective squeezes depth, so a pixel gain would be too twitchy.
       const unit = Math.max(.8, Math.min(1.6, innerHeight / 390));
-      const touchCell = (): Cell => ({
-        x: Math.max(0, Math.min(rules.arena.width_cells - 1, Math.round(anchorCell!.x - controls.touchDelta.x / (TOUCH_PX_X / menu.sens() * unit)))),
-        z: Math.max(0, Math.min(rules.arena.depth_cells - 1, Math.round(anchorCell!.z + controls.touchDelta.y / (TOUCH_PX_Z / menu.sens() * unit)))),
-      });
-      const pick = () => controls.touch && anchorCell ? touchCell() : world.pick(controls.aim.x, controls.aim.y);
+      const touchCell = (): Cell => touchAim(anchorCell!, controls.touchDelta, TOUCH_PX_X / menu.sens() * unit, TOUCH_PX_Z / menu.sens() * unit, rules.arena.width_cells, rules.arena.depth_cells);
+      // Mouse: while a throw is held the camera pulls out and the cell under a still pointer changes, so the aimed point is carried through camera motion
+      const mouseCell = (): Cell | null => {
+        const a = controls.aim, now = world.pickPoint(a.x, a.y); if (!now) return null;
+        const last = mouseLast ?? a, atLast = world.pickPoint(last.x, last.y) ?? now;
+        mouseT = mouseAim(mouseT, atLast, now, Math.hypot(a.x - last.x, a.y - last.y)); mouseLast = { x: a.x, y: a.y };
+        return world.cellNear(mouseT, true);
+      };
+      const pick = () => controls.touch && anchorCell ? touchCell() : charging ? mouseCell() : world.pick(controls.aim.x, controls.aim.y);
       if (!charging && b.charges[0]) { b.cancelCharge(0); if (online && nowS - pred.lastEnd > .6) { net.send({ t: 'cancel' }); pred.lastEnd = nowS; } }
       if (controls.pressed) {
         controls.pressed = false;
         if (controls.lookHeld) { /* the aim camera is off while looking back */ }
         else if (b.beginCharge(0)) {
-          charging = true; if (online) { net.send({ t: 'begin' }); lastTarget = ''; }
+          charging = true; mouseT = null; mouseLast = null; if (online) { net.send({ t: 'begin' }); lastTarget = ''; }
           if (controls.touch) {
             const foe = b.cellOf(1), ok = foe && b.hp(foe, 1) > 0;
             anchorCell = ok ? foe : (anchorCell ?? { x: 4, z: 6 });
@@ -239,7 +245,7 @@ async function boot() {
         controls.released = false;
         if (charging) {
           if (controls.cancelled || controls.overCancel) { b.cancelCharge(0); if (online) net.send({ t: 'cancel' }); pred.lastEnd = nowS; }
-          else if (online) { const tg = b.charges[0]?.target; if (tg) { net.send({ t: 'release', x: tg.x, z: tg.z }); b.cancelCharge(0); pred.lastEnd = nowS; } else toast('Цель вне острова'); }
+          else if (online) { const tg = b.charges[0]?.target; if (tg) { net.send({ t: 'release', x: tg.x, z: tg.z, k: kindForHold(b.charges[0]!.t) }); b.cancelCharge(0); pred.lastEnd = nowS; } else toast('Цель вне острова'); }
           else if (!b.releaseCharge(0)) toast('Цель вне острова');
           charging = false;
         }

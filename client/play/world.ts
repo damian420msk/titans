@@ -60,6 +60,8 @@ export class World {
   /** Online: ease the foe's drawn position between snapshots. */
   smoothFoe = false; foeVis = { x: 0, z: 0, ok: false };
   private aimHold = 0;
+  /** Titan position when the throw began: the camera stops following while aiming, so a cell under a still pointer stays under it. */
+  private aimAt: { x: number; z: number } | null = null;
   freezeCamera = false;
   /** Hard reset of everything a finished match can leave behind: plates mid-fall, camera pose, leftover titan posture. */
   resetMatch() {
@@ -70,7 +72,7 @@ export class World {
     }
     for (const m of this.shotMeshes.values()) m.dispose(); this.shotMeshes.clear();
     for (const p of this.particles) p.mesh.dispose(); this.particles.length = 0;
-    this.aimBlend = 0; this.aimHold = 0; this.lookBlend = 0; this.lookBack = false; this.snapCamera = true;
+    this.aimBlend = 0; this.aimHold = 0; this.aimAt = null; this.lookBlend = 0; this.lookBack = false; this.snapCamera = true;
     for (const t of this.titans) { t.lean = 0; t.lie = 0; t.body.rotation.x = 0; t.body.position.y = 0; }
     this.resetPoses();
   }
@@ -238,13 +240,22 @@ export class World {
 
   // ---------- per-frame ----------
   /** Pointer position (CSS px relative to the canvas) -> enemy island cell, or null. */
-  pick(x: number, y: number): Cell | null {
+  pick(x: number, y: number): Cell | null { const p = this.pickPoint(x, y); return p && this.cellNear(p, false); }
+
+  /** Pointer (CSS px) -> point on the enemy island plane, in world coordinates. Babylon divides by the hardware scaling level itself,
+   *  so CSS px go in unchanged (checked for dpr 1/2/2.5 and the quality steps). */
+  pickPoint(x: number, y: number): { x: number; z: number } | null {
     const ray = this.scene.createPickingRay(x, y, Matrix.Identity(), this.camera);
     if (ray.direction.y > -1e-4) return null;
-    const t = -ray.origin.y / ray.direction.y, px = ray.origin.x + ray.direction.x * t, pz = ray.origin.z + ray.direction.z * t;
+    const t = -ray.origin.y / ray.direction.y;
+    return { x: ray.origin.x + ray.direction.x * t, z: ray.origin.z + ray.direction.z * t };
+  }
+
+  /** Nearest enemy cell to a world point; with `clamp` off, null when the point is further than 1.6 cells from any centre. */
+  cellNear(p: { x: number; z: number }, clamp: boolean): Cell | null {
     let best: Cell | null = null, bd = Infinity;
-    for (const c of map.cells) { const q = cellCentre(c, 1), d = Math.hypot(q.x - px, q.z - pz); if (d < bd) { bd = d; best = c; } }
-    return best && bd < size * 1.6 ? { x: best.x, z: best.z } : null;
+    for (const c of map.cells) { const q = cellCentre(c, 1), d = Math.hypot(q.x - p.x, q.z - p.z); if (d < bd) { bd = d; best = c; } }
+    return best && (clamp || bd < size * 1.6) ? { x: best.x, z: best.z } : null;
   }
 
   /** Enemy-island cell centre -> screen position in CSS px relative to the canvas. */
@@ -299,7 +310,9 @@ export class World {
     const lookGoal = this.lookBack ? 1 : this.autoLook;
     this.lookBlend += Math.max(-dt / .35, Math.min(dt / .22, lookGoal - this.lookBlend));
     const e = this.aimBlend * this.aimBlend * (3 - 2 * this.aimBlend), me = b.actors[0].pos, lk = this.lookBlend * this.lookBlend * (3 - 2 * this.lookBlend);
-    const px = me.x, pz = Math.max(me.z, -33), lerp = (a: number, c: number) => a + (c - a) * e, lerp2 = (a: number, c: number, t: number) => a + (c - a) * t;
+    if (aiming && !this.aimAt) this.aimAt = { x: me.x, z: me.z }; else if (!aiming && this.aimHold <= 0) this.aimAt = null;
+    const fx = this.aimAt ? this.aimAt.x : me.x, fz = this.aimAt ? this.aimAt.z : me.z;
+    const px = fx, pz = Math.max(fz, -33), lerp = (a: number, c: number) => a + (c - a) * e, lerp2 = (a: number, c: number, t: number) => a + (c - a) * t;
     const portrait = this.engine.getRenderWidth() < this.engine.getRenderHeight();
     // f: 0 at the own rear edge (arsenal), 1 at the front edge. Near the rear the camera looks further ahead so the enemy island stays readable;
     // near the front it backs off and rises so the titan is not pressed against the enemy island.

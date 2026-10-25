@@ -29,6 +29,8 @@ const START_CELL: Cell = { x: rules.arena.spawn_cell[0], z: rules.arena.spawn_ce
 const GRAVITY = 18, FALL_DEPTH = -12, SLIDE_S = .25;
 const valid = (c: Cell | null): c is Cell => !!c && Number.isInteger(c.x) && Number.isInteger(c.z) && c.x >= 0 && c.x < rules.arena.width_cells && c.z >= 0 && c.z < rules.arena.depth_cells;
 
+const KIND_RANK: Record<Kind, number> = { normal: 0, spin: 1, heavy: 2 };
+export const HOLD_SLACK_S = .25;
 /** Which throw a hold of `t` seconds produces. */
 export function kindForHold(t: number): Kind {
   return t >= KINDS.heavy.hold_from_s ? 'heavy' : t >= KINDS.spin.hold_from_s ? 'spin' : 'normal';
@@ -111,11 +113,13 @@ export class Battle {
   }
   setTarget(side: Side, c: Cell | null) { const ch = this.charges[side]; if (ch) ch.target = valid(c) ? { ...c } : null; }
   cancelCharge(side: Side) { this.charges[side] = null; }
-  releaseCharge(side: Side): Shot | null {
+  /** `claimed`: the throw the player saw in the preview. Online the server's hold timer lags a little behind, so a claim up to HOLD_SLACK_S ahead of it is honoured. */
+  releaseCharge(side: Side, claimed?: Kind): Shot | null {
     const ch = this.charges[side]; this.charges[side] = null;
     const a = this.actors[side];
     if (!ch || !valid(ch.target) || !this.canAct(side) || a.stones < rules.inventory.shot_cost) return null;
-    const kind = kindForHold(ch.t);
+    let kind = kindForHold(ch.t);
+    if (claimed && KIND_RANK[claimed] > KIND_RANK[kind] && KIND_RANK[kindForHold(ch.t + HOLD_SLACK_S)] >= KIND_RANK[claimed]) kind = claimed;
     const shot: Shot = { id: ++this.shotId, owner: side, kind, cells: cellsFor(kind, ch.target), start: { ...a.pos }, elapsed: 0 };
     this.shots.push(shot); a.stones -= rules.inventory.shot_cost; a.cooldown = this.mods[side].cooldown;
     this.events.push({ type: 'throw', side, kind }); return shot;
