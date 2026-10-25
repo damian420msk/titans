@@ -65,6 +65,7 @@ async function boot() {
   const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
   menu = initMenu({
     sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); const first = store.get('tutorial') !== '1'; level = first ? 'easy' : l; if (!first && matchesPlayed > 0) await ya.interstitial(); startMatch(); if (first) { tut.on = true; tut.step = 0; tut.t = 0; tut.throws = 0; tut.x = battle.actors[0].pos.x; tut.z = battle.actors[0].pos.z; } },
+    onTrain: () => { goFullscreen(); level = 'easy'; startMatch(); tut.jumped = false; tut.on = true; tut.step = 0; tut.t = 0; tut.throws = 0; tut.x = battle.actors[0].pos.x; tut.z = battle.actors[0].pos.z; },
     onScreen: sc => { if (sc === 'online') { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); } },
     onCreate: (name, pass, ranked) => { createdPass = pass; hello(); net.send({ t: 'create', name, pass, ranked }); },
     onQuick: on => { if (on) { goFullscreen(); if (!needNet()) { quickWanted = true; return; } hello(); net.send({ t: 'quick', on: true }); } else { quickWanted = false; net.send({ t: 'quick', on: false }); } },
@@ -307,6 +308,7 @@ async function boot() {
     $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'В КОМНАТУ') : 'ЕЩЁ РАЗ';
     $('end-gain').textContent = online ? endGain : ''; $('end-foe').textContent = ''; $('rematch').hidden = $('end-say').hidden = true; if (online && !why) setTimeout(updateRematch, 0);
     if (!online && why !== 'conn') {
+      if (winner === 0) menu.botWin();
       pendingResult = { level, won: winner === 0 };
       if (net.state === 'on') { hello(); net.send({ t: 'result', level, won: winner === 0 }); pendingResult = null; } else net.connect();
     }

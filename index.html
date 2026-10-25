@@ -32,40 +32,51 @@
   </div>
 
   <section class="scr" data-scr="main">
-    <div class="main-left">
+    <header class="hub-top">
+      <div class="hub-id">
+        <button class="chip player" data-go="settings"><span class="avatar">Я</span><span><b id="nick-label">Игрок</b><i><span id="league-label">Бронза</span> · <span id="rating-label">1000</span></i></span></button>
+        <span class="pill gold coins-pill">🪙 <b id="coins-label">0</b></span>
+      </div>
+      <button class="round" data-go="settings" aria-label="Настройки">⚙</button>
+    </header>
+    <div class="hub-mid">
       <h1 class="logo">ТИТАНЫ<small>БРОСКИ С НЕБЕСНЫХ ОСТРОВОВ</small></h1>
-      <p class="tag">Бросай небесные камни по острову врага. Разбей плиты под титаном, чтобы он упал.</p>
-      <button class="chip player" data-go="settings"><span class="avatar">Я</span><span><b id="nick-label">Игрок</b><i><span id="league-label">Бронза</span> · <span id="rating-label">1000</span></i></span><em class="coins">🪙 <span id="coins-label">0</span></em></button>
+      <button class="big play-btn" data-go="play">ИГРАТЬ</button>
       <button id="daily" class="gift" hidden>🎁 Подарок дня: +50 монет</button>
-      <button id="quests-btn" class="gift quest" data-go="quests">📋 Задания <span id="quests-count">0/3</span></button>
     </div>
-    <nav class="main-right">
-      <button class="big" data-go="bot">БОЙ С БОТОМ</button>
-      <button id="quick-btn" class="mbtn online"><b>БЫСТРЫЙ БОЙ</b><i>с живым соперником, на рейтинг</i></button>
-      <button class="mbtn friends" data-go="online"><b>ИГРА С ДРУЗЬЯМИ</b><i>комнаты и пароли</i></button>
-      <div class="row2">
-        <button class="mbtn" data-go="rating"><b>РЕЙТИНГ</b></button>
-        <button class="mbtn" data-go="shop"><b>МАГАЗИН</b></button>
-      </div>
-      <div class="row2">
-        <button class="mbtn" data-go="settings"><b>НАСТРОЙКИ</b></button>
-        <button class="mbtn" data-go="howto"><b>КАК ИГРАТЬ</b></button>
-      </div>
+    <nav class="hub-bottom">
+      <button class="tile" data-go="shop"><span>🛒</span><b>Магазин</b></button>
+      <button class="tile" id="quests-btn" data-go="quests"><span>📋</span><b>Задания</b><em id="quests-count">0/3</em></button>
+      <button class="tile" data-go="rating"><span>🏆</span><b>Рейтинг</b></button>
+      <button class="tile soon" data-soon="Моя база появится в одном из следующих обновлений"><span>🏰</span><b>Моя база</b><em>скоро</em></button>
+      <button class="tile soon" data-soon="Кампания появится в одном из следующих обновлений"><span>🗺</span><b>Кампания</b><em>скоро</em></button>
     </nav>
   </section>
 
+  <section class="scr" data-scr="play" hidden>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Играть</h2><span></span></header>
+    <div class="modes">
+      <button class="mode" data-go="bot"><span class="mi">⚔</span><b>Быстрый бой</b><em>против бота или живого соперника из твоей лиги</em></button>
+      <button class="mode" id="friends-btn" data-go="online"><span class="mi">👥</span><b>С друзьями</b><em>комнаты и пароли</em><i class="lockmark">🔒</i></button>
+      <button class="mode" id="train-btn"><span class="mi">🎯</span><b>Тренировка</b><em>учимся двигаться и бросать, выйти можно в любой момент</em></button>
+    </div>
+    <button class="ghost" data-go="howto">Как играть</button>
+  </section>
+
   <section class="scr" data-scr="bot" hidden>
-    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Бой с ботом</h2><span></span></header>
-    <div class="levels">
+    <header class="top"><button class="back" data-go="play">‹ Назад</button><h2>Быстрый бой</h2><span></span></header>
+    <div class="seg" id="opp-seg"><button data-opp="bot" class="sel">🤖 Бот</button><button data-opp="live" id="opp-live">🌐 Живой соперник <i class="lockmark">🔒</i></button></div>
+    <div class="levels" id="levels">
       <button class="lvl" data-level="easy"><span class="face teal">1</span><b>ГРОМ</b><i>Лёгкий</i><em>Редко попадает, ходит неспешно. Чтобы освоиться.</em></button>
       <button class="lvl sel" data-level="normal"><span class="face teal">2</span><b>БОРГАР</b><i>Средний</i><em>Уворачивается, чинит остров, бросает кручёные.</em></button>
       <button class="lvl" data-level="hard"><span class="face coral">3</span><b>ТОРВАЛЬД</b><i>Сложный</i><em>Точный и быстрый. Мощные броски, почти не промахивается.</em></button>
     </div>
+    <p class="live-note" id="live-note" hidden>Соперник подбирается по рейтингу и лиге. Бой идёт на рейтинг, за победу монеты.</p>
     <button id="start" class="big wide">В БОЙ</button>
   </section>
 
   <section class="scr" data-scr="online" hidden>
-    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Онлайн</h2><span class="pill" id="net-pill"><i></i><span>сервер не подключён</span></span></header>
+    <header class="top"><button class="back" data-go="play">‹ Назад</button><h2>Онлайн</h2><span class="pill" id="net-pill"><i></i><span>сервер не подключён</span></span></header>
     <div class="glass list-wrap">
       <div class="list-head"><span>Комната</span><span>Хозяин</span><span>Игроки</span><span></span></div>
       <div id="rooms" class="rooms"></div>

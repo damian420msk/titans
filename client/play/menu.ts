@@ -7,7 +7,7 @@ import type { NetState } from './online';
 import type { RoomInfo, RoomView, MyProfile } from '../../shared/net';
 import { UPGRADES, COSMETICS, QUESTS, LEAGUES, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
 export type { RoomInfo, RoomView };
-export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick' | 'quests';
+export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick' | 'quests' | 'play';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const store = {
@@ -20,6 +20,7 @@ export type MenuHooks = {
   sfx: Sfx;
   touch: boolean;
   onStartBot: (level: Difficulty) => void;
+  onTrain: () => void;
   onScreen: (s: Screen) => void;
   onCreate: (name: string, password: string, ranked: boolean) => void;
   onQuick: (on: boolean) => void;
@@ -36,7 +37,7 @@ export type MenuHooks = {
 
 export function initMenu(h: MenuHooks) {
   const root = $('menu'), { sfx } = h;
-  let level: Difficulty = 'normal', current: Screen = 'main', view: RoomView | null = null, netState: NetState = 'off', slow = false;
+  let opp: 'bot' | 'live' = 'bot', level: Difficulty = 'normal', current: Screen = 'main', view: RoomView | null = null, netState: NetState = 'off', slow = false;
   let prof: MyProfile | null = null, top: PublicEntry[] = [], topRank: number | null = null, tab: 'up' | CosmeticKind = 'up';
   document.body.classList.toggle('touch', h.touch);
 
@@ -44,8 +45,24 @@ export function initMenu(h: MenuHooks) {
   const sens = () => Math.max(.6, Math.min(1.8, parseFloat(store.get('sens', '1')) || 1));
   const paintNick = () => { $('nick-label').textContent = nick(); $('rate-me').textContent = nick(); document.querySelectorAll('#menu .avatar').forEach(a => { a.textContent = nick().slice(0, 1).toUpperCase(); }); };
 
+  /** Live opponents and rooms open after the first win over a bot (or any recorded win on the profile). */
+  const unlocked = () => store.get('botwin', '0') === '1' || (prof?.wins ?? 0) > 0;
+  const paintLocks = () => {
+    const lk = !unlocked();
+    $('friends-btn').classList.toggle('locked', lk); $('opp-live').classList.toggle('locked', lk);
+    document.querySelectorAll<HTMLElement>('#menu .lockmark').forEach(x => { x.hidden = !lk; });
+    if (lk && opp === 'live') setOpp('bot');
+  };
+  function setOpp(o: 'bot' | 'live') {
+    opp = o;
+    root.querySelectorAll('#opp-seg [data-opp]').forEach(x => x.classList.toggle('sel', (x as HTMLElement).dataset.opp === o));
+    $('levels').hidden = o === 'live'; $('live-note').hidden = o !== 'live';
+    $('start').textContent = o === 'live' ? 'ИСКАТЬ СОПЕРНИКА' : 'В БОЙ';
+  }
+  const LOCK_TEXT = 'Живые соперники откроются после первой победы над ботом';
   function open(s: Screen) {
     current = s;
+    if (s === 'bot' || s === 'play') paintLocks();
     root.querySelectorAll<HTMLElement>('.scr').forEach(x => { x.hidden = x.dataset.scr !== s; });
     $('pwd').hidden = true;
     h.onScreen(s);
@@ -65,8 +82,11 @@ export function initMenu(h: MenuHooks) {
   root.addEventListener('click', e => {
     const t = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null; if (!t) return;
     sfx.unlock(); sfx.click();
+    if (t.dataset.go === 'online' && !unlocked()) { notice(LOCK_TEXT); return; }
     if (t.dataset.go) open(t.dataset.go as Screen);
-    if (t.id === 'quick-btn') { h.onQuick(true); open('quick'); }
+    if (t.dataset.soon) notice(t.dataset.soon);
+    if (t.dataset.opp) { if (t.dataset.opp === 'live' && !unlocked()) notice(LOCK_TEXT); else setOpp(t.dataset.opp as 'bot' | 'live'); }
+    if (t.id === 'train-btn') h.onTrain();
     if (t.id === 'quick-cancel') { h.onQuick(false); open('main'); }
     if (t.id === 'daily') h.onClaim();
     if (t.dataset.tab) { tab = t.dataset.tab as typeof tab; renderShop(); }
@@ -74,7 +94,7 @@ export function initMenu(h: MenuHooks) {
     if (t.dataset.eq) h.onEquip(t.dataset.eq);
     if (t.dataset.level) { level = t.dataset.level as Difficulty; root.querySelectorAll('[data-level]').forEach(x => x.classList.toggle('sel', x === t)); }
   });
-  $('start').addEventListener('click', () => h.onStartBot(level));
+  $('start').addEventListener('click', () => { if (opp === 'live') { if (!unlocked()) { notice(LOCK_TEXT); return; } h.onQuick(true); open('quick'); } else h.onStartBot(level); });
 
   // online lobby
   let rooms: RoomInfo[] = [];
@@ -129,7 +149,8 @@ export function initMenu(h: MenuHooks) {
   const paintProfile = () => {
     const p = prof; const r = p?.rating ?? 1000, lg = league(r);
     $('rating-label').textContent = String(r); $('league-label').textContent = lg.name; $('league-label').style.color = lg.color;
-    $('coins-label').textContent = String(p?.coins ?? 0); $('shop-coins').textContent = String(p?.coins ?? 0);
+    $('coins-label').textContent = String(p?.coins ?? 0);
+    paintLocks(); $('shop-coins').textContent = String(p?.coins ?? 0);
     $('daily').hidden = !(p && p.dailyReady);
     $('quests-count').textContent = `${p ? p.quest.paid.filter(Boolean).length : 0}/${QUESTS.length}`;
     $('rate-pts').textContent = String(r); $('rate-wins').textContent = String(p?.wins ?? 0);
@@ -187,8 +208,9 @@ export function initMenu(h: MenuHooks) {
     el.addEventListener('input', () => { sfx.setVolume(k, +el.value / 100); paint(); });
     el.addEventListener('change', () => { if (k === 'sfx' && !sfx.muted) sfx.click(); }); // a click as a sample of the new level
   }
-  paintNick(); paintSound(); paintHaptic(); setRooms([]); paintProfile();
+  paintNick(); paintSound(); paintHaptic(); setRooms([]); paintProfile(); setOpp('bot');
 
-  return { setProfile, setTop, setQueue, show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
+  const botWin = () => { store.set('botwin', '1'); paintLocks(); };
+  return { botWin, setProfile, setTop, setQueue, show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
 }
 export type Menu = ReturnType<typeof initMenu>;
