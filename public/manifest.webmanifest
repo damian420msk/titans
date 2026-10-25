@@ -1,0 +1,11 @@
+{
+  "name": "Титаны",
+  "short_name": "Титаны",
+  "description": "Броски с небесных островов",
+  "start_url": ".",
+  "scope": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#2a1f5c",
+  "theme_color": "#2a1f5c"
+}

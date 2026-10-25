@@ -22,6 +22,7 @@ import '@babylonjs/core/Culling/ray';
 import '@babylonjs/loaders/glTF/2.0';
 import { createEnvironment } from '../environment';
 import { TitanRig, readClips, CLIP } from './rig';
+import { QualityPolicy, renderScale } from './quality';
 import { rules, map, size, cellCentre, type Cell, type Point, type Side } from '../../shared/world';
 import { Battle, cellKey, cellsFor, kindForHold, shotPosition, sideOther, type GameEvent, type Kind } from '../../shared/battle';
 
@@ -35,11 +36,16 @@ type TitanView = { mats: Material[]; holder: TransformNode; body: TransformNode;
   cheer: number; flail: number; cheerTarget: boolean; squash: number };
 /** Local rotation offset from Euler angles in degrees (x, y, z). */
 const rot = (x: number, y: number, z: number) => Quaternion.RotationYawPitchRoll(y * Math.PI / 180, x * Math.PI / 180, z * Math.PI / 180);
-type Particle = { mesh: Mesh; v: Vector3; life: number; max: number; gravity: number };
+type Particle = { mesh: Mesh; v: Vector3; life: number; max: number; gravity: number; chip?: boolean };
 
 export class World {
   engine: Engine; scene: Scene; camera: FreeCamera;
   private shadows!: ShadowGenerator;
+  private sun!: DirectionalLight;
+  readonly policy = new QualityPolicy(matchMedia('(pointer: coarse)').matches);
+  private clouds: Mesh[] = [];
+  private chipTemplates = new Map<StandardMaterial, Mesh>();
+  private trailAt = new Map<number, number>();
   private casters: Mesh[] = [];
   private cells: [Map<string, CellView>, Map<string, CellView>] = [new Map(), new Map()];
   private titans: [TitanView, TitanView] = [] as unknown as [TitanView, TitanView];
@@ -69,7 +75,7 @@ export class World {
       v.intact.setEnabled(true); v.cracked.setEnabled(false); v.foundation.setEnabled(true);
     }
     for (const m of this.shotMeshes.values()) m.dispose(); this.shotMeshes.clear();
-    for (const p of this.particles) p.mesh.dispose(); this.particles.length = 0;
+    for (const p of this.particles) p.mesh.dispose(); this.particles.length = 0; this.trailAt.clear();
     this.aimFrozen = false; this.snapCamera = true;
     for (const t of this.titans) { t.lean = 0; t.lie = 0; t.body.rotation.x = 0; t.body.position.y = 0; }
     this.resetPoses();
@@ -79,7 +85,6 @@ export class World {
 
   private constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: true, preserveDrawingBuffer: false }, false);
-    this.engine.setHardwareScalingLevel(1 / Math.min(2, window.devicePixelRatio || 1));
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(.72, .71, .84, 1);
     this.camera = new FreeCamera('cam', new Vector3(0, 6, -40), this.scene);
@@ -94,6 +99,7 @@ export class World {
     await w.buildTitans();
     w.scene.onAfterAnimationsObservable.add(() => w.applyBones());
     w.buildPools();
+    w.applyQuality();
     return w;
   }
 
@@ -121,18 +127,18 @@ export class World {
   private buildLightsAndSky() {
     const s = this.scene;
     const fill = new HemisphericLight('sky', new Vector3(.2, 1, .3), s); fill.intensity = .7; fill.diffuse = new Color3(.8, .86, 1); fill.groundColor = new Color3(.4, .38, .46);
-    const sun = new DirectionalLight('sun', new Vector3(-.45, -1, .35), s); sun.position.set(30, 60, -30); sun.diffuse = new Color3(1, .9, .76); sun.intensity = 1.7;
+    const sun = this.sun = new DirectionalLight('sun', new Vector3(-.45, -1, .35), s); sun.position.set(30, 60, -30); sun.diffuse = new Color3(1, .9, .76); sun.intensity = 1.7;
     sun.autoUpdateExtends = false; sun.orthoLeft = -50; sun.orthoRight = 50; sun.orthoTop = 50; sun.orthoBottom = -50; sun.shadowMinZ = 1; sun.shadowMaxZ = 140;
     const touch = matchMedia('(pointer: coarse)').matches;
     this.shadows = new ShadowGenerator(touch ? 1024 : 2048, sun); this.shadows.usePercentageCloserFiltering = true; this.shadows.bias = .0004; this.shadows.normalBias = .03; this.shadows.setDarkness(.3);
-    this.glow = new GlowLayer('glow', s, { blurKernelSize: touch ? 24 : 40 }); this.glow.intensity = .85;
+    this.glow = new GlowLayer('glow', s, { blurKernelSize: touch ? 24 : 40, ...(touch ? { mainTextureFixedSize: 256 } : {}) }); this.glow.intensity = .85;
     createEnvironment(s, new TransformNode('env', s));
     const sky = s.getMeshByName('gradient sky')!, v = sky.getVerticesData('position')!, col: number[] = [];
     const top = Color3.FromHexString('#6D6FD8'), mid = Color3.FromHexString('#B49BE6'), hor = Color3.FromHexString('#FFC9C4');
     for (let i = 0; i < v.length; i += 3) { const t = (v[i + 1] + 245) / 490; const c = t > .55 ? Color3.Lerp(mid, top, (t - .55) / .45) : Color3.Lerp(hor, mid, Math.max(0, (t - .4) / .15)); col.push(c.r, c.g, c.b, 1); }
     sky.setVerticesData('color', col);
     const cloud = s.getMaterialByName('soft cloud banks') as StandardMaterial; cloud.alpha = .9;
-    for (let i = 0; i < 70; i++) { const a = i * 2.39996, r = 8 + (i % 10) * 9 + (i * 7 % 13); const m = MeshBuilder.CreatePlane('cloudsea', { width: 26 + (i % 4) * 8, height: 13 + (i % 3) * 4 }, s); m.position.set(Math.sin(a) * r, -9 - (i % 5) * 3.2, Math.cos(a) * r); m.billboardMode = Mesh.BILLBOARDMODE_ALL; m.material = cloud; m.isPickable = false; }
+    for (let i = 0; i < 70; i++) { const a = i * 2.39996, r = 8 + (i % 10) * 9 + (i * 7 % 13); const m = MeshBuilder.CreatePlane('cloudsea', { width: 26 + (i % 4) * 8, height: 13 + (i % 3) * 4 }, s); m.position.set(Math.sin(a) * r, -9 - (i % 5) * 3.2, Math.cos(a) * r); m.billboardMode = Mesh.BILLBOARDMODE_ALL; m.material = cloud; m.isPickable = false; this.clouds.push(m); }
     for (const m of s.meshes) if (m.name.startsWith('far rock') || m.name.startsWith('mountain template')) m.setEnabled(false);
   }
   private glow!: GlowLayer;
@@ -294,18 +300,17 @@ export class World {
   /** The rig writes every bone from the clips (plus the cheer/flail fallback offsets). Runs after animations, before skinning. */
   private applyBones() { for (const t of this.titans) t?.rig.apply(); }
 
-  private slowTime = 0; private fastTime = 0; private qStep = 0; private baseScale = 1;
-  /** One-way quality governor for weak phones: if frames stay slow, draw fewer pixels (up to 3 steps). */
-  adaptQuality(frame: number) {
-    if (this.qStep === 0 && this.baseScale === 1) this.baseScale = this.engine.getHardwareScalingLevel();
-    if (frame > 1 / 38) this.slowTime += frame; else this.slowTime = Math.max(0, this.slowTime - frame);
-    if (this.slowTime > 2.5 && this.qStep < 3) {
-      this.qStep++; this.slowTime = 0;
-      this.engine.setHardwareScalingLevel(this.baseScale * (1 + .3 * this.qStep)); this.engine.resize();
-      if (this.qStep === 3) this.shadows.getShadowMap()!.refreshRate = 2;
-    }
+  /** Applies the current quality step: render resolution (phones never above 1 px per CSS px), clouds, shadows, glow. Safe to call again. */
+  applyQuality() {
+    const q = this.policy.current, c = this.engine.getRenderingCanvas(), r = c?.getBoundingClientRect(), w = r?.width || innerWidth, h = r?.height || innerHeight;
+    this.engine.setHardwareScalingLevel(1 / renderScale(w, h, q, window.devicePixelRatio || 1)); this.engine.resize();
+    this.clouds.forEach((m, i) => m.setEnabled(i < q.clouds));
+    this.sun.shadowEnabled = q.shadows; this.shadows.getShadowMap()!.refreshRate = q.shadowEvery;
+    this.glow.isEnabled = q.glow;
   }
-  get qualityStep() { return this.qStep; }
+  /** Called with every frame time while a match runs; steps the picture down for good if frames stay slow. */
+  adaptQuality(frame: number) { if (this.policy.sample(frame * 1000)) this.applyQuality(); }
+  get qualityStep() { return this.policy.degradation; }
 
   /** One steady frame: the camera keeps the same offset, height, tilt and zoom behind the titan and only slides with it
    *  (no zoom, no tilt, no look-ahead). The own island, the titan and the enemy island are always in view. While a throw is held the
@@ -400,7 +405,7 @@ export class World {
   /** Visual only: a stone seen right after the throw starts in the thrower's hand and settles onto its flight line within 0.3 s. */
   private shotOffset = new Map<number, Vector3>();
   private updateShots(b: Battle, dt: number) {
-    for (const [id, m] of this.shotMeshes) if (!b.shots.some(s => s.id === id)) { m.dispose(); this.shotMeshes.delete(id); this.shotOffset.delete(id); }
+    for (const [id, m] of this.shotMeshes) if (!b.shots.some(s => s.id === id)) { m.dispose(); this.shotMeshes.delete(id); this.shotOffset.delete(id); this.trailAt.delete(id); }
     for (const [k, w] of this.warns) { const id = Number(k.split('/')[0]); if (!b.shots.some(s => s.id === id)) { w.dispose(); this.warns.delete(k); } }
     for (const s of b.shots) {
       let m = this.shotMeshes.get(s.id);
@@ -413,7 +418,7 @@ export class World {
       }
       const o = this.shotOffset.get(s.id)!, fade = Math.max(0, 1 - s.elapsed / .3); p.x += o.x * fade; p.y += o.y * fade; p.z += o.z * fade;
       m.position.set(p.x, p.y, p.z); m.rotation.x += dt * (s.kind === 'spin' ? 16 : 7); m.rotation.z += dt * 4; m.rotation.y += dt * (s.kind === 'spin' ? 14 : 3);
-      this.particle(new Vector3(p.x, p.y, p.z), Vector3.Zero(), .3, 0, this.trailTemplate, .25 + (s.kind === 'heavy' ? .15 : 0));
+      if (this.time - (this.trailAt.get(s.id) ?? -1) >= this.policy.current.trailEvery) { this.trailAt.set(s.id, this.time); this.particle(new Vector3(p.x, p.y, p.z), Vector3.Zero(), .3, 0, this.trailTemplate, .25 + (s.kind === 'heavy' ? .15 : 0)); }
       s.cells.forEach((c, i) => {
         const key = `${s.id}/${i}`, victim = sideOther(s.owner);
         let w = this.warns.get(key);
@@ -457,15 +462,28 @@ export class World {
       if (e.type === 'over') { this.titans[0].cheerTarget = e.winner === 0; this.titans[1].cheerTarget = e.winner === 1; }
     }
   }
+  /** One shared low-poly rock per material; every chip is an instance of it (no geometry is created during play). */
+  private chipFor(material: StandardMaterial): Mesh {
+    let t = this.chipTemplates.get(material);
+    if (!t) { t = MeshBuilder.CreateIcoSphere('chipT', { radius: 1, subdivisions: 0, flat: true }, this.scene); t.material = material; t.isVisible = false; t.isPickable = false; this.chipTemplates.set(material, t); }
+    return t;
+  }
+  /** Keeps the effect budget: when a kind is over its limit the oldest short-lived pieces of that kind go first. Holes, HP and repairs are untouched. */
+  private spawn(p: Particle) {
+    const q = this.policy.current, limit = p.chip ? q.fragments : q.particles;
+    let n = 0; for (const x of this.particles) if (!!x.chip === !!p.chip) n++;
+    for (let i = 0; n >= limit && i < this.particles.length; i++) if (!!this.particles[i].chip === !!p.chip) { this.particles[i].mesh.dispose(); this.particles.splice(i, 1); i--; n--; }
+    this.particles.push(p);
+  }
   private burst(c: Point, power: number, material: StandardMaterial, y = .2) {
-    const m = MeshBuilder.CreateIcoSphere('chip', { radius: .12 + Math.random() * .16, subdivisions: 0, flat: true }, this.scene); m.material = material; m.isPickable = false;
+    const m = this.chipFor(material).createInstance('chip'); m.scaling.setAll(.12 + Math.random() * .16); m.isPickable = false;
     const a = Math.random() * Math.PI * 2, s = (1 + Math.random() * 3) * power;
     m.position.set(c.x + Math.cos(a) * .6, y, c.z + Math.sin(a) * .6);
-    this.particles.push({ mesh: m, v: new Vector3(Math.cos(a) * s, 3 + Math.random() * 4 * power, Math.sin(a) * s), life: .9, max: .9, gravity: 14 });
+    this.spawn({ mesh: m as unknown as Mesh, v: new Vector3(Math.cos(a) * s, 3 + Math.random() * 4 * power, Math.sin(a) * s), life: .9, max: .9, gravity: 14, chip: true });
   }
   private particle(pos: Vector3, v: Vector3, life: number, gravity: number, template: Mesh, scale = 1) {
     const m = template.createInstance('p'); m.position.copyFrom(pos); m.scaling.setAll(scale); m.isPickable = false;
-    this.particles.push({ mesh: m as unknown as Mesh, v, life, max: life, gravity });
+    this.spawn({ mesh: m as unknown as Mesh, v, life, max: life, gravity });
   }
   private updateParticles(dt: number) {
     for (let i = this.particles.length - 1; i >= 0; i--) {

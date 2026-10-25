@@ -38,13 +38,20 @@ export class Controls {
     window.addEventListener('pointercancel', e => this.up(e, true));
     window.addEventListener('keydown', e => this.key(e, true));
     window.addEventListener('keyup', e => this.key(e, false));
-    window.addEventListener('blur', () => this.reset());
+    // anything that takes the game away from the player (switching apps, a call, the notification shade, a lost window):
+    // let go of every key, finger and hold, and tell the match so nothing keeps walking or charging on its own
+    const interrupt = () => { this.reset(); this.onInterrupt(); };
+    window.addEventListener('blur', interrupt);
+    window.addEventListener('pagehide', interrupt);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) interrupt(); });
     const jumpEl = document.getElementById('jump')!;
     jumpEl.addEventListener('pointerdown', e => { e.preventDefault(); this.touch = e.pointerType !== 'mouse'; this.jumpPressed = true; jumpEl.classList.add('hold'); });
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) jumpEl.addEventListener(ev, () => jumpEl.classList.remove('hold'));
     this.repairEl.addEventListener('pointerdown', e => { e.preventDefault(); this.touch = e.pointerType !== 'mouse'; this.repairId = e.pointerId; this.repairHeld = true; this.repairEl.classList.add('hold'); this.repairEl.setPointerCapture(e.pointerId); });
   }
 
+  /** Set by the game: stops the local actor and, online, sends the stop / cancel intents to the server. */
+  onInterrupt: () => void = () => {};
   reset() {
     if (this.held) this.cancelHold();
     this.keys.clear(); this.keySprint = this.stickFast = this.sprintHeld = false; this.jumpPressed = false; this.stick = null; this.aimId = null; this.repairId = null; this.repairHeld = false; this.move = { x: 0, z: 0 };

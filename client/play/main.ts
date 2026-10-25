@@ -3,6 +3,7 @@ import { Sfx } from './audio';
 import { Controls } from './controls';
 import { PHRASES } from '../../shared/net';
 import { createChat } from './chat';
+import { initOrientation, lockLandscape, isPortrait } from './orientation';
 import { pickBot, DISGUISE_BOT } from '../../shared/quick';
 import type { RoomView } from '../../shared/net';
 import { touchAim, magnet } from '../../shared/aim';
@@ -62,7 +63,8 @@ async function boot() {
   $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт';
   const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
   // a tap on a battle button is the only moment a browser allows fullscreen and the landscape lock; phones that cannot do it just ignore this
-  const goFullscreen = () => { if (!touchDevice || document.fullscreenElement || !document.fullscreenEnabled || store.get('nofs') === '1') return; document.documentElement.requestFullscreen().then(() => (screen.orientation as any)?.lock?.('landscape')).catch(() => {}); };
+  const goFullscreen = () => { if (!touchDevice || document.fullscreenElement || !document.fullscreenEnabled || store.get('nofs') === '1') return; document.documentElement.requestFullscreen().then(lockLandscape).catch(() => {}); };
+  initOrientation(touchDevice, goFullscreen);
   const hello = () => net.send({ t: 'hello', nick: menu.nick(), token });
   const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
   menu = initMenu({
@@ -130,7 +132,7 @@ async function boot() {
   };
   const startMatch = (foe?: string, info?: { mods: [Mods, Mods]; look: [Look, Look]; rating: number; ranked: boolean }) => {
     sfx.unlock(); sfx.startMusic(); sfx.click(); ya.gameplay(true); $('double').hidden = true; if (typeof foe === 'string') { training = null; paintTrain(); }
-    online = typeof foe === 'string'; try { (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}); } catch { /* needs fullscreen on most browsers */ } pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
+    online = typeof foe === 'string'; lockLandscape(); pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
     world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity); paintNotches();
     $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
@@ -213,14 +215,20 @@ async function boot() {
       else { store.set('nofs', '0'); await document.documentElement.requestFullscreen(); await (screen.orientation as any)?.lock?.('landscape').catch(() => {}); }
     } catch { toast('Полный экран недоступен'); }
   };
-  const resize = () => world.engine.resize();
+  controls.onInterrupt = () => {
+    if (mode !== 'playing') return;
+    charging = false; battle.cancelCharge(0); battle.cancelRepair(0); battle.setMove(0, 0, 0); battle.setSprint(0, false);
+    if (online) { lastMove = { x: 0, z: 0, t: performance.now() / 1000 }; net.send({ t: 'move', x: 0, z: 0 }); net.send({ t: 'sprint', on: false }); net.send({ t: 'cancel' }); net.send({ t: 'repair', on: false }); }
+  };
+  const resize = () => world.applyQuality();
   window.addEventListener('resize', resize); window.visualViewport?.addEventListener('resize', resize); window.addEventListener('orientationchange', () => setTimeout(resize, 250));
-  const paused = () => !online && (document.hidden || userPause || (controls.touch && innerWidth < innerHeight));
+  const paused = () => !online && (document.hidden || userPause || (touchDevice && isPortrait()));
   Object.assign(window, { titans: { battle, world, net, controls, setPause, state: () => ({ quality: world.qualityStep, mode, online, room: roomView, charging, lives: battle.actors.map(a => a.lives), stones: battle.actors.map(a => a.stones), time: battle.time, ready: world.isReady() }) } });
 
   world.engine.runRenderLoop(() => {
     const rawDt = world.engine.getDeltaTime() / 1000, dt = Math.min(rawDt, .05), isPaused = paused();
-    $('portrait').hidden = !(controls.touch && innerWidth < innerHeight && mode === 'playing'); $('portrait-text').textContent = online ? 'Бой идёт, соперник не ждёт. Переверни телефон набок.' : 'Игра идёт в горизонтальном режиме. Бой на паузе.';
+    const turn = touchDevice && isPortrait(), pt = mode !== 'playing' ? 'Игра работает только в горизонтальном положении.' : online ? 'Бой идёт, соперник не ждёт. Переверни телефон набок.' : 'Бой на паузе. Переверни телефон набок.';
+    if ($('portrait').hidden === turn) $('portrait').hidden = !turn; if ($('portrait-text').textContent !== pt) $('portrait-text').textContent = pt;
     if (reconnectAt && performance.now() - reconnectAt > 15000) { reconnectAt = 0; $('reconn').hidden = true; if (online && mode === 'playing') showEnd(1, 'conn'); }
     if (controls.pauseRequested) { controls.pauseRequested = false; setPause($('pause').hidden === true); }
     const nowS = performance.now() / 1000;

@@ -4,6 +4,7 @@
 <title>Титаны</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/client/play/hud.css"><link rel="stylesheet" href="/client/play/menu.css">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#2a1f5c"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 </head><body>
 <canvas id="game"></canvas>
 <div id="hud" hidden>
@@ -185,7 +186,7 @@
 <div id="chat" aria-live="polite"></div>
 <div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><div id="end-gain" class="gain"></div><button id="double" class="ghost" hidden>🎬 Удвоить награду</button><div id="end-foe" class="gain"></div><button id="rematch" class="big" hidden>РЕВАНШ</button><div id="end-say" class="say" hidden></div><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>
 <div id="pause" class="overlay" hidden><div class="panel"><h1>ПАУЗА</h1><button id="resume" class="big">ПРОДОЛЖИТЬ</button><button id="pause-menu">Выйти в меню</button></div></div>
-<div id="portrait" class="overlay" hidden><div class="panel"><h1>Поверните телефон</h1><p id="portrait-text">Игра идёт в горизонтальном режиме. Бой на паузе.</p></div></div>
+<div id="portrait" class="overlay" hidden><div class="panel"><div class="rot" aria-hidden="true"><i></i></div><h1>Поверните телефон</h1><p id="portrait-text">Игра идёт в горизонтальном режиме. Бой на паузе.</p></div></div>
 <div id="loading" class="overlay"><div class="panel"><h1>Загрузка…</h1></div></div>
 <script>
 /* load guard: a phone that cached an old index.html points at deleted files; reload once, then say what is wrong */
