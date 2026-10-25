@@ -181,6 +181,12 @@ export function initMenu(h: MenuHooks) {
   $<HTMLInputElement>('nick').addEventListener('input', e => { store.set('nick', (e.target as HTMLInputElement).value); paintNick(); });
   const sl = $<HTMLInputElement>('sens'); sl.value = String(sens()); $('sens-val').textContent = `×${sens().toFixed(1)}`;
   sl.addEventListener('input', () => { store.set('sens', sl.value); $('sens-val').textContent = `×${sens().toFixed(1)}`; });
+  for (const k of ['sfx', 'music'] as const) {
+    const el = $<HTMLInputElement>('vol-' + k), val = $('vol-' + k + '-val'), paint = () => { val.textContent = `${el.value}%`; };
+    el.value = String(Math.round(sfx.volume[k] * 100)); paint();
+    el.addEventListener('input', () => { sfx.setVolume(k, +el.value / 100); paint(); });
+    el.addEventListener('change', () => { if (k === 'sfx' && !sfx.muted) sfx.click(); }); // a click as a sample of the new level
+  }
   paintNick(); paintSound(); paintHaptic(); setRooms([]); paintProfile();
 
   return { setProfile, setTop, setQueue, show, hide, notice, get hidden() { return root.hidden; }, open, nick, sens, setRooms, setNet, renderRoom, pwdError, get screen() { return current; }, get inRoom() { return view; }, clearRoom() { view = null; } };
