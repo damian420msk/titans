@@ -62,3 +62,9 @@ test('daily quests pay once when done, count only ranked wins as online wins, an
   const back = sanitizeProfile(JSON.parse(JSON.stringify(p)), 'x'); assert.deepEqual(back.quest, p.quest);
   assert.deepEqual(sanitizeProfile({ quest: 'junk' }, 'x').quest, freshQuest(-1));
 });
+test('mods stay finite for an old or damaged profile (missing or junk upgrade levels)', () => {
+  for (const up of [{ bag: 1, plates: 1 }, { bag: NaN, hands: 'x', legs: 99, quarry: -3 }, {}, null]) {
+    const m = modsFor({ up } as any); for (const v of Object.values(m)) assert.ok(Number.isFinite(v), JSON.stringify(up));
+  }
+  assert.equal(modsFor({ up: { legs: 99 } } as any).walk, 1 + .04 * 3, 'levels are capped');
+});

@@ -59,6 +59,20 @@ export class World {
   smoothFoe = false; foeVis = { x: 0, z: 0, ok: false };
   private aimHold = 0;
   freezeCamera = false;
+  /** Hard reset of everything a finished match can leave behind: plates mid-fall, camera pose, leftover titan posture. */
+  resetMatch() {
+    for (const side of [0, 1] as Side[]) for (const v of this.cells[side].values()) {
+      v.fall = 0; v.shown = 'intact';
+      for (const n of [v.intact, v.cracked]) { n.position.y = 0; n.rotation.x = n.rotation.z = 0; }
+      v.intact.setEnabled(true); v.cracked.setEnabled(false); v.foundation.setEnabled(true);
+    }
+    for (const m of this.shotMeshes.values()) m.dispose(); this.shotMeshes.clear();
+    for (const p of this.particles) p.mesh.dispose(); this.particles.length = 0;
+    this.aimBlend = 0; this.aimHold = 0; this.lookBlend = 0; this.lookBack = false; this.snapCamera = true;
+    for (const t of this.titans) { t.lean = 0; t.lie = 0; t.body.rotation.x = 0; t.body.position.y = 0; }
+    this.resetPoses();
+  }
+  private snapCamera = false;
   resetPoses() { this.foeVis.ok = false; for (const t of this.titans) { t.cheerTarget = false; t.cheer = t.windup = t.swing = t.flail = 0; } }
 
   private constructor(canvas: HTMLCanvasElement) {
@@ -298,8 +312,9 @@ export class World {
       target.x = lerp2(target.x, px * .3, lk); target.y = lerp2(target.y, 0, lk); target.z = lerp2(target.z, -18, lk);
       this.camera.fov = lerp2(this.camera.fov, 54 * Math.PI / 180, lk);
     }
-    this.camera.position.copyFrom(Vector3.Lerp(this.camera.position, pos, Math.min(1, dt * 10)));
-    this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, Math.min(1, dt * 10)));
+    const k = this.snapCamera ? 1 : Math.min(1, dt * 10); this.snapCamera = false;
+    this.camera.position.copyFrom(Vector3.Lerp(this.camera.position, pos, k));
+    this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, k));
   }
 
   private updateCells(b: Battle, dt: number) {

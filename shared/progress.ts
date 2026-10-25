@@ -76,8 +76,8 @@ export function sanitizeProfile(raw: any, id: string): Profile {
 
 /** Battle tuning that a profile's upgrades give. */
 export function modsFor(p: Pick<Profile, 'up'>): Mods {
-  const m = makeMods();
-  m.capacity += p.up.bag; m.cooldown *= 1 - .07 * p.up.hands; m.walk *= 1 + .04 * p.up.legs; m.refill *= 1 - .12 * p.up.quarry; m.repair *= 1 - .15 * p.up.mender;
+  const m = makeMods(), up = (k: UpgradeId) => { const v = p.up?.[k]; return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(v, UPGRADES.find(u => u.id === k)!.costs.length)) : 0; };
+  m.capacity += up('bag'); m.cooldown *= 1 - .07 * up('hands'); m.walk *= 1 + .04 * up('legs'); m.refill *= 1 - .12 * up('quarry'); m.repair *= 1 - .15 * up('mender');
   return m;
 }
 
