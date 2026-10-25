@@ -37,7 +37,8 @@ let matchesPlayed = 0, endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 const pred = new Predictor();
-let backT = 0, miniKey = '';
+let backT = 0, miniKey = '', createdPass = '';
+const inviteLink = (() => { const q = new URLSearchParams(location.search), id = q.get('join'); return id && /^[a-z0-9]{3,8}$/.test(id) ? { id, pw: (q.get('pw') ?? '').slice(0, 16) } : null; })();
 const forceHq = new URLSearchParams(location.search).has('hq');
 let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
 const srvEvents: GameEvent[] = [];
@@ -52,13 +53,15 @@ async function boot() {
   const touchDevice = matchMedia('(pointer: coarse)').matches;
   $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел ремонт · C оглянуться';
   const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
+  // a tap on a battle button is the only moment a browser allows fullscreen and the landscape lock; phones that cannot do it just ignore this
+  const goFullscreen = () => { if (!touchDevice || document.fullscreenElement || !document.fullscreenEnabled || store.get('nofs') === '1') return; document.documentElement.requestFullscreen().then(() => (screen.orientation as any)?.lock?.('landscape')).catch(() => {}); };
   const hello = () => net.send({ t: 'hello', nick: menu.nick(), token });
   const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
   menu = initMenu({
-    sfx, touch: touchDevice, onStartBot: async l => { const first = store.get('tutorial') !== '1'; level = first ? 'easy' : l; if (!first && matchesPlayed > 0) await ya.interstitial(); startMatch(); if (first) { tut.on = true; tut.step = 0; tut.t = 0; tut.throws = 0; tut.x = battle.actors[0].pos.x; tut.z = battle.actors[0].pos.z; } },
+    sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); const first = store.get('tutorial') !== '1'; level = first ? 'easy' : l; if (!first && matchesPlayed > 0) await ya.interstitial(); startMatch(); if (first) { tut.on = true; tut.step = 0; tut.t = 0; tut.throws = 0; tut.x = battle.actors[0].pos.x; tut.z = battle.actors[0].pos.z; } },
     onScreen: sc => { if (sc === 'online') { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); } },
-    onCreate: (name, pass, ranked) => { hello(); net.send({ t: 'create', name, pass, ranked }); },
-    onQuick: on => { if (on) { if (!needNet()) { quickWanted = true; return; } hello(); net.send({ t: 'quick', on: true }); } else { quickWanted = false; net.send({ t: 'quick', on: false }); } },
+    onCreate: (name, pass, ranked) => { createdPass = pass; hello(); net.send({ t: 'create', name, pass, ranked }); },
+    onQuick: on => { if (on) { goFullscreen(); if (!needNet()) { quickWanted = true; return; } hello(); net.send({ t: 'quick', on: true }); } else { quickWanted = false; net.send({ t: 'quick', on: false }); } },
     onBuy: (kind, id) => { if (needNet()) net.send({ t: 'buy', kind, id }); },
     onEquip: id => { if (needNet()) net.send({ t: 'equip', id }); },
     onClaim: () => { if (needNet()) net.send({ t: 'claim' }); },
@@ -66,12 +69,19 @@ async function boot() {
     onJoin: (id, pass) => { hello(); net.send({ t: 'join', id, pass }); },
     onReady: on => net.send({ t: 'ready', on }),
     onLeave: () => net.send({ t: 'leave' }),
+    onInvite: async id => {
+      const u = new URL(location.href); u.search = ''; u.hash = ''; u.searchParams.set('join', id); if (createdPass) u.searchParams.set('pw', createdPass);
+      const url = u.toString(), text = `Заходи в бой в «Титанах»: ${menu.nick()} ждёт тебя`;
+      try { if (navigator.share) { await navigator.share({ title: 'Титаны', text, url }); return; } } catch { /* cancelled: fall through to copy */ }
+      try { await navigator.clipboard.writeText(url); menu.notice('Ссылка скопирована, отправь её другу'); } catch { menu.notice(url); }
+    },
     onRefresh: () => { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); },
   });
-  let retries = 0, quickWanted = false;
+  let retries = 0, quickWanted = false, inviteDone = false, inviteWait = false;
   if (myProfile) menu.setProfile(myProfile);
   net.onState = st => {
     menu.setNet(st, net.slow);
+    if (st === 'on' && inviteLink && !inviteDone) { inviteDone = true; inviteWait = true; hello(); menu.notice('Заходим в комнату друга…'); net.send({ t: 'join', id: inviteLink.id, pass: inviteLink.pw }); history.replaceState(null, '', location.pathname); }
     if (st === 'on') { retries = 0; if (quickWanted) { hello(); net.send({ t: 'quick', on: true }); } }
     if (st === 'off' && online && mode === 'playing') { if (!reconnectAt) { reconnectAt = performance.now(); $('reconn').hidden = false; } window.setTimeout(() => net.connect(), 700); }
     // a sleeping free server needs up to a minute: keep knocking while the player waits in the lobby
@@ -81,10 +91,10 @@ async function boot() {
     switch (m.t) {
       case 'rooms': menu.setRooms(m.rooms); break;
       case 'room':
-        if (m.room) { menu.renderRoom(m.room); if (!menu.hidden && (menu.screen === 'online' || menu.screen === 'create')) menu.open('room'); }
+        if (m.room) { menu.renderRoom(m.room); if (!menu.hidden && (menu.screen === 'online' || menu.screen === 'create' || (inviteWait && menu.screen !== 'room'))) { inviteWait = false; menu.open('room'); } }
         else { menu.clearRoom(); if (!menu.hidden && menu.screen === 'room') menu.open('online'); }
         break;
-      case 'err': if (!$('pwd').hidden && m.code === 'wrong_pass') menu.pwdError(m.text); else menu.notice(m.text); break;
+      case 'err': inviteWait = false; if (!$('pwd').hidden && m.code === 'wrong_pass') menu.pwdError(m.text); else menu.notice(m.text); break;
       case 'profile': {
         myProfile = m.p; store.set('profile', JSON.stringify(m.p)); menu.setProfile(m.p);
         if (pendingResult) { net.send({ t: 'result', level: pendingResult.level, won: pendingResult.won }); pendingResult = null; }
@@ -173,8 +183,8 @@ async function boot() {
   fsBtn.hidden = !touchDevice && !document.fullscreenEnabled;
   fsBtn.onclick = async () => {
     try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else { await document.documentElement.requestFullscreen(); await (screen.orientation as any)?.lock?.('landscape').catch(() => {}); }
+      if (document.fullscreenElement) { store.set('nofs', '1'); await document.exitFullscreen(); }
+      else { store.set('nofs', '0'); await document.documentElement.requestFullscreen(); await (screen.orientation as any)?.lock?.('landscape').catch(() => {}); }
     } catch { toast('Полный экран недоступен'); }
   };
   const resize = () => world.engine.resize();

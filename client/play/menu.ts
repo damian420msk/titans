@@ -30,6 +30,7 @@ export type MenuHooks = {
   onJoin: (id: string, password: string) => void;
   onReady: (on: boolean) => void;
   onLeave: () => void;
+  onInvite: (roomId: string) => void;
   onRefresh: () => void;
 };
 
@@ -120,6 +121,7 @@ export function initMenu(h: MenuHooks) {
     rb.disabled = !both || v.count !== null; rb.classList.toggle('on', !!mine?.ready); rb.textContent = mine?.ready ? 'ОТМЕНА' : 'ГОТОВ';
     $('count').textContent = v.count === null ? '' : String(v.count);
   }
+  $('invite').onclick = () => { if (view) h.onInvite(view.id); };
   $('ready').onclick = () => { if (view) h.onReady(!view.seats[view.me]?.ready); };
   $('leave').onclick = () => { view = null; h.onLeave(); open('online'); };
 

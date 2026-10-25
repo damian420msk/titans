@@ -7,7 +7,7 @@ import type { Difficulty } from './bot.ts';
 
 export type RoomInfo = { id: string; name: string; host: string; players: number; locked: boolean; playing: boolean; ranked: boolean };
 export type Seat = { nick: string; ready: boolean; rating: number } | null;
-export type RoomView = { name: string; locked: boolean; ranked: boolean; seats: [Seat, Seat]; me: 0 | 1; count: number | null };
+export type RoomView = { id: string; name: string; locked: boolean; ranked: boolean; seats: [Seat, Seat]; me: 0 | 1; count: number | null };
 export type Look = Record<CosmeticKind, string>;
 export type MyProfile = Omit<Profile, 'id'> & { dailyReady: boolean };
 

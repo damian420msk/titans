@@ -211,7 +211,7 @@ export class Lobby {
   }
 
   private seatOf(room: Room, i: 0 | 1): Seat { const p = room.players[i]; return p ? { nick: p.nick, ready: room.ready[i], rating: p.profile?.rating ?? 1000 } : null; }
-  private viewOf(room: Room, seat: 0 | 1): RoomView { return { name: room.name, locked: !!room.pass, ranked: room.ranked, seats: [this.seatOf(room, 0), this.seatOf(room, 1)], me: seat, count: room.phase === 'count' ? room.count : null }; }
+  private viewOf(room: Room, seat: 0 | 1): RoomView { return { id: room.id, name: room.name, locked: !!room.pass, ranked: room.ranked, seats: [this.seatOf(room, 0), this.seatOf(room, 1)], me: seat, count: room.phase === 'count' ? room.count : null }; }
   private pushRoom(room: Room) { for (const p of room.players) if (p) p.conn.send({ t: 'room', room: this.viewOf(room, p.seat) }); }
 
   // ---- quick match ----
