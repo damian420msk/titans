@@ -358,7 +358,7 @@ input::placeholder{color:rgba(255,255,255,.6)}
 .gal{position:relative;display:flex;align-items:center;gap:4px;min-height:0}
 .strip{--cw:clamp(118px,19vw,176px);flex:1;display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:14px calc(50% - var(--cw) / 2) 8px;touch-action:pan-x;overscroll-behavior-x:contain}
 .strip::-webkit-scrollbar{display:none}
-.card{flex:0 0 var(--cw);scroll-snap-align:center;position:relative;border-radius:18px;padding:6px 6px 8px;background:linear-gradient(rgba(96,70,190,.85),rgba(58,40,130,.9));border:3px solid rgba(255,255,255,.45);box-shadow:0 5px 0 rgba(50,25,110,.5);text-align:center;cursor:pointer;transform:scale(.86);opacity:.72;transition:transform .18s,opacity .18s,border-color .18s}
+.card{flex:0 0 var(--cw);scroll-snap-align:center;scroll-snap-stop:always;position:relative;border-radius:18px;padding:6px 6px 8px;background:linear-gradient(rgba(96,70,190,.85),rgba(58,40,130,.9));border:3px solid rgba(255,255,255,.45);box-shadow:0 5px 0 rgba(50,25,110,.5);text-align:center;cursor:pointer;transform:scale(.86);opacity:.72;transition:transform .18s,opacity .18s,border-color .18s}
 .card.cur{transform:scale(1);opacity:1;border-color:#ffd25a;box-shadow:0 5px 0 rgba(50,25,110,.5),0 0 22px rgba(255,210,90,.45)}
 .card img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:12px;background:#6a54b8;pointer-events:none}
 .card b{display:block;margin-top:6px;font-size:15px}

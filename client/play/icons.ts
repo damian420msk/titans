@@ -50,6 +50,7 @@ export const ICON = {
   tools: wrap(`<g transform="rotate(-45 16 16)"><rect x="13.8" y="9" width="4.4" height="20" rx="2.2" fill="#d79a5a" ${O} stroke-width="2"/><rect x="6.5" y="3" width="19" height="8.5" rx="3" ${G} ${O} stroke-width="2.2"/></g>`),
   film: wrap(`<rect x="3" y="6.5" width="26" height="19" rx="4" ${G} ${O} stroke-width="2.4"/><path d="M13 11.5v9l8-4.5z" fill="#2c1d62"/>`),
   star: wrap(`<path d="M16 3.5l3.8 8 8.7 1.1-6.4 6 1.7 8.7L16 22.9l-7.8 4.4 1.7-8.7-6.4-6 8.7-1.1z" ${G} ${O} stroke-width="2.4"/>`),
+  coin: wrap(`<circle cx="16" cy="16" r="11.5" ${G} ${O} stroke-width="2.6"/><circle cx="16" cy="16" r="6.6" fill="none" stroke="#c98a1c" stroke-width="2.2"/>`),
 } as const;
 export type IconName = keyof typeof ICON;
 export const icon = (name: IconName) => ICON[name];

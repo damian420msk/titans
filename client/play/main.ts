@@ -15,7 +15,7 @@ import { initMenu } from './menu';
 import { Online } from './online';
 import { ya } from './yandex';
 import type { Snap, MyProfile, Look } from '../../shared/net';
-import { icon, EMOTE_ICONS, hydrateIcons } from './icons';
+import { icon, ico, EMOTE_ICONS, hydrateIcons } from './icons';
 import { titanOf, foeTitan, botTitan } from '../../shared/titans';
 import { modsFor, newProfile, sanitizeProfile, DEFAULT_EQUIP } from '../../shared/progress';
 import type { Mods } from '../../shared/battle';
@@ -192,7 +192,7 @@ async function boot() {
   const finishTraining = () => {
     const first = !menu.trainDone(); store.set('train.done', '1'); menu.setTrained();
     if (first) { if (net.state === 'on') { hello(); net.send({ t: 'trained' }); } else { pendingTrained = true; net.connect(); } }
-    $('train-done-text').textContent = first ? 'Награда за обучение: +100 🪙' : 'Ты уже проходил обучение, повторная награда не даётся';
+    $('train-done-text').innerHTML = first ? `Награда за обучение: +100 ${ico('coin')}` : 'Ты уже проходил обучение, повторная награда не даётся';
     $('train-done').hidden = false; userPause = true; controls.reset(); charging = false; battle.cancelCharge(0); battle.cancelRepair(0);
   };
   $('train-more').onclick = () => { $('train-done').hidden = true; userPause = false; };
@@ -352,7 +352,7 @@ async function boot() {
     $('end-title').textContent = winner === 0 ? 'ПОБЕДА' : winner === 1 ? 'ПОРАЖЕНИЕ' : 'НИЧЬЯ';
     $('end-text').textContent = why === 'left' ? 'Соперник вышел из боя. Победа твоя.' : why === 'conn' ? 'Связь с сервером потеряна.' : winner === 0 ? 'Враг рухнул вниз. Небесные камни твои.' : winner === 1 ? 'Тебя сбросили с острова. Попробуй ещё раз.' : 'Время вышло, силы равны.';
     $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'НА СЕРВЕР') : disguise ? 'ИСКАТЬ ЕЩЁ' : 'ЕЩЁ РАЗ';
-    $('end-gain').textContent = online ? endGain : ''; $('end-foe').textContent = ''; $('rematch').hidden = $('end-say').hidden = true; if (online && !why) setTimeout(updateRematch, 0);
+    $('end-gain').innerHTML = online ? endGain.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!)).replace('🪙', ico('coin')) : ''; $('end-foe').textContent = ''; $('rematch').hidden = $('end-say').hidden = true; if (online && !why) setTimeout(updateRematch, 0);
     if (!online && why !== 'conn') {
       if (winner === 0) menu.botWin();
       pendingResult = { level, won: winner === 0, foe: disguise ?? undefined };

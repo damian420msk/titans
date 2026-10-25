@@ -129,6 +129,7 @@ body:not(.touch) #jump{display:none}
 @media (max-height:480px){#tools button{width:38px;height:38px;padding:5px}.hearts .gi{width:18px;height:18px}.slot .gi{width:100%}#jump span{width:26px;height:26px}#repair .ri{width:28px;height:28px}#cancel .gi{width:38px;height:38px}.bubble{width:46px;height:46px;top:max(8px,env(safe-area-inset-top))}}
 
 [data-icon],.ico{display:inline-block;width:1em;height:1em;line-height:1;vertical-align:-.16em;flex:none}
+#end-gain .ico,#train-done-text .ico{width:1.35em;height:1.35em;vertical-align:-.3em}
 [data-icon] .gi,.ico .gi{width:100%;height:100%}
 .round{font-size:26px}.round [data-icon]{display:block}.tile>span{display:block;width:1em;height:1em}.mode .mi{display:block;margin:0 auto}
 #end .ghost [data-icon]{vertical-align:-.2em}
