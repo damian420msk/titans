@@ -32,10 +32,10 @@
     {
       "x": 3,
       "z": 0,
-      "role": "protected",
+      "role": "normal",
       "walkable": true,
-      "destructible": false,
-      "hp": null,
+      "destructible": true,
+      "hp": 2,
       "spawn": false
     },
     {
@@ -50,10 +50,10 @@
     {
       "x": 5,
       "z": 0,
-      "role": "protected",
+      "role": "normal",
       "walkable": true,
-      "destructible": false,
-      "hp": null,
+      "destructible": true,
+      "hp": 2,
       "spawn": false
     },
     {
@@ -122,172 +122,172 @@
     {
       "x": 4,
       "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 1,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 5,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 6,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 7,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 8,
+      "z": 2,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 0,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 1,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 2,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 3,
+      "z": 3,
+      "role": "normal",
+      "walkable": true,
+      "destructible": true,
+      "hp": 2,
+      "spawn": false
+    },
+    {
+      "x": 4,
+      "z": 3,
       "role": "arsenal",
       "walkable": false,
       "destructible": false,
       "hp": null,
-      "spawn": false
-    },
-    {
-      "x": 5,
-      "z": 1,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 6,
-      "z": 1,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 7,
-      "z": 1,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 8,
-      "z": 1,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 0,
-      "z": 2,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 1,
-      "z": 2,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 2,
-      "z": 2,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 3,
-      "z": 2,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 4,
-      "z": 2,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 5,
-      "z": 2,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 6,
-      "z": 2,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 7,
-      "z": 2,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 8,
-      "z": 2,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 0,
-      "z": 3,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 1,
-      "z": 3,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 2,
-      "z": 3,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 3,
-      "z": 3,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
-      "spawn": false
-    },
-    {
-      "x": 4,
-      "z": 3,
-      "role": "normal",
-      "walkable": true,
-      "destructible": true,
-      "hp": 2,
       "spawn": false
     },
     {

@@ -67,7 +67,7 @@ test('repair: neighbour hole needs 2.2 s and a stone; moving cancels', () => {
 });
 
 test('auto refill at the arsenal, 0.7 s per stone', () => {
-  const b = new Battle(); b.actors[0].stones = 0; place(b, 0, 4, 0);
+  const b = new Battle(); b.actors[0].stones = 0; place(b, 0, 4, 4);
   run(b, 1.5); assert.equal(b.actors[0].stones, 2);
   place(b, 1, 0, 10); b.actors[1].stones = 0; place(b, 1, 0, 10); run(b, 2); assert.equal(b.actors[1].stones, 0);
 });
@@ -207,4 +207,14 @@ test('after a respawn the titan is invulnerable for 3 s: a spawn-camping hit nei
   run(b, 3); assert.equal(b.actors[1].inv, 0); b.actors[0].cooldown = 0;
   from = b.events.length; throwAt(b, 0, { x: 4, z: 0 }, .05); landed(from);
   assert.ok(b.events.slice(from).some(e => e.type === 'hit' && e.side === 1), 'once it ends the shot hits as usual');
+});
+
+test('arsenal stands 3 cells in from the back edge; only it and the respawn cell are indestructible, the back row can be destroyed and mended', () => {
+  assert.deepEqual(rules.arena.arsenal_cell, [4, 3]); assert.deepEqual(rules.arena.protected_cells, [[4, 0]]);
+  const b = new Battle();
+  for (const k of ['3,0', '5,0', '4,1', '4,2']) assert.equal(b.floors[0].get(k), rules.arena.start_normal_cell_hp, k);
+  assert.equal(b.floors[0].get('4,3'), Infinity); assert.equal(b.floors[0].get('4,0'), Infinity);
+  throwAt(b, 1, { x: 3, z: 0 }, .05); run(b, 1.6); throwAt(b, 1, { x: 3, z: 0 }, .05); run(b, 1.6);
+  assert.equal(b.floors[0].get('3,0'), 0, 'the old guard cells are ordinary cells now');
+  assert.equal(b.floors[0].get('4,3'), Infinity);
 });

@@ -8,6 +8,7 @@ import type { RoomInfo, RoomView, MyProfile } from '../../shared/net';
 import { checkNick, checkText } from '../../shared/names';
 import { QUICK_SEARCH_S } from '../../shared/quick';
 import { DAILY_REWARDS } from '../../shared/progress';
+import { icon } from './icons';
 import { UPGRADES, COSMETICS, QUESTS, LEAGUES, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
 export type { RoomInfo, RoomView };
 export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick' | 'quests' | 'play';
@@ -231,7 +232,7 @@ export function initMenu(h: MenuHooks) {
   function paintSound() { const b = $('set-sound'); b.textContent = sfx.muted ? 'Выкл' : 'Вкл'; b.classList.toggle('on', !sfx.muted); }
   const paintHaptic = () => { const b = $('set-haptic'), on = store.get('haptic', '1') !== '0'; b.textContent = on ? 'Вкл' : 'Выкл'; b.classList.toggle('on', on); };
   $('set-haptic').onclick = () => { store.set('haptic', store.get('haptic', '1') !== '0' ? '0' : '1'); paintHaptic(); };
-  $('set-sound').onclick = () => { sfx.setMuted(!sfx.muted); paintSound(); document.getElementById('mute-btn')!.textContent = sfx.muted ? '🔇' : '🔊'; if (!sfx.muted) sfx.click(); };
+  $('set-sound').onclick = () => { sfx.setMuted(!sfx.muted); paintSound(); document.getElementById('mute-btn')!.innerHTML = icon(sfx.muted ? 'mute' : 'sound'); if (!sfx.muted) sfx.click(); };
   $<HTMLInputElement>('nick').addEventListener('input', e => {
     const el = e.target as HTMLInputElement, v = el.value.trim(), ck = v ? checkNick(v) : { ok: true as const };
     el.classList.toggle('bad', !ck.ok); $('nick-err').textContent = ck.ok ? '' : ck.text;

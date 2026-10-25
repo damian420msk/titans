@@ -92,3 +92,38 @@ body:not(.touch) #jump{display:none}
 #portrait .rot{width:64px;height:104px;margin:0 auto 18px;border:5px solid #ffe08a;border-radius:14px;position:relative;animation:turnphone 2.4s ease-in-out infinite}
 #portrait .rot i{position:absolute;left:50%;bottom:7px;width:20px;height:5px;margin-left:-10px;border-radius:3px;background:#ffe08a}
 @keyframes turnphone{0%,25%{transform:rotate(0)}60%,85%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
+
+/* repair progress in the middle of the screen: the finger on the button hides the button's own state */
+#repairhud{position:absolute;left:50%;top:max(50px,calc(env(safe-area-inset-top) + 46px));transform:translate(-50%,-6px);pointer-events:none;display:flex;align-items:center;gap:10px;padding:8px 16px 8px 14px;border-radius:18px;background:linear-gradient(#3a7d4f,#215d37);border:2px solid #eaffef;box-shadow:0 4px 0 #0f4a26,0 8px 18px rgba(20,10,50,.35);color:#f4fff7;opacity:0;transition:opacity .15s,transform .15s;z-index:4}
+#repairhud.on{opacity:1;transform:translate(-50%,0)}
+#repairhud b{font:800 15px Rubik,system-ui;letter-spacing:.04em;text-transform:uppercase;text-shadow:0 2px 0 rgba(0,0,0,.35)}
+#repairhud .rbar{width:min(150px,26vw);height:14px;border-radius:8px;background:rgba(0,0,0,.35);overflow:hidden;border:1px solid rgba(255,255,255,.4)}
+#repairhud .rbar i{display:block;height:100%;width:0;background:linear-gradient(#d9ff9a,#7fe05c)}
+#repairhud em{font:800 14px Rubik,system-ui;font-style:normal;min-width:2.6em;text-align:right}
+#repair.act{animation:repairPulse .7s ease-in-out infinite}
+@keyframes repairPulse{50%{box-shadow:0 4px 0 #0f5a2b,0 0 0 8px rgba(120,235,150,.45)}}
+@media (max-height:480px){#repairhud{top:max(44px,calc(env(safe-area-inset-top) + 40px));padding:5px 12px}#repairhud b{font-size:13px}}
+
+/* ---- HUD icons: one set, one grid, menu look (violet glass, white rim, gold glyph) ---- */
+.ic{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 1.5px 0 rgba(20,8,60,.55))}
+#tools{gap:8px}
+#tools button,#emotes button{margin:0;padding:6px;border-radius:14px;background:linear-gradient(rgba(96,70,190,.9),rgba(58,40,130,.92));border:2px solid rgba(255,255,255,.55);box-shadow:0 3px 0 rgba(40,20,100,.55);display:grid;place-items:center}
+#tools button{width:44px;height:44px}
+#tools button:active,#emotes button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(40,20,100,.55)}
+#emotes button{width:46px;height:46px;border-radius:50%;padding:5px}
+.hearts{display:flex;gap:2px;font-size:0;letter-spacing:0;line-height:0;text-shadow:none}
+.hearts .ic{width:22px;height:22px}
+.slot{background:linear-gradient(rgba(96,70,190,.75),rgba(58,40,130,.8));border:2px solid rgba(255,255,255,.5);box-shadow:0 2px 0 rgba(40,20,100,.5);padding:3px}
+.slot .ic{filter:none}.slot.e .ic{opacity:.22;filter:grayscale(1)}
+#jump,#repair,#cancel{background:linear-gradient(rgba(96,70,190,.92),rgba(58,40,130,.95));border:3px solid rgba(255,255,255,.75);box-shadow:0 4px 0 rgba(40,20,100,.6)}
+#jump span{display:block;width:30px;height:30px;font-size:0}
+#jump i{margin-top:-1px;color:#fff}
+#jump.hold{background:linear-gradient(#ffd25a,#f08a1c)}
+#repair{background:linear-gradient(#58c97f,#23944a);border-color:#eaffef;box-shadow:0 4px 0 #0f5a2b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:0}
+#repair .ri{display:block;width:34px;height:34px}#repair i{font:800 9px Rubik,system-ui;font-style:normal;letter-spacing:.06em;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4);margin-top:-2px}
+#cancel{font-size:0}#cancel .ic{width:46px;height:46px}
+#cancel.over{background:linear-gradient(#ff7b6e,#d9433b)}
+/* reactions sit on both sides of the timer, so they never cover the tool buttons */
+.bubble{left:auto;right:calc(50% + 58px);top:max(10px,env(safe-area-inset-top));width:54px;height:54px;padding:6px;font-size:0;display:grid;place-items:center;border-radius:50%;background:linear-gradient(rgba(96,70,190,.95),rgba(58,40,130,.95));border:3px solid #fff}
+.bubble.r{right:auto;left:calc(50% + 58px)}
+@media (max-height:480px){#tools button{width:38px;height:38px;padding:5px}.hearts .ic{width:18px;height:18px}.slot .ic{width:100%}#jump span{width:26px;height:26px}#repair .ri{width:28px;height:28px}#cancel .ic{width:38px;height:38px}.bubble{width:46px;height:46px;top:max(8px,env(safe-area-inset-top))}}

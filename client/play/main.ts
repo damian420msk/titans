@@ -15,6 +15,7 @@ import { initMenu } from './menu';
 import { Online } from './online';
 import { ya } from './yandex';
 import type { Snap, MyProfile, Look } from '../../shared/net';
+import { icon, EMOTE_ICONS } from './icons';
 import { titanOf, foeTitan, botTitan } from '../../shared/titans';
 import { modsFor, newProfile, sanitizeProfile, DEFAULT_EQUIP } from '../../shared/progress';
 import type { Mods } from '../../shared/battle';
@@ -51,6 +52,7 @@ let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
 const srvEvents: GameEvent[] = [];
 let pendingSnap: { s: Snap; at: number } | null = null;
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
+let repairWasHeld = false, heartsKey = '';
 let seenAimHint = (() => { try { return localStorage.getItem('titans.aimhint') === '1'; } catch { return false; } })();
 let roomView: RoomView | null = null;
 let lastSprint = 0;
@@ -137,12 +139,12 @@ async function boot() {
     world.configurePlatform(online ? (roomView?.me ?? 0) : 0);
     { const mineModel = titanOf(info ? info.look[0]?.titan : myProfile?.eq.titan); world.assignTitans(mineModel, info ? foeTitan(mineModel, titanOf(info.look[1]?.titan)) : botTitan(mineModel, mulberry32(seed * 104729 + 17))); }
     world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
-    slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity); paintNotches();
+    slots.innerHTML = `<div class="slot">${icon('stone')}</div>`.repeat(battle.mods[0].capacity); paintNotches();
     $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
     if (online) disguise = null; const shown = online ? foe! : (disguise ?? NAMES[level]); $('foe-name').textContent = shown; $('foe-face').textContent = online || disguise ? shown.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
-  const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
+  const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.innerHTML = icon(sfx.muted ? 'mute' : 'sound'); }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
   $('again').onclick = () => { if ((online && lastQuick) || (!online && disguise)) { if (online) net.send({ t: 'leave' }); online = false; disguise = null; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.quickSearch(); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else { void ya.interstitial().then(() => startMatch()); } };
   const toMenu = () => { endTraining(false); ya.gameplay(false); if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; chat.clear(); menu.show('main'); mode = 'menu'; };
   $('to-menu').onclick = toMenu;
@@ -165,8 +167,8 @@ async function boot() {
   $('loading').hidden = true;
   ya.init({ onAdStart: () => { sfx.hold(true); }, onAdEnd: () => { sfx.hold(false); } }).then(() => ya.ready());
   net.connect();
-  const EMOTES = ['👍', '😎', '😮', '😡'], bubbleT = [0, 0];
-  const showBubble = (who: 0 | 1, id: number) => { const el = $('bubble' + who); el.textContent = EMOTES[id] ?? '👍'; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; window.clearTimeout(bubbleT[who]); bubbleT[who] = window.setTimeout(() => { el.hidden = true; }, 3800); };
+  const bubbleT = [0, 0];
+  const showBubble = (who: 0 | 1, id: number) => { const el = $('bubble' + who); el.innerHTML = icon(EMOTE_ICONS[id] ?? 'smile'); el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; window.clearTimeout(bubbleT[who]); bubbleT[who] = window.setTimeout(() => { el.hidden = true; }, 3800); };
   let lastEmote = -1e9;
   const sendEmote = (id: number) => { if (!online || mode !== 'playing' || performance.now() - lastEmote < 1500) return; lastEmote = performance.now(); net.send({ t: 'emote', id }); showBubble(0, id); $('emotes').hidden = true; };
   $('emote-btn').onclick = () => { $('emotes').hidden = !$('emotes').hidden; };
@@ -203,7 +205,11 @@ async function boot() {
     if (training.complete && $('train-done').hidden && !trainDoneShown) { trainDoneShown = true; finishTraining(); }
   };
   const toast = (t: string) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); toastTimer = 1.4; };
-  const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
+  const hearts = (n: number) => icon('heart').repeat(n) + icon('heartEmpty').repeat(LIVES - n);
+  // static HUD buttons get their glyphs here (one icon set, one grid)
+  $('pause-btn').innerHTML = icon('pause'); $('fs-btn').innerHTML = icon('full'); $('emote-btn').innerHTML = icon('chat'); $('cancel').innerHTML = icon('cancel');
+  $('jump').firstElementChild!.innerHTML = icon('jump'); $('repair').firstElementChild!.innerHTML = icon('repair');
+  document.querySelectorAll<HTMLElement>('#emotes [data-e]').forEach(b => { b.innerHTML = icon(EMOTE_ICONS[+b.dataset.e!] ?? 'smile'); });
   const slots = $('slots'); 
 
   const setPause = (on: boolean) => { if (on && mode !== 'playing') return; userPause = on && !online; $('pause').hidden = !on; $('pause-menu').textContent = online ? 'Сдаться и выйти' : 'Выйти в меню'; if (on) { controls.reset(); charging = false; battle.cancelCharge(0); battle.cancelRepair(0); } };
@@ -243,7 +249,9 @@ async function boot() {
     if (mode === 'playing' && !isPaused) {
       const b = battle, me = b.actors[0];
       // while looking back the view is turned around, so the stick is turned too
-      b.setMove(0, b.canAct(0) ? controls.move.x : 0, b.canAct(0) ? controls.move.z : 0);
+      // on a touch screen the repair button is a hold: a slightly drifting thumb on the stick must not cancel it, so movement waits until it is released
+      const stand = controls.touch && controls.repairHeld;
+      b.setMove(0, b.canAct(0) && !stand ? controls.move.x : 0, b.canAct(0) && !stand ? controls.move.z : 0);
       if (online) {
         const mx = Math.round(b.input[0].x * 100) / 100, mz = Math.round(b.input[0].z * 100) / 100;
         if ((mx !== lastMove.x || mz !== lastMove.z) && nowS - lastMove.t > .04 || nowS - lastMove.t > 1) { lastMove = { x: mx, z: mz, t: nowS }; net.send({ t: 'move', x: mx, z: mz }); }
@@ -286,7 +294,11 @@ async function boot() {
         }
         controls.cancelled = false; controls.overCancel = false; $('cancel').classList.remove('over');
       }
-      if (controls.repairHeld && !b.repairs[0] && !b.charges[0]) { if (b.beginRepair(0) && online) net.send({ t: 'repair', on: true }); }
+      if (controls.repairHeld && !b.repairs[0] && !b.charges[0]) {
+        if (b.beginRepair(0)) { if (online) net.send({ t: 'repair', on: true }); }
+        else if (!repairWasHeld) toast(!b.canAct(0) || b.actors[0].air > 0 ? 'Сейчас нельзя чинить' : b.actors[0].stones < rules.inventory.repair_cost ? 'Нужен камень для ремонта' : 'Рядом нечего чинить');
+      }
+      repairWasHeld = controls.repairHeld;
       if (!controls.repairHeld && b.repairs[0]) { b.cancelRepair(0); if (online) net.send({ t: 'repair', on: false }); }
       hover = !charging && controls.aim.seen && !controls.touch ? pick() : null;
       // Online the simulation must keep real time even on a slow phone, or the server (real time) outruns the local copy and pulls it back.
@@ -317,11 +329,13 @@ async function boot() {
     world.handle(b.events); b.events.length = 0;
     // HUD
     if (mode !== 'menu') {
-      $('hearts0').innerHTML = hearts(b.actors[0].lives); $('hearts1').innerHTML = hearts(b.actors[1].lives);
+      const hk = `${b.actors[0].lives}${b.actors[1].lives}`; if (hk !== heartsKey) { heartsKey = hk; $('hearts0').innerHTML = hearts(b.actors[0].lives); $('hearts1').innerHTML = hearts(b.actors[1].lives); }
       const left = Math.max(0, Math.ceil(MATCH_SECONDS - b.time)); $('timer').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       [...slots.children].forEach((s, i) => s.classList.toggle('e', i >= b.actors[0].stones));
       const rp = b.repairs[0], can = b.canRepair(0) || !!rp; $('repair').hidden = !can && !controls.repairHeld;
-      $('repair').textContent = rp ? `${Math.round(100 * rp.t / rp.need)}%` : 'РЕМОНТ';
+      $('repair').classList.toggle('act', !!rp);
+      const rh = $('repairhud'); rh.classList.toggle('on', !!rp);
+      if (rp) { const f = Math.min(1, rp.t / rp.need); (rh.querySelector('.rbar i') as HTMLElement).style.width = `${f * 100}%`; rh.querySelector('em')!.textContent = `${Math.round(f * 100)}%`; }
       const bar = $('charge'); bar.classList.toggle('on', !!ch);
       if (ch) { const k = kindForHold(ch.t), tgt = k === 'heavy' ? 1 : k === 'spin' ? (ch.t - .9) / 1.7 : ch.t / .9; (bar.firstElementChild as HTMLElement).style.width = `${Math.min(1, ch.t / 2.6) * 100}%`; (bar.firstElementChild as HTMLElement).style.background = KIND_COLOR[k]; bar.lastElementChild!.textContent = KIND_LABEL[k]; void tgt; }
       $('cancel').hidden = !(charging && controls.touch); $('jump').style.visibility = charging ? 'hidden' : ''; $('jump').classList.toggle('cool', b.actors[0].air > 0 || b.actors[0].stamina < b.jumpCost(0));

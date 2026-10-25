@@ -7,24 +7,30 @@
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#2a1f5c"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
 </head><body>
 <canvas id="game"></canvas>
+<svg id="icon-defs" width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="ig-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff8dc"/><stop offset=".55" stop-color="#ffd978"/><stop offset="1" stop-color="#f5a73a"/></linearGradient>
+  <linearGradient id="ig-heart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8d9a"/><stop offset="1" stop-color="#e5304c"/></linearGradient>
+  <radialGradient id="ig-face" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#fff3b8"/><stop offset="1" stop-color="#f6b441"/></radialGradient>
+</defs></svg>
 <div id="hud" hidden>
   <div class="badge l"><div class="face teal">ВЫ</div><div><div class="who">ВЫ</div><div class="hearts" id="hearts0"></div></div></div>
   <div class="badge r"><div class="face coral" id="foe-face">ИИ</div><div><div class="who" id="foe-name">БОРГАР</div><div class="hearts" id="hearts1"></div></div></div>
   <div id="timer">3:00</div>
-  <div id="tools"><button id="pause-btn" aria-label="Пауза">❚❚</button><button id="mute-btn" aria-label="Звук">🔊</button><button id="fs-btn" aria-label="Полный экран">⛶</button><button id="emote-btn" aria-label="Фразы" hidden>💬</button></div>
+  <div id="tools"><button id="pause-btn" aria-label="Пауза"></button><button id="mute-btn" aria-label="Звук"></button><button id="fs-btn" aria-label="Полный экран"></button><button id="emote-btn" aria-label="Фразы" hidden></button></div>
   <div id="train" hidden><div class="th">Обучение <b id="train-n">0/7</b></div><ul id="train-list"></ul><div id="train-hint" hidden></div></div>
   <div id="train-done" class="overlay" hidden><div class="panel"><h1>Обучение пройдено!</h1><p id="train-done-text"></p><button id="train-menu" class="big">В МЕНЮ</button><button id="train-more">Ещё потренироваться</button></div></div>
   <div id="toast"></div>
-  <div id="emotes" hidden><button data-e="0">👍</button><button data-e="1">😎</button><button data-e="2">😮</button><button data-e="3">😡</button></div>
+  <div id="emotes" hidden><button data-e="0"></button><button data-e="1"></button><button data-e="2"></button><button data-e="3"></button></div>
   <div class="bubble" id="bubble0" hidden></div><div class="bubble r" id="bubble1" hidden></div>
   <div id="reconn" hidden><i></i><span>Связь потеряна, переподключаемся…</span></div>
   <div id="charge"><i></i><span></span></div>
   <div id="slots"></div>
   <div id="stick"><i></i></div>
-  <button id="repair" hidden>РЕМОНТ</button>
-  <button id="jump" aria-label="Прыжок"><span>⤒</span><i>ПРЫЖОК</i></button>
+  <button id="repair" hidden><span class="ri"></span><i>РЕМОНТ</i></button>
+  <div id="repairhud" aria-live="polite"><b>Ремонт</b><span class="rbar"><i></i></span><em></em></div>
+  <button id="jump" aria-label="Прыжок"><span></span><i>ПРЫЖОК</i></button>
   <div id="stamina"><i></i></div>
-  <div id="cancel" hidden>✕</div>
+  <div id="cancel" hidden></div>
   <div id="hint"></div>
 </div>
 <div id="menu" class="sky">
