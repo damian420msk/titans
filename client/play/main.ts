@@ -2,6 +2,7 @@ import { World } from './world';
 import { Sfx } from './audio';
 import { Controls } from './controls';
 import { PHRASES } from '../../shared/net';
+import { createChat } from './chat';
 import type { RoomView } from '../../shared/net';
 import { touchAim, magnet } from '../../shared/aim';
 import { Battle, kindForHold, cellKey, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
@@ -118,7 +119,7 @@ async function boot() {
       case 'shop': if (mode === 'over') { $('end-gain').textContent = m.text; if (m.ok && /^\+\d+ монет/.test(m.text)) offerDouble(); } else menu.notice(m.text); if (m.ok) sfx.repaired(); break;
       case 'queue': quickWanted = m.on; menu.setQueue(m.on); break;
       case 'emote': showBubble(1, m.id); break;
-      case 'say': { const t = `${roomView?.seats[roomView.me === 0 ? 1 : 0]?.nick ?? 'Соперник'}: «${PHRASES[m.id] ?? ''}»`; if (mode === 'over') $('end-foe').textContent = t; else if (!menu.hidden) menu.notice(t); break; }
+      case 'say': { const f = roomView?.seats[roomView.me === 0 ? 1 : 0]; chat.push(roomView?.me === 0 ? 1 : 0, f?.nick ?? 'Соперник', PHRASES[m.id] ?? '', false); break; }
       case 'away': if (online) toast(m.on ? 'Соперник потерял связь. Ждём…' : 'Соперник вернулся'); break;
       case 'start': quickWanted = false; if (online && mode === 'playing') { reconnectAt = 0; $('reconn').hidden = true; toast('Связь восстановлена'); break; } lastQuick = !!m.quick; startMatch(m.foe, { mods: m.mods, look: m.look, rating: m.foeRating, ranked: m.ranked }); break;
       case 'snap': if (online) { pendingSnap = { s: m.s, at: performance.now() / 1000 }; srvEvents.push(...m.ev); } break;
@@ -136,7 +137,7 @@ async function boot() {
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
   const muteBtn = $('mute-btn'); const paintMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; }; paintMute(); muteBtn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paintMute(); };
   $('again').onclick = () => { if (online && lastQuick) { online = false; net.send({ t: 'leave' }); $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show('quick'); if (needNet()) { hello(); net.send({ t: 'quick', on: true }); } else quickWanted = true; } else if (online) { online = false; $('end').hidden = true; $('hud').hidden = true; mode = 'menu'; menu.show(menu.inRoom ? 'room' : 'online'); } else { void ya.interstitial().then(() => startMatch()); } };
-  const toMenu = () => { endTraining(false); ya.gameplay(false); if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; menu.show('main'); mode = 'menu'; };
+  const toMenu = () => { endTraining(false); ya.gameplay(false); if (online) { net.send({ t: 'leave' }); online = false; } $('end').hidden = true; $('hud').hidden = true; chat.clear(); menu.show('main'); mode = 'menu'; };
   $('to-menu').onclick = toMenu;
   // rematch = "ready" in the room that is still open after the fight
   function updateRematch() {
@@ -149,15 +150,16 @@ async function boot() {
     else if (foe.ready && !mine?.ready) $('end-foe').textContent = `${foe.nick} просит реванш!`;
   }
   $('rematch').onclick = () => { const mine = roomView?.seats[roomView.me]; net.send({ t: 'ready', on: !mine?.ready }); };
+  const chat = createChat($('chat'));
   let lastSay = 0;
-  for (const el of [$('end-say'), $('room-say')]) PHRASES.forEach((text, id) => { const b = document.createElement('button'); b.textContent = text; b.onclick = () => { if (performance.now() - lastSay < 1000) return; lastSay = performance.now(); net.send({ t: 'say', id }); if (el.id === 'end-say') $('end-foe').textContent = `Ты: «${text}»`; else menu.notice(`Ты: «${text}»`); }; el.appendChild(b); });
+  for (const el of [$('end-say'), $('room-say')]) PHRASES.forEach((text, id) => { const b = document.createElement('button'); b.textContent = text; b.onclick = () => { if (performance.now() - lastSay < 800) return; lastSay = performance.now(); net.send({ t: 'say', id }); chat.push((roomView?.me ?? 0) as 0 | 1, 'Ты', text, true); }; el.appendChild(b); });
   $('double').onclick = async () => { $('double').hidden = true; if (await ya.rewarded()) net.send({ t: 'bonus' }); };
   const offerDouble = () => { if (ya.available && net.state === 'on') $('double').hidden = false; };
   $('loading').hidden = true;
   ya.init({ onAdStart: () => { sfx.hold(true); }, onAdEnd: () => { sfx.hold(false); } }).then(() => ya.ready());
   net.connect();
   const EMOTES = ['👍', '😎', '😮', '😡'], bubbleT = [0, 0];
-  const showBubble = (who: 0 | 1, id: number) => { const el = $('bubble' + who); el.textContent = EMOTES[id] ?? '👍'; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; window.clearTimeout(bubbleT[who]); bubbleT[who] = window.setTimeout(() => { el.hidden = true; }, 2200); };
+  const showBubble = (who: 0 | 1, id: number) => { const el = $('bubble' + who); el.textContent = EMOTES[id] ?? '👍'; el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; window.clearTimeout(bubbleT[who]); bubbleT[who] = window.setTimeout(() => { el.hidden = true; }, 3800); };
   let lastEmote = -1e9;
   const sendEmote = (id: number) => { if (!online || mode !== 'playing' || performance.now() - lastEmote < 1500) return; lastEmote = performance.now(); net.send({ t: 'emote', id }); showBubble(0, id); $('emotes').hidden = true; };
   $('emote-btn').onclick = () => { $('emotes').hidden = !$('emotes').hidden; };

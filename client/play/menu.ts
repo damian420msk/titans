@@ -53,7 +53,7 @@ export function initMenu(h: MenuHooks) {
     document.querySelectorAll<HTMLElement>('#menu .lockmark').forEach(x => { x.hidden = !lk; });
   };
   const trainDone = () => store.get('train.done', '0') === '1' || !!prof?.trained;
-  const paintTrain = () => { const d = trainDone(), b = $('train-btn'); b.classList.toggle('done', d); b.classList.toggle('todo', !d); $('train-state').textContent = d ? '✓ Обучение пройдено, можно повторить' : 'пройди задания и получи 100 🪙'; };
+  const paintTrain = () => { const d = trainDone(), b = $('train-btn'); b.classList.toggle('done', d); b.classList.toggle('todo', !d); $('train-state').innerHTML = d ? '✓ Обучение пройдено, можно повторить' : 'пройди задания и получи 100 <i class="coin"></i>'; };
   const LOCK_TEXT = 'Онлайн откроется после первой победы над ботом';
   function open(s: Screen) {
     current = s;
@@ -153,7 +153,7 @@ export function initMenu(h: MenuHooks) {
   };
   function renderQuests() {
     const q = prof?.quest;
-    $('quests-list').innerHTML = QUESTS.map((d, i) => { const v = Math.min(d.goal, q?.[d.key] ?? 0), done = !!q?.paid[i]; return `<div class="item quest${done ? ' eq' : ''}"><span class="ic">${done ? '✅' : '🎯'}</span><div class="tx"><b>${esc(d.text)}</b><span class="bar"><i style="width:${100 * v / d.goal}%"></i></span><em>${v} / ${d.goal}</em></div><span class="${done ? 'maxed' : 'rw'}">${done ? 'ГОТОВО' : '+' + d.reward + ' 🪙'}</span></div>`; }).join('');
+    $('quests-list').innerHTML = QUESTS.map((d, i) => { const v = Math.min(d.goal, q?.[d.key] ?? 0), done = !!q?.paid[i]; return `<div class="item quest${done ? ' eq' : ''}"><span class="ic">${done ? '✅' : ['🎮', '🏆', '🌐'][i] ?? '🎯'}</span><div class="tx"><b>${esc(d.text)}</b><span class="bar"><i style="width:${100 * v / d.goal}%"></i></span><em>${v} / ${d.goal}</em></div><span class="${done ? 'maxed' : 'rw'}">${done ? 'ГОТОВО' : '+' + d.reward + ' <i class="coin"></i>'}</span></div>`; }).join('');
   }
   function setProfile(p: MyProfile) { prof = p; paintProfile(); if (current === 'quests') renderQuests(); if (current === 'shop') renderShop(); if (current === 'rating') renderTop(); }
   function renderShop() {
@@ -164,13 +164,13 @@ export function initMenu(h: MenuHooks) {
       el.innerHTML = UPGRADES.map(u => {
         const lv = p.up[u.id], max = u.costs.length, cost = lv < max ? u.costs[lv] : null;
         const pips = Array.from({ length: max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('');
-        return `<div class="item"><span class="ic">${u.icon}</span><div class="tx"><b>${esc(u.name)}</b><em>${esc(u.desc)}</em><span class="pips">${pips}</span></div>${cost === null ? '<span class="maxed">МАКС</span>' : `<button class="buy" data-kind="up" data-buy="${u.id}" ${coins < cost ? 'disabled' : ''}>🪙 ${cost}</button>`}</div>`;
+        return `<div class="item"><span class="ic">${u.icon}</span><div class="tx"><b>${esc(u.name)}</b><em>${esc(u.desc)}</em><span class="pips">${pips}</span></div>${cost === null ? '<span class="maxed">МАКС</span>' : `<button class="buy" data-kind="up" data-buy="${u.id}" ${coins < cost ? 'disabled' : ''}><i class="coin"></i> ${cost}</button>`}</div>`;
       }).join('');
       return;
     }
     el.innerHTML = COSMETICS.filter(c => c.kind === tab).map(c => {
       const own = p.own.includes(c.id), on = p.eq[c.kind] === c.id;
-      const btn = on ? '<span class="maxed">ВЫБРАНО</span>' : own ? `<button class="buy ok" data-eq="${c.id}">Выбрать</button>` : `<button class="buy" data-kind="item" data-buy="${c.id}" ${coins < c.cost ? 'disabled' : ''}>🪙 ${c.cost}</button>`;
+      const btn = on ? '<span class="maxed">ВЫБРАНО</span>' : own ? `<button class="buy ok" data-eq="${c.id}">Выбрать</button>` : `<button class="buy" data-kind="item" data-buy="${c.id}" ${coins < c.cost ? 'disabled' : ''}><i class="coin"></i> ${c.cost}</button>`;
       return `<div class="item${on ? ' eq' : ''}"><span class="sw" style="background:${c.color ?? 'linear-gradient(135deg,#fff,#aab)'}"></span><div class="tx"><b>${esc(c.name)}</b></div>${btn}</div>`;
     }).join('');
   }

@@ -36,7 +36,7 @@
     <header class="hub-top">
       <div class="hub-id">
         <button class="chip player" data-go="settings"><span class="avatar">Я</span><span><b id="nick-label">Игрок</b><i><span id="league-label">Бронза</span> · <span id="rating-label">1000</span></i></span></button>
-        <span class="pill gold coins-pill">🪙 <b id="coins-label">0</b></span>
+        <span class="pill gold coins-pill"><i class="coin"></i> <b id="coins-label">0</b></span>
       </div>
       <div class="hub-act">
         <button class="round" data-go="rating" aria-label="Рейтинг">🏆</button>
@@ -138,7 +138,7 @@
   </section>
 
   <section class="scr" data-scr="shop" hidden>
-    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Магазин</h2><span class="pill gold">🪙 <span id="shop-coins">0</span></span></header>
+    <header class="top"><button class="back" data-go="main">‹ Назад</button><h2>Магазин</h2><span class="pill gold"><i class="coin"></i> <span id="shop-coins">0</span></span></header>
     <div class="tabs" id="shop-tabs"><button data-tab="up" class="sel">Улучшения</button><button data-tab="skin">Титан</button><button data-tab="tiles">Плиты</button><button data-tab="stone">Камни</button></div>
     <div class="glass shop" id="shop-list"></div>
   </section>
@@ -181,6 +181,7 @@
   <div id="menu-toast"></div>
   <div id="pwd" class="modal" hidden><form class="glass form"><h3 id="pwd-title">Пароль</h3><input id="pwd-in" maxlength="16" placeholder="Пароль сервера" autocomplete="off"><div class="err" id="pwd-err"></div><div class="row2"><button type="button" class="ghost" id="pwd-cancel">Отмена</button><button class="big" type="submit">ВОЙТИ</button></div></form></div>
 </div>
+<div id="chat" aria-live="polite"></div>
 <div id="end" class="overlay" hidden><div class="panel"><h1 id="end-title"></h1><p id="end-text"></p><div id="end-gain" class="gain"></div><button id="double" class="ghost" hidden>🎬 Удвоить награду</button><div id="end-foe" class="gain"></div><button id="rematch" class="big" hidden>РЕВАНШ</button><div id="end-say" class="say" hidden></div><button id="again" class="big">ЕЩЁ РАЗ</button><button id="to-menu">Меню</button></div></div>
 <div id="pause" class="overlay" hidden><div class="panel"><h1>ПАУЗА</h1><button id="resume" class="big">ПРОДОЛЖИТЬ</button><button id="pause-menu">Выйти в меню</button></div></div>
 <div id="portrait" class="overlay" hidden><div class="panel"><h1>Поверните телефон</h1><p id="portrait-text">Игра идёт в горизонтальном режиме. Бой на паузе.</p></div></div>
