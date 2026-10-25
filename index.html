@@ -39,6 +39,7 @@
         <span class="pill gold coins-pill"><i class="coin"></i> <b id="coins-label">0</b></span>
       </div>
       <div class="hub-act">
+        <button class="round" id="gift-btn" aria-label="Подарок дня">🎁<i class="dot" hidden></i></button>
         <button class="round" data-go="rating" aria-label="Рейтинг">🏆</button>
         <button class="round" data-go="settings" aria-label="Настройки">⚙</button>
       </div>
@@ -46,7 +47,6 @@
     <div class="hub-center">
       <h1 class="logo">ТИТАНЫ<small>БРОСКИ С НЕБЕСНЫХ ОСТРОВОВ</small></h1>
       <button class="big play-btn" data-go="play" id="play-btn">ИГРАТЬ</button>
-      <button id="daily" class="gift" hidden>🎁 Подарок дня: +50 монет</button>
       <nav class="hub-bottom">
         <button class="tile" data-go="shop"><span>🛒</span><b>Магазин</b></button>
         <button class="tile" id="quests-btn" data-go="quests"><span>📋</span><b>Задания</b><em id="quests-count">0/3</em></button>
@@ -179,6 +179,7 @@
   </section>
 
   <div id="menu-toast"></div>
+  <div id="gift" class="modal" hidden><div class="glass giftbox"><h3>Подарок дня</h3><p id="gift-sub"></p><div class="days" id="gift-days"></div><div class="row2"><button class="big" id="gift-claim">ЗАБРАТЬ</button><button class="ghost" id="gift-close">Закрыть</button></div></div></div>
   <div id="pwd" class="modal" hidden><form class="glass form"><h3 id="pwd-title">Пароль</h3><input id="pwd-in" maxlength="16" placeholder="Пароль сервера" autocomplete="off"><div class="err" id="pwd-err"></div><div class="row2"><button type="button" class="ghost" id="pwd-cancel">Отмена</button><button class="big" type="submit">ВОЙТИ</button></div></form></div>
 </div>
 <div id="chat" aria-live="polite"></div>

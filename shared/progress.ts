@@ -37,7 +37,7 @@ export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { skin: 'skin_classic
 
 export type Profile = {
   id: string; nick: string; rating: number; wins: number; losses: number; games: number; coins: number;
-  up: Record<UpgradeId, number>; own: string[]; eq: Record<CosmeticKind, string>; daily: number; quest: Quest; recent: Recent[];
+  up: Record<UpgradeId, number>; own: string[]; eq: Record<CosmeticKind, string>; daily: number; streak: number; quest: Quest; recent: Recent[];
   /** The training checklist was finished and its one-time reward paid. */
   trained: boolean;
 };
@@ -64,7 +64,7 @@ export function recordQuest(p: Profile, day: number, r: { won: boolean; ranked: 
 export const START_RATING = 1000;
 export const newProfile = (id: string, nick = 'Игрок'): Profile => ({
   id, nick, rating: START_RATING, wins: 0, losses: 0, games: 0, coins: 100,
-  up: { bag: 0, hands: 0, legs: 0, quarry: 0, mender: 0, lungs: 0, thrift: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1, quest: freshQuest(-1), recent: [], trained: false,
+  up: { bag: 0, hands: 0, legs: 0, quarry: 0, mender: 0, lungs: 0, thrift: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1, streak: 0, quest: freshQuest(-1), recent: [], trained: false,
 });
 
 const num = (v: unknown, d: number, lo = 0, hi = 1e9) => typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : d;
@@ -72,7 +72,7 @@ const num = (v: unknown, d: number, lo = 0, hi = 1e9) => typeof v === 'number' &
 export function sanitizeProfile(raw: any, id: string): Profile {
   const p = newProfile(id), r = raw && typeof raw === 'object' ? raw : {};
   p.nick = typeof r.nick === 'string' ? r.nick.slice(0, 14) || p.nick : p.nick;
-  p.rating = num(r.rating, p.rating, 0, 9999); p.wins = num(r.wins, 0); p.losses = num(r.losses, 0); p.games = num(r.games, 0); p.coins = num(r.coins, p.coins); p.daily = num(r.daily, -1, -1);
+  p.rating = num(r.rating, p.rating, 0, 9999); p.wins = num(r.wins, 0); p.losses = num(r.losses, 0); p.games = num(r.games, 0); p.coins = num(r.coins, p.coins); p.daily = num(r.daily, -1, -1); p.streak = num(r.streak, 0, 0, 7);
   for (const u of UPGRADES) p.up[u.id] = num(r.up?.[u.id], 0, 0, u.costs.length);
   if (num(r.up?.plates, 0) > 0) p.coins += 800; // the old 'plates' upgrade was removed (too strong): refund it
   const known = new Set(COSMETICS.map(c => c.id));
@@ -112,14 +112,22 @@ export function equip(p: Profile, id: string): Result {
 // ---- rewards and rating ----
 export const BOT_REWARD: Record<Difficulty, { win: number; loss: number }> = { easy: { win: 20, loss: 5 }, normal: { win: 35, loss: 10 }, hard: { win: 60, loss: 15 } };
 export const ONLINE_REWARD = { win: 60, loss: 20, draw: 30 };
-export const DAILY_BONUS = 50;
+/** Seven-day gift calendar: miss a day and the run starts again from day 1; after day 7 it starts again too. */
+export const DAILY_REWARDS = [50, 50, 75, 75, 100, 100, 200] as const;
+export const DAILY_BONUS = DAILY_REWARDS[0];
 /** One-time coins for finishing the training checklist. No rating and no bot-fight rewards come from training. */
 export const TRAIN_REWARD = 100;
 export function claimTrained(p: Profile): number { if (p.trained) return 0; p.trained = true; p.coins += TRAIN_REWARD; return TRAIN_REWARD; }
 /** Day number since the epoch in Moscow time; one daily bonus per day. */
 export const dayIndex = (ms: number) => Math.floor((ms + 3 * 3600e3) / 86400e3);
 
-export function claimDaily(p: Profile, day: number): number { if (p.daily >= day) return 0; p.daily = day; p.coins += DAILY_BONUS; return DAILY_BONUS; }
+/** Days of the current run already collected (0..7) as seen on `day`. */
+export function dailyStreak(p: Profile, day: number): number { return p.daily >= day - 1 && !(p.daily < day && p.streak >= 7) ? p.streak : 0; }
+export function claimDaily(p: Profile, day: number): number {
+  if (p.daily >= day) return 0;
+  const s = dailyStreak(p, day) + 1, g = DAILY_REWARDS[s - 1];
+  p.streak = s; p.daily = day; p.coins += g; return g;
+}
 /** Rating for a bot fight: Elo against a fixed bot rating, then halved (a bot is worth half a live player). A win always gives at least +1, a loss costs at least 1. */
 export const BOT_RATING: Record<Difficulty, number> = { easy: 850, normal: 1050, hard: 1250 };
 export function botRatingDelta(p: Pick<Profile, 'rating' | 'games'>, level: Difficulty, won: boolean): number {

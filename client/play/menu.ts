@@ -7,6 +7,7 @@ import type { NetState } from './online';
 import type { RoomInfo, RoomView, MyProfile } from '../../shared/net';
 import { checkNick, checkText } from '../../shared/names';
 import { QUICK_SEARCH_S } from '../../shared/quick';
+import { DAILY_REWARDS } from '../../shared/progress';
 import { UPGRADES, COSMETICS, QUESTS, LEAGUES, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
 export type { RoomInfo, RoomView };
 export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick' | 'quests' | 'play';
@@ -73,7 +74,7 @@ export function initMenu(h: MenuHooks) {
   }
   let noticeT = 0;
   function notice(t: string) { const el = $('menu-toast'); el.textContent = t; el.classList.add('on'); window.clearTimeout(noticeT); noticeT = window.setTimeout(() => el.classList.remove('on'), 2800); }
-  const show = (s: Screen = 'main') => { root.hidden = false; open(s); };
+  const show = (s: Screen = 'main') => { root.hidden = false; open(s); if (s === 'main') maybeAutoGift(); };
   const hide = () => { root.hidden = true; };
 
   // navigation
@@ -87,7 +88,9 @@ export function initMenu(h: MenuHooks) {
     if (t.id === 'quick-btn') { h.onQuick(true); quickSearch(); }
     if (t.id === 'train-btn') h.onTrain();
     if (t.id === 'quick-cancel') { qStop(); h.onQuick(false); open('online'); }
-    if (t.id === 'daily') h.onClaim();
+    if (t.id === 'gift-btn') openGift();
+    if (t.id === 'gift-claim') { (t as HTMLButtonElement).disabled = true; h.onClaim(); }
+    if (t.id === 'gift-close') $('gift').hidden = true;
     if (t.dataset.tab) { tab = t.dataset.tab as typeof tab; renderShop(); }
     if (t.dataset.buy) h.onBuy(t.dataset.kind as 'up' | 'item', t.dataset.buy);
     if (t.dataset.eq) h.onEquip(t.dataset.eq);
@@ -147,12 +150,25 @@ export function initMenu(h: MenuHooks) {
   $('leave').onclick = () => { view = null; h.onLeave(); open('online'); };
 
   // profile, shop, rating
+  // 7-day gift calendar: opens by itself once per visit when today's gift is waiting, and from the 🎁 button
+  let giftAuto = false;
+  function renderGift() {
+    const st = prof?.streak ?? 0, ready = !!prof?.dailyReady, today = ready ? st + 1 : 0;
+    $('gift-days').innerHTML = DAILY_REWARDS.map((g, i) => { const d = i + 1, cls = d <= st ? 'done' : d === today ? 'today' : d === st + 1 ? 'tom' : ''; return `<div class="day ${cls}${d === 7 ? ' big7' : ''}"><b>День ${d}</b><span class="gi">${d === 7 ? '🎁' : '<i class="coin"></i>'}</span><em>+${g}</em>${d <= st ? '<u>✓</u>' : ''}</div>`; }).join('');
+    $('gift-sub').textContent = ready ? 'Заходи каждый день: награда растёт, на 7-й день самая большая.' : 'Сегодняшний подарок уже у тебя. Следующий завтра: пропустишь день, и серия начнётся заново.';
+    const cl = $<HTMLButtonElement>('gift-claim'); cl.hidden = !ready; cl.disabled = false; cl.textContent = `ЗАБРАТЬ +${DAILY_REWARDS[Math.min(st, 6)]}`;
+    $('gift-close').textContent = ready ? 'Позже' : 'Закрыть';
+  }
+  function openGift() { renderGift(); $('gift').hidden = false; }
+  function maybeAutoGift() { if (prof?.dailyReady && !giftAuto && !root.hidden && current === 'main') { giftAuto = true; openGift(); } }
+  $('gift').addEventListener('click', e => { if (e.target === $('gift')) $('gift').hidden = true; });
   const paintProfile = () => {
     const p = prof; const r = p?.rating ?? 1000, lg = league(r);
     $('rating-label').textContent = String(r); $('league-label').textContent = lg.name; $('league-label').style.color = lg.color;
     $('coins-label').textContent = String(p?.coins ?? 0);
     paintLocks(); $('shop-coins').textContent = String(p?.coins ?? 0);
-    $('daily').hidden = !(p && p.dailyReady);
+    $('gift-btn').classList.toggle('alert', !!p?.dailyReady); $('gift-btn').querySelector('.dot')!.toggleAttribute('hidden', !p?.dailyReady);
+    if (!$('gift').hidden) renderGift(); else maybeAutoGift();
     $('quests-count').textContent = `${p ? p.quest.paid.filter(Boolean).length : 0}/${QUESTS.length}`;
     $('rate-pts').textContent = String(r); $('rate-wins').textContent = String(p?.wins ?? 0);
   };

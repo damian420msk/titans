@@ -5,7 +5,7 @@ import { Battle, cellKey, sideOther, RESPAWN_CELL, type Kind } from './battle.ts
 export type Difficulty = 'easy' | 'normal' | 'hard';
 type Profile = { think: number; aimError: number; onTarget: number; heavy: number; spin: number; dodge: number; repair: number; fireGap: number; speed: number };
 const PROFILES: Record<Difficulty, Profile> = {
-  easy:   { think: .9,  aimError: 2.6, onTarget: .30, heavy: 0,   spin: .05, dodge: .08, repair: .15, fireGap: 3.4, speed: .55 },
+  easy:   { think: 1.1, aimError: 3.4, onTarget: .18, heavy: 0,   spin: .03, dodge: .04, repair: .10, fireGap: 4.6, speed: .45 },
   normal: { think: .5,  aimError: 1.5, onTarget: .55, heavy: .08, spin: .20, dodge: .40, repair: .50, fireGap: 2.0, speed: .8 },
   hard:   { think: .3,  aimError: .7,  onTarget: .80, heavy: .20, spin: .30, dodge: .75, repair: .80, fireGap: 1.2, speed: 1 },
 };

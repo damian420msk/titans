@@ -5,7 +5,7 @@ import { Battle, type GameEvent } from '../shared/battle.ts';
 import { cellsValid } from './validate.ts';
 import { MemoryStore, type Store } from './store.ts';
 import { PHRASES, REMATCH_S, snapshot, mirrorSnap, mirrorEvents, type C2S, type S2C, type RoomInfo, type RoomView, type Seat, type ErrCode, type MyProfile } from '../shared/net.ts';
-import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, claimTrained, dayIndex, rewardBot, botRatingDelta, applyOnline, recordQuest, pushRecent, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
+import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dailyStreak, claimTrained, dayIndex, rewardBot, botRatingDelta, applyOnline, recordQuest, pushRecent, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
 
 export interface Conn { send(m: S2C): void }
 type Client = {
@@ -127,7 +127,7 @@ export class Lobby {
     if (cached !== undefined) done(cached); else this.store.load(pid).then(done, e => { console.error('profile load failed', e); done(null); });
   }
   private persist(p: Profile) { if (p.id.startsWith('guest-')) return; this.topCache = null; this.store.save(p).catch(e => console.error('profile save failed', e)); }
-  private view(p: Profile): MyProfile { const { id: _id, ...rest } = p; const day = dayIndex(this.now()); return { ...rest, quest: p.quest.day === day ? p.quest : freshQuest(day), dailyReady: p.daily < day }; }
+  private view(p: Profile): MyProfile { const { id: _id, ...rest } = p; const day = dayIndex(this.now()); return { ...rest, streak: dailyStreak(p, day), quest: p.quest.day === day ? p.quest : freshQuest(day), dailyReady: p.daily < day }; }
   private sendProfile(c: Client) { if (c.profile) c.conn.send({ t: 'profile', p: this.view(c.profile) }); }
   private shop(c: Client, ok: boolean, text: string) { c.conn.send({ t: 'shop', ok, text }); }
 

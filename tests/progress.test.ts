@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dayIndex, rewardBot, botRatingDelta, recordQuest, QUESTS, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
+import { newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dailyStreak, DAILY_REWARDS, dayIndex, rewardBot, botRatingDelta, recordQuest, QUESTS, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
 import { Battle } from '../shared/battle.ts';
 
 test('new profile: 1000 rating, starter coins, free cosmetics equipped', () => {
@@ -95,4 +95,14 @@ test('lungs and thrift upgrades change the stamina mods', () => {
   assert.equal(modsFor(p).stam, 1); assert.equal(modsFor(p).thrift, 1);
   buyUpgrade(p, 'lungs'); buyUpgrade(p, 'thrift'); buyUpgrade(p, 'thrift');
   const m = modsFor(p); assert.ok(Math.abs(m.stam - 1.15) < 1e-9); assert.ok(Math.abs(m.thrift - .8) < 1e-9);
+});
+
+test('gift calendar: seven days, a missed day or a finished week restarts the run', () => {
+  const p = newProfile('x'), d0 = 20000; const got: number[] = [];
+  for (let i = 0; i < 7; i++) { assert.equal(dailyStreak(p, d0 + i), i); got.push(claimDaily(p, d0 + i)); assert.equal(claimDaily(p, d0 + i), 0, 'once a day'); }
+  assert.deepEqual(got, [...DAILY_REWARDS]); assert.equal(dailyStreak(p, d0 + 6), 7);
+  assert.equal(dailyStreak(p, d0 + 7), 0, 'week finished: new run'); assert.equal(claimDaily(p, d0 + 7), DAILY_REWARDS[0]);
+  assert.equal(claimDaily(p, d0 + 8), DAILY_REWARDS[1]); assert.equal(claimDaily(p, d0 + 9), DAILY_REWARDS[2]);
+  assert.equal(dailyStreak(p, d0 + 11), 0, 'a skipped day resets'); assert.equal(claimDaily(p, d0 + 11), DAILY_REWARDS[0]);
+  assert.equal(sanitizeProfile({ streak: 99 }, 'x').streak, 7);
 });
