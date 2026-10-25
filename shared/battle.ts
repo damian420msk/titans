@@ -8,6 +8,8 @@ export type Actor = {
   lives: number; stones: number; cooldown: number; stun: number; slide: { dx: number; dz: number; t: number } | null;
   /** jump: seconds left in the air (0 = on the ground) and the cooldown after landing; sprint: stamina in seconds of running left, 'winded' blocks sprint until it recovers */
   air: number; jumpCd: number; stamina: number; winded: boolean; sprintWait: number; running: boolean;
+  /** seconds of invulnerability left after a respawn: shots neither knock the titan back nor stun it (the cells still take damage) */
+  inv: number;
 };
 export type Charge = { t: number; target: Cell | null };
 export type Repair = { cell: Cell; t: number; need: number };
@@ -76,7 +78,7 @@ export class Battle {
   }
 
   private newActor(side: Side, at: Cell = START_CELL): Actor {
-    return { pos: cellCentre(at, side), y: 0, vy: 0, falling: false, lives: LIVES, stones: this.mods[side].capacity, cooldown: 0, stun: 0, slide: null, air: 0, jumpCd: 0, stamina: SPRINT.stamina_s * this.mods[side].stam, winded: false, sprintWait: 0, running: false };
+    return { pos: cellCentre(at, side), y: 0, vy: 0, falling: false, lives: LIVES, stones: this.mods[side].capacity, cooldown: 0, stun: 0, slide: null, air: 0, jumpCd: 0, stamina: SPRINT.stamina_s * this.mods[side].stam, winded: false, sprintWait: 0, running: false, inv: 0 };
   }
   private resetFloors() {
     for (const side of [0, 1] as Side[]) {
@@ -166,7 +168,7 @@ export class Battle {
       if (a.y < FALL_DEPTH) this.afterFall(side);
       return;
     }
-    a.cooldown = Math.max(0, a.cooldown - dt); a.stun = Math.max(0, a.stun - dt); a.jumpCd = Math.max(0, a.jumpCd - dt);
+    a.cooldown = Math.max(0, a.cooldown - dt); a.stun = Math.max(0, a.stun - dt); a.inv = Math.max(0, a.inv - dt); a.jumpCd = Math.max(0, a.jumpCd - dt);
     const ch = this.charges[side]; if (ch) ch.t += dt;
     if (a.air > 0) {
       a.air = Math.max(0, a.air - dt); const u = 1 - a.air / JUMP.duration_s; a.y = JUMP.height_m * 4 * u * (1 - u);
@@ -211,7 +213,7 @@ export class Battle {
     const a = this.actors[side];
     a.lives--;
     if (a.lives <= 0) { a.y = FALL_DEPTH; this.finish(sideOther(side)); return; }
-    this.actors[side] = { ...this.newActor(side, RESPAWN_CELL), lives: a.lives };
+    this.actors[side] = { ...this.newActor(side, RESPAWN_CELL), lives: a.lives, inv: rules.recovery.respawn_invulnerable_s };
     this.input[side] = { x: 0, z: 0 }; this.events.push({ type: 'respawn', side });
   }
 
@@ -232,7 +234,7 @@ export class Battle {
       this.events.push({ type: 'impact', side, cell: c, kind: s.kind, hpBefore: before, hpAfter: after });
     }
     const v = this.actors[side], here = this.cellOf(side);
-    if (!v.falling && v.air > 0 && here && hitCells.has(cellKey(here)) && this.phase === 'playing') this.events.push({ type: 'dodge', side });
+    if (!v.falling && (v.air > 0 || v.inv > 0) && here && hitCells.has(cellKey(here)) && this.phase === 'playing') this.events.push({ type: 'dodge', side });
     else if (!v.falling && here && hitCells.has(cellKey(here)) && this.phase === 'playing') {
       v.stun = rules.recovery.knockdown_and_stand_s; this.charges[side] = null; this.repairs[side] = null;
       const dist = t.knockback_cells * size, dir = side === 0 ? -1 : 1;

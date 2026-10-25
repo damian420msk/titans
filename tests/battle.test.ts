@@ -193,3 +193,18 @@ test('stamina upgrades: a bigger pool and cheaper hops/sprint apply per side onl
   const s = new Battle([{ thrift: .5 }, {}]); place(s, 0, 4, 6); place(s, 1, 4, 6); for (const k of [0, 1] as const) { s.setMove(k, 0, 1); s.setSprint(k, true); } run(s, 1);
   assert.ok(Math.abs((SP.stamina_s - s.actors[0].stamina) * 2 - (SP.stamina_s - s.actors[1].stamina)) < .05, 'half the drain');
 });
+
+test('after a respawn the titan is invulnerable for 3 s: a spawn-camping hit neither stuns nor pushes it, then it is hittable again', () => {
+  const b = new Battle(); place(b, 1, 4, 6); b.floors[1].set('4,6', 0);
+  for (let i = 0; i < 600 && !b.events.some(e => e.type === 'respawn'); i++) b.step(1 / 60);
+  assert.equal(b.actors[1].lives, LIVES - 1); assert.deepEqual(b.cellOf(1), { x: 4, z: 0 });
+  assert.equal(b.actors[1].inv, rules.recovery.respawn_invulnerable_s);
+  const landed = (from: number) => { for (let i = 0; i < 600 && !b.events.slice(from).some(e => e.type === 'impact'); i++) b.step(1 / 60); run(b, .05); };
+  let from = b.events.length; throwAt(b, 0, { x: 4, z: 0 }, .05); landed(from);
+  assert.ok(b.actors[1].inv > 0, 'still protected when the shot lands');
+  assert.equal(b.actors[1].stun, 0); assert.equal(b.actors[1].slide, null); assert.equal(b.actors[1].falling, false);
+  assert.ok(b.events.slice(from).some(e => e.type === 'dodge' && e.side === 1) && !b.events.slice(from).some(e => e.type === 'hit'), 'the shot is shown as dodged');
+  run(b, 3); assert.equal(b.actors[1].inv, 0); b.actors[0].cooldown = 0;
+  from = b.events.length; throwAt(b, 0, { x: 4, z: 0 }, .05); landed(from);
+  assert.ok(b.events.slice(from).some(e => e.type === 'hit' && e.side === 1), 'once it ends the shot hits as usual');
+});

@@ -134,7 +134,8 @@
     "knockdown_and_stand_s": 0.55,
     "post_recovery_stability_s": 0.5,
     "retrigger_extends_knockdown": false,
-    "floor_damage_during_stability": true
+    "floor_damage_during_stability": true,
+    "respawn_invulnerable_s": 3.0
   },
   "interaction": {
     "arsenal_range_m": 3.4,

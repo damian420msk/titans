@@ -62,7 +62,7 @@ export type S2C =
   | { t: 'pong'; n: number };
 
 type V2 = [number, number];
-export type ActorSnap = { x: number; z: number; y: number; vy: number; f: 0 | 1; l: number; s: number; c: number; st: number; sl: [number, number, number] | null; ja: number; jc: number; sm: number; wd: 0 | 1; rn: 0 | 1; sr: 0 | 1 };
+export type ActorSnap = { x: number; z: number; y: number; vy: number; f: 0 | 1; l: number; s: number; c: number; st: number; sl: [number, number, number] | null; ja: number; jc: number; sm: number; wd: 0 | 1; rn: 0 | 1; sr: 0 | 1; iv: number };
 export type Snap = {
   tm: number; over: 0 | 1; w: Side | null;
   a: [ActorSnap, ActorSnap];
@@ -79,7 +79,7 @@ const HP_INF = 99;
 const other = (s: Side): Side => s === 0 ? 1 : 0;
 
 export function snapshot(b: Battle): Snap {
-  const act = (i: Side): ActorSnap => { const a = b.actors[i]; return { x: r3(a.pos.x), z: r3(a.pos.z), y: r3(a.y), vy: r3(a.vy), f: a.falling ? 1 : 0, l: a.lives, s: a.stones, c: r3(a.cooldown), st: r3(a.stun), sl: a.slide ? [r3(a.slide.dx), r3(a.slide.dz), r3(a.slide.t)] : null, ja: r3(a.air), jc: r3(a.jumpCd), sm: r3(a.stamina), wd: a.winded ? 1 : 0, rn: a.running ? 1 : 0, sr: b.sprint[i] ? 1 : 0 }; };
+  const act = (i: Side): ActorSnap => { const a = b.actors[i]; return { x: r3(a.pos.x), z: r3(a.pos.z), y: r3(a.y), vy: r3(a.vy), f: a.falling ? 1 : 0, l: a.lives, s: a.stones, c: r3(a.cooldown), st: r3(a.stun), sl: a.slide ? [r3(a.slide.dx), r3(a.slide.dz), r3(a.slide.t)] : null, ja: r3(a.air), jc: r3(a.jumpCd), sm: r3(a.stamina), wd: a.winded ? 1 : 0, rn: a.running ? 1 : 0, sr: b.sprint[i] ? 1 : 0, iv: r3(a.inv) }; };
   const floor = (i: Side) => map.cells.map(c => { const v = b.floors[i].get(cellKey(c)) ?? 0; return Number.isFinite(v) ? v : HP_INF; });
   const ch = (i: Side): Snap['ch'][0] => { const c = b.charges[i]; return c ? [r3(c.t), c.target ? c.target.x : -1, c.target ? c.target.z : -1] : null; };
   const rp = (i: Side): Snap['rp'][0] => { const r = b.repairs[i]; return r ? [r.cell.x, r.cell.z, r3(r.t), r.need] : null; };
@@ -97,7 +97,7 @@ export function applySnap(b: Battle, s: Snap) {
   b.time = s.tm; b.phase = s.over ? 'over' : 'playing'; b.winner = s.w;
   for (const i of [0, 1] as Side[]) {
     const a = s.a[i];
-    b.actors[i] = { pos: { x: a.x, z: a.z }, y: a.y, vy: a.vy, falling: a.f === 1, lives: a.l, stones: a.s, cooldown: a.c, stun: a.st, slide: a.sl ? { dx: a.sl[0], dz: a.sl[1], t: a.sl[2] } : null, air: a.ja, jumpCd: a.jc, stamina: a.sm, winded: a.wd === 1, sprintWait: 0, running: a.rn === 1 };
+    b.actors[i] = { pos: { x: a.x, z: a.z }, y: a.y, vy: a.vy, falling: a.f === 1, lives: a.l, stones: a.s, cooldown: a.c, stun: a.st, slide: a.sl ? { dx: a.sl[0], dz: a.sl[1], t: a.sl[2] } : null, air: a.ja, jumpCd: a.jc, stamina: a.sm, winded: a.wd === 1, sprintWait: 0, running: a.rn === 1, inv: a.iv ?? 0 };
     b.sprint[i] = a.sr === 1;
     map.cells.forEach((c, k) => { const v = s.fl[i][k]; b.floors[i].set(cellKey(c), v >= HP_INF ? Infinity : v); });
     b.input[i] = { x: s.in[i][0], z: s.in[i][1] };

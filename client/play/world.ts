@@ -378,6 +378,8 @@ export class World {
       const rate = charging ? .6 : a.running ? 1.5 : 1, free = !a.falling && a.stun <= 0 && a.air <= 0;
       t.rig.update(dt, moving, rate, charging, free); t.moving = moving;
       this.poseTitan(t, side, a, dt); t.ring.setEnabled(!a.falling);
+      // invulnerable after a respawn: the titan blinks (it is visibly safe, and a hit that lands on it is shown as a dodge)
+      t.body.setEnabled(!(a.inv > 0) || Math.floor(performance.now() / 90) % 3 !== 0);
       const ch = b.charges[side];
       t.stone.setEnabled(!!ch && !a.falling && t.rig.layer > .35);
       if (ch) {
