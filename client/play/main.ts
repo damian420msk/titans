@@ -334,7 +334,7 @@ async function boot() {
       const left = Math.max(0, Math.ceil(MATCH_SECONDS - b.time)); $('timer').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       [...slots.children].forEach((s, i) => s.classList.toggle('e', i >= b.actors[0].stones));
       const rp = b.repairs[0], can = b.canRepair(0) || !!rp; $('repair').hidden = !can && !controls.repairHeld;
-      $('repair').classList.toggle('act', !!rp);
+      $('repair').classList.toggle('busy', !!rp);
       const rh = $('repairhud'); rh.classList.toggle('on', !!rp);
       if (rp) { const f = Math.min(1, rp.t / rp.need); (rh.querySelector('.rbar i') as HTMLElement).style.width = `${f * 100}%`; rh.querySelector('em')!.textContent = `${Math.round(f * 100)}%`; }
       const bar = $('charge'); bar.classList.toggle('on', !!ch);

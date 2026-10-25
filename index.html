@@ -8,9 +8,8 @@
 </head><body>
 <canvas id="game"></canvas>
 <svg id="icon-defs" width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-  <linearGradient id="ig-gold" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="32"><stop offset="0" stop-color="#fff8dc"/><stop offset=".55" stop-color="#ffd978"/><stop offset="1" stop-color="#f5a73a"/></linearGradient>
-  <linearGradient id="ig-heart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8d9a"/><stop offset="1" stop-color="#e5304c"/></linearGradient>
-  <radialGradient id="ig-face" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#fff3b8"/><stop offset="1" stop-color="#f6b441"/></radialGradient>
+  <linearGradient id="ig-pearl" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="32"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#e6dcff"/><stop offset="1" stop-color="#b9a6f0"/></linearGradient>
+  <radialGradient id="ig-coin" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#fff5b8"/><stop offset=".5" stop-color="#ffd24d"/><stop offset="1" stop-color="#f0a21f"/></radialGradient>
 </defs></svg>
 <div id="hud" hidden>
   <div class="badge l"><div class="face teal">ВЫ</div><div><div class="who">ВЫ</div><div class="hearts" id="hearts0"></div></div></div>
@@ -55,7 +54,7 @@
       <h1 class="logo">ТИТАНЫ<small>БРОСКИ С НЕБЕСНЫХ ОСТРОВОВ</small></h1>
       <button class="big play-btn" data-go="play" id="play-btn">ИГРАТЬ</button>
       <nav class="hub-bottom">
-        <button class="tile" data-go="shop"><span data-icon="cart"></span><b>Магазин</b></button>
+        <button class="tile" data-go="shop"><span data-icon="money"></span><b>Магазин</b></button>
         <button class="tile" id="quests-btn" data-go="quests"><span data-icon="tasks"></span><b>Задания</b><em id="quests-count">0/3</em></button>
         <button class="tile soon" data-soon="Моя база появится в одном из следующих обновлений"><span data-icon="castle"></span><b>Моя база</b><em>скоро</em></button>
         <button class="tile soon" data-soon="Кампания появится в одном из следующих обновлений"><span data-icon="map"></span><b>Кампания</b><em>скоро</em></button>

@@ -100,12 +100,14 @@ body:not(.touch) #jump{display:none}
 #repairhud .rbar{width:min(150px,26vw);height:14px;border-radius:8px;background:rgba(0,0,0,.35);overflow:hidden;border:1px solid rgba(255,255,255,.4)}
 #repairhud .rbar i{display:block;height:100%;width:0;background:linear-gradient(#d9ff9a,#7fe05c)}
 #repairhud em{font:800 14px Rubik,system-ui;font-style:normal;min-width:2.6em;text-align:right}
-#repair.act{animation:repairPulse .7s ease-in-out infinite}
+#repair.busy{animation:repairPulse .7s ease-in-out infinite}
 @keyframes repairPulse{50%{box-shadow:0 4px 0 #0f5a2b,0 0 0 8px rgba(120,235,150,.45)}}
 @media (max-height:480px){#repairhud{top:max(44px,calc(env(safe-area-inset-top) + 40px));padding:5px 12px}#repairhud b{font-size:13px}}
 
 /* ---- HUD icons: one set, one grid, menu look (violet glass, white rim, gold glyph) ---- */
-.gi{display:block;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 1.5px 0 rgba(20,8,60,.55))}
+.gi{display:block;width:100%;height:100%;overflow:visible;object-fit:contain;filter:drop-shadow(0 1.5px 0 rgba(20,8,60,.5))}
+img.gi{pointer-events:none;-webkit-user-drag:none;user-select:none}
+.gi.off{filter:grayscale(1) brightness(.55) opacity(.7)}
 #tools{gap:8px}
 #tools button,#emotes button{margin:0;padding:6px;border-radius:14px;background:linear-gradient(rgba(96,70,190,.9),rgba(58,40,130,.92));border:2px solid rgba(255,255,255,.55);box-shadow:0 3px 0 rgba(40,20,100,.55);display:grid;place-items:center}
 #tools button{width:44px;height:44px}
