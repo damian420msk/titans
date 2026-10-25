@@ -49,6 +49,8 @@ export class Controls {
     this.repairEl.addEventListener('pointerdown', e => { e.preventDefault(); this.touch = e.pointerType !== 'mouse'; this.repairId = e.pointerId; this.repairHeld = true; this.repairEl.classList.add('hold'); this.repairEl.setPointerCapture(e.pointerId); });
   }
 
+  /** Camera swing input on PC: Z left, X right (-1..1). */
+  get yawInput() { return (this.keys.has('KeyX') ? 1 : 0) - (this.keys.has('KeyZ') ? 1 : 0); }
   clearLook() { this.lookHeld = false; this.lookToggle = false; document.getElementById('look')?.classList.remove('hold'); }
   reset() {
     if (this.held) this.cancelHold();
@@ -120,7 +122,7 @@ export class Controls {
     if (e.repeat && (code === 'Escape' || code === 'KeyQ')) return;
     if (code === 'Space') { e.preventDefault(); if (down && !e.repeat) this.jumpPressed = true; this.touch = false; return; }
     if (code === 'ShiftLeft' || code === 'ShiftRight') { this.keySprint = down; this.sprintHeld = this.keySprint || this.stickFast; this.touch = false; return; }
-    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE'].includes(code)) { e.preventDefault(); if (down) this.keys.add(code); else this.keys.delete(code); this.touch = false; this.updateMove(); }
+    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyE', 'KeyZ', 'KeyX'].includes(code)) { e.preventDefault(); if (down) this.keys.add(code); else this.keys.delete(code); this.touch = false; this.updateMove(); }
     if (code === 'KeyE') this.repairHeld = down;
     if (code === 'KeyC') { this.lookToggle = false; this.lookHeld = down; }
     if (down && (code === 'Escape' || code === 'KeyQ')) { if (this.held) this.cancelHold(); else if (code === 'Escape') this.pauseRequested = true; }

@@ -62,13 +62,11 @@ button.big{display:block;margin:12px auto 4px;padding:14px 46px;font-size:24px;f
 
 .gain{white-space:pre-line}
 
-/* own-island overview: button and mini map */
+/* own-island overview button */
 #look{position:absolute;pointer-events:auto;right:max(14px,calc(env(safe-area-inset-right) + 8px));bottom:max(220px,calc(env(safe-area-inset-bottom) + 210px));width:64px;height:64px;border-radius:50%;background:rgba(32,30,58,.78);border:3px solid rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;gap:0;touch-action:none;box-shadow:0 4px 0 rgba(0,0,0,.28)}
 #look span{font-size:22px;line-height:1}#look i{font:800 9px Rubik,system-ui;font-style:normal;letter-spacing:.06em}
 #look.hold{background:linear-gradient(#5db6ff,#2f74e0);border-color:#fff}
 body:not(.touch) #look{display:none}
-#mini{position:absolute;display:block;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));width:60px;height:73px;border-radius:10px;background:rgba(20,16,50,.45);border:2px solid rgba(255,255,255,.35);pointer-events:none;opacity:.92}
-@media (min-width:900px) and (min-height:600px){#mini{width:90px;height:110px}}
 @media (max-height:480px){#look{width:54px;height:54px;bottom:max(196px,calc(env(safe-area-inset-bottom) + 186px))}#look span{font-size:19px}}
 
 #stick.fast{border-color:#ffd25a;box-shadow:0 0 16px #ffd25a}

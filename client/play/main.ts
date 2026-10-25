@@ -40,7 +40,7 @@ let matchesPlayed = 0, endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
 const pred = new Predictor();
-let backT = 0, miniKey = '', createdPass = '';
+let backT = 0, createdPass = '';
 const inviteLink = (() => { const q = new URLSearchParams(location.search), id = q.get('join'); return id && /^[a-z0-9]{3,8}$/.test(id) ? { id, pw: (q.get('pw') ?? '').slice(0, 16) } : null; })();
 const forceHq = new URLSearchParams(location.search).has('hq');
 let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
@@ -57,7 +57,7 @@ const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
-  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт · C оглянуться';
+  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт · C оглянуться · Z/X повернуть камеру';
   const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
   // a tap on a battle button is the only moment a browser allows fullscreen and the landscape lock; phones that cannot do it just ignore this
   const goFullscreen = () => { if (!touchDevice || document.fullscreenElement || !document.fullscreenEnabled || store.get('nofs') === '1') return; document.documentElement.requestFullscreen().then(() => (screen.orientation as any)?.lock?.('landscape')).catch(() => {}); };
@@ -123,7 +123,7 @@ async function boot() {
     online = typeof foe === 'string'; try { (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}); } catch { /* needs fullscreen on most browsers */ } pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
     world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = '<div class="slot"><b></b></div>'.repeat(battle.mods[0].capacity);
-    miniKey = ''; $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
+    $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
     $('foe-name').textContent = online ? foe! : NAMES[level]; $('foe-face').textContent = online ? foe!.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
@@ -177,23 +177,6 @@ async function boot() {
     else if (tut.step === 4 && (tut.jumped || tut.t > 10)) next();
     if (tut.t > 45 && tut.step < 2) next(); // a stuck player still sees the later tips
   };
-  // mini map of the own island: plate state, the titan and the cells an incoming shot is about to hit
-  const mini = $<HTMLCanvasElement>('mini'), mctx = mini.getContext('2d')!, MW = rules.arena.width_cells, MD = rules.arena.depth_cells;
-  const drawMini = (b: Battle) => {
-    if (mode === 'menu') return;
-    const me = b.cellOf(0), danger = new Set<string>(); for (const s of b.shots) if (s.owner === 1) for (const c of s.cells) danger.add(`${c.x},${c.z}`);
-    let key = `${me?.x},${me?.z}|` + [...danger].join(';') + '|'; for (const v of b.floors[0].values()) key += v === Infinity ? 'i' : v;
-    if (key === miniKey) return; miniKey = key;
-    const w = mini.width / MW, h = mini.height / MD; mctx.clearRect(0, 0, mini.width, mini.height);
-    for (let x = 0; x < MW; x++) for (let z = 0; z < MD; z++) {
-      const hp = b.floors[0].get(`${x},${z}`); if (hp === undefined) continue;
-      const px = x * w, py = (MD - 1 - z) * h; // the own island is seen from behind: x grows to the right, z grows upward
-      mctx.fillStyle = hp === Infinity ? 'rgba(130,150,200,.85)' : hp >= 2 ? 'rgba(255,236,190,.9)' : hp === 1 ? '#ff9a3c' : 'rgba(0,0,0,.55)';
-      mctx.fillRect(px + 1, py + 1, w - 2, h - 2);
-      if (danger.has(`${x},${z}`)) { mctx.strokeStyle = '#ff3b3b'; mctx.lineWidth = 2; mctx.strokeRect(px + 1.5, py + 1.5, w - 3, h - 3); }
-    }
-    if (me) { mctx.fillStyle = '#19d3c5'; mctx.strokeStyle = '#fff'; mctx.lineWidth = 2; mctx.beginPath(); mctx.arc(me.x * w + w / 2, (MD - 1 - me.z) * h + h / 2, Math.min(w, h) * .38, 0, 7); mctx.fill(); mctx.stroke(); }
-  };
   const toast = (t: string) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); toastTimer = 1.4; };
   const hearts = (n: number) => '♥'.repeat(n) + `<i>${'♥'.repeat(LIVES - n)}</i>`;
   const slots = $('slots'); 
@@ -230,7 +213,11 @@ async function boot() {
       const b = battle, me = b.actors[0];
       // while looking back the view is turned around, so the stick is turned too
       const flip = controls.lookHeld ? -1 : 1;
-      b.setMove(0, b.canAct(0) ? controls.move.x * flip : 0, b.canAct(0) ? controls.move.z * flip : 0);
+      // PC camera swing (Z/X): hold to turn, it drifts back to the default view; the stick is turned with the view
+      const yi = controls.yawInput;
+      world.yawGoal = Math.max(-.7, Math.min(.7, yi ? world.yawGoal + yi * dt * 1.3 : world.yawGoal * Math.exp(-dt / 2.5)));
+      const yc = Math.cos(world.yaw), ys = Math.sin(world.yaw), mx0 = controls.move.x * flip, mz0 = controls.move.z * flip;
+      b.setMove(0, b.canAct(0) ? mx0 * yc - mz0 * ys : 0, b.canAct(0) ? mx0 * ys + mz0 * yc : 0);
       if (online) {
         const mx = Math.round(b.input[0].x * 100) / 100, mz = Math.round(b.input[0].z * 100) / 100;
         if ((mx !== lastMove.x || mz !== lastMove.z) && nowS - lastMove.t > .04 || nowS - lastMove.t > 1) { lastMove = { x: mx, z: mz, t: nowS }; net.send({ t: 'move', x: mx, z: mz }); }
@@ -294,7 +281,6 @@ async function boot() {
     backT = controls.move.z < -.4 && mode === 'playing' ? Math.min(1, backT + dt) : Math.max(0, backT - dt * 2);
     world.autoLook = backT > .35 ? .55 : 0;
     world.lookBack = mode === 'playing' && controls.lookHeld && !charging;
-    drawMini(b);
     world.update(b, isPaused ? 0 : dt, { aiming: charging, kind, aimCell: ch ? ch.target : hover, cancel: controls.cancelled || controls.overCancel });
     tutorialTick(isPaused ? 0 : dt, b.events);
     for (const e of b.events) {

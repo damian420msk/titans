@@ -49,6 +49,7 @@ export class World {
   private mats: Record<string, StandardMaterial> = {};
   private stoneTemplate!: Mesh;
   private tileMats: [Material[], Material[]] = [[], []];
+  private baseAlbedo = new Map<Material, Color3>();
   private trailTemplate!: Mesh;
   private time = 0;
   /** 0 = walking camera, 1 = aiming camera (both titan and enemy island in view). */
@@ -62,6 +63,14 @@ export class World {
   private aimHold = 0;
   /** Titan position when the throw began: the camera stops following while aiming, so a cell under a still pointer stays under it. */
   private aimAt: { x: number; z: number } | null = null;
+  /** Camera follow point (smoothed titan position): a knock-back slide or a snapshot correction must not yank the view. */
+  private follow = { x: 0, z: -15.6, tau: .09 };
+  /** Smoothed enemy x for the framing assist. */
+  private foeX = 0;
+  /** Manual camera swing around the view target (radians, set by the game; PC only) and the smoothed value in use. */
+  yawGoal = 0; yaw = 0;
+  /** Framing assist: the camera leans toward the enemy titan so it stays near the middle of the view. */
+  assist = true;
   freezeCamera = false;
   /** Hard reset of everything a finished match can leave behind: plates mid-fall, camera pose, leftover titan posture. */
   resetMatch() {
@@ -212,7 +221,14 @@ export class World {
   /** Cosmetics: tint the titan, the island plates and the plain stones of one side. A null colour restores the original look. */
   setLook(side: Side, look: Record<CosmeticKind, string>) {
     const color = (kind: CosmeticKind) => COSMETICS.find(c => c.id === look[kind])?.color ?? null;
-    const tint = (list: Material[], hex: string | null) => { for (const m of list) { const pbr = m as Material & { albedoColor?: Color3 }; if (pbr.albedoColor) pbr.albedoColor = hex ? Color3.FromHexString(hex).toLinearSpace() : new Color3(1, 1, 1); } };
+    // a tint multiplies the colour the model came with (plate edges and cracks are not white); no tint restores exactly that colour
+    const tint = (list: Material[], hex: string | null) => {
+      for (const m of list) {
+        const pbr = m as Material & { albedoColor?: Color3 }; if (!pbr.albedoColor) continue;
+        const base = this.baseAlbedo.get(m) ?? (this.baseAlbedo.set(m, pbr.albedoColor.clone()), pbr.albedoColor.clone());
+        pbr.albedoColor = hex ? base.multiply(Color3.FromHexString(hex).toLinearSpace()) : base.clone();
+      }
+    };
     tint(this.titans[side].mats, color('skin')); tint(this.tileMats[side], color('tiles'));
     const sm = this.mats['stone_normal' + side], hex = color('stone') ?? STONE_COLOR.normal;
     sm.diffuseColor = Color3.FromHexString(hex).toLinearSpace(); sm.emissiveColor = Color3.FromHexString(hex).scale(.12);
@@ -305,13 +321,22 @@ export class World {
   private updateCamera(b: Battle, dt: number, aiming: boolean) {
     if (this.freezeCamera) return;
     // pull out while holding a throw, return smoothly after a short delay
+    const a0 = b.actors[0];
     if (aiming) { this.aimHold = .3; this.aimBlend = Math.min(1, this.aimBlend + dt / .25); }
-    else if ((this.aimHold -= dt) <= 0) this.aimBlend = Math.max(0, this.aimBlend - dt / .4);
+    else {
+      if (a0.stun > 0 || a0.slide) this.aimHold = Math.max(this.aimHold, .3); // knocked out of a throw: stay pulled out until back on the feet
+      if ((this.aimHold -= dt) <= 0) this.aimBlend = Math.max(0, this.aimBlend - dt / .7);
+    }
+    // follow point: tight while walking, lazy while sliding or lying (the hit knocks the titan, not the camera)
+    const f0 = this.follow, jump = Math.hypot(a0.pos.x - f0.x, a0.pos.z - f0.z);
+    f0.tau += ((a0.stun > 0 || a0.slide ? .6 : .09) - f0.tau) * Math.min(1, dt * 10);
+    if (this.snapCamera || jump > 9 || a0.falling) { f0.x = a0.pos.x; f0.z = a0.pos.z; } else { const kf = 1 - Math.exp(-dt / f0.tau); f0.x += (a0.pos.x - f0.x) * kf; f0.z += (a0.pos.z - f0.z) * kf; }
+    this.foeX += (b.actors[1].pos.x - this.foeX) * (1 - Math.exp(-dt / .5)); this.yaw += (this.yawGoal - this.yaw) * (1 - Math.exp(-dt / .12));
     const lookGoal = this.lookBack ? 1 : this.autoLook;
     this.lookBlend += Math.max(-dt / .35, Math.min(dt / .22, lookGoal - this.lookBlend));
     const e = this.aimBlend * this.aimBlend * (3 - 2 * this.aimBlend), me = b.actors[0].pos, lk = this.lookBlend * this.lookBlend * (3 - 2 * this.lookBlend);
     if (aiming && !this.aimAt) this.aimAt = { x: me.x, z: me.z }; else if (!aiming && this.aimHold <= 0) this.aimAt = null;
-    const fx = this.aimAt ? this.aimAt.x : me.x, fz = this.aimAt ? this.aimAt.z : me.z;
+    const fx = this.aimAt ? this.aimAt.x : f0.x, fz = this.aimAt ? this.aimAt.z : f0.z;
     const px = fx, pz = Math.max(fz, -33), lerp = (a: number, c: number) => a + (c - a) * e, lerp2 = (a: number, c: number, t: number) => a + (c - a) * t;
     const portrait = this.engine.getRenderWidth() < this.engine.getRenderHeight();
     // f: 0 at the own rear edge (arsenal), 1 at the front edge. Near the rear the camera looks further ahead so the enemy island stays readable;
@@ -323,12 +348,19 @@ export class World {
     const back = lerp2(17, 13, ease), height = lerp2(10.5, 10, ease), ahead = lerp2(-5, pz + 12, ease);
     const pos = new Vector3(lerp(px * .75, px * .4), lerp(height, 19), lerp(pz - back, pz - 21));
     const target = new Vector3(lerp(px * .5, 0), lerp(.5, 0), lerp(ahead, 14));
+    if (this.assist) { // lean toward the enemy titan (more while aiming), without letting a dodge swing the view
+      const lean = (.2 + .25 * e) * (1 - lk); target.x += (this.foeX - target.x) * lean; pos.x += (this.foeX - pos.x) * lean * .25;
+    }
     if (lk > 0) { // look back: high, in front of the titan, looking down at the own island
       pos.x = lerp2(pos.x, px * .3, lk); pos.y = lerp2(pos.y, 23, lk); pos.z = lerp2(pos.z, Math.min(pz + 13, 7), lk);
       target.x = lerp2(target.x, px * .3, lk); target.y = lerp2(target.y, 0, lk); target.z = lerp2(target.z, -18, lk);
       this.camera.fov = lerp2(this.camera.fov, 54 * Math.PI / 180, lk);
     }
-    const k = this.snapCamera ? 1 : Math.min(1, dt * 10); this.snapCamera = false;
+    if (Math.abs(this.yaw) > 1e-3) { // manual swing around the view target
+      const c = Math.cos(this.yaw), s = Math.sin(this.yaw), ox = pos.x - target.x, oz = pos.z - target.z;
+      pos.x = target.x + ox * c - oz * s; pos.z = target.z + ox * s + oz * c;
+    }
+    const k = this.snapCamera ? 1 : Math.min(1, dt * 8); this.snapCamera = false;
     this.camera.position.copyFrom(Vector3.Lerp(this.camera.position, pos, k));
     this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, k));
   }
