@@ -144,7 +144,7 @@
         <div class="setrow col"><span><b>Музыка</b><i>мелодия боя</i></span><div class="slide"><input id="vol-music" type="range" min="0" max="100" step="5" value="100"><em id="vol-music-val">100%</em></div></div>
         <div class="setrow touch-only"><span><b>Вибрация</b><i>отдача при бросках и ударах</i></span><button id="set-haptic" class="toggle"></button></div>
         <div class="setrow touch-only col"><span><b>Чувствительность прицела</b><i>как быстро палец двигает прицел</i></span><div class="slide"><input id="sens" type="range" min="0.6" max="1.8" step="0.1" value="1"><em id="sens-val">×1.0</em></div></div>
-        <div class="setrow pc-only"><span><b>Управление</b><i>WASD · ЛКМ бросок · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт · C оглянуться · Z/X повернуть камеру</i></span></div>
+        <div class="setrow pc-only"><span><b>Управление</b><i>WASD · ЛКМ бросок · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт · C оглянуться</i></span></div>
       </div>
     </div>
   </section>
@@ -169,5 +169,20 @@
 <div id="pause" class="overlay" hidden><div class="panel"><h1>ПАУЗА</h1><button id="resume" class="big">ПРОДОЛЖИТЬ</button><button id="pause-menu">Выйти в меню</button></div></div>
 <div id="portrait" class="overlay" hidden><div class="panel"><h1>Поверните телефон</h1><p id="portrait-text">Игра идёт в горизонтальном режиме. Бой на паузе.</p></div></div>
 <div id="loading" class="overlay"><div class="panel"><h1>Загрузка…</h1></div></div>
+<script>
+/* load guard: a phone that cached an old index.html points at deleted files; reload once, then say what is wrong */
+(function () {
+  function say(t) { var l = document.getElementById('loading'); if (!l) return; l.hidden = false; var h = l.querySelector('h1'); if (h) h.textContent = t; }
+  window.addEventListener('error', function (e) {
+    var el = e.target;
+    if (el && el.tagName === 'SCRIPT') {
+      var done = false; try { done = sessionStorage.getItem('titans.reload') === '1'; sessionStorage.setItem('titans.reload', '1'); } catch (x) { done = true; }
+      if (!done) { location.replace(location.pathname + '?v=' + Date.now()); return; }
+      say('Не загрузился файл игры. Обновите страницу');
+    } else if (e.message && !document.getElementById('loading').hidden) say('Ошибка: ' + e.message.slice(0, 80));
+  }, true);
+  setTimeout(function () { var l = document.getElementById('loading'); if (l && !l.hidden && !window.titans) { var h = l.querySelector('h1'); if (h && h.textContent === 'Загрузка…') h.textContent = 'Загрузка… (медленно, подождите)'; } }, 15000);
+})();
+</script>
 <script type="module" src="/client/play/main.ts"></script>
 </body></html>

@@ -31,3 +31,8 @@ export function mouseAim(prev: Pt | null, pAtLast: Pt, pNow: Pt, moved: number):
   const k = Math.exp(-moved / MOUSE_CATCHUP_PX);
   return { x: pNow.x + (prev.x - pAtLast.x) * k, z: pNow.z + (prev.z - pAtLast.z) * k };
 }
+
+/** Aim assist: a target cell next to the enemy's own cell (up to `r` cells away, diagonals too) snaps to the enemy's cell. */
+export function magnet(c: { x: number; z: number }, foe: { x: number; z: number } | null, r = 1): { x: number; z: number } {
+  return foe && Math.max(Math.abs(c.x - foe.x), Math.abs(c.z - foe.z)) <= r ? { x: foe.x, z: foe.z } : c;
+}

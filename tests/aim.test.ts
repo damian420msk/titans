@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { liftOff, touchAim, LIFT_MS } from '../shared/aim.ts';
+import { liftOff, touchAim, magnet, LIFT_MS } from '../shared/aim.ts';
 import { Battle, HOLD_SLACK_S, cellsFor } from '../shared/battle.ts';
 import { rules } from '../shared/world.ts';
 
@@ -65,4 +65,13 @@ test('mouseAim: camera motion under a still pointer does not move the aim; mouse
   // long travel: offset disappears, aim sits under the pointer
   const far = mouseAim(t, shifted, moved, 6000);
   assert.ok(Math.hypot(far.x - moved.x, far.z - moved.z) < 1e-3);
+});
+
+test('magnet: snaps cells next to the enemy (diagonals too) onto the enemy, leaves the rest alone', () => {
+  const foe = { x: 4, z: 6 };
+  assert.deepEqual(magnet({ x: 5, z: 7 }, foe), foe);
+  assert.deepEqual(magnet({ x: 3, z: 6 }, foe), foe);
+  assert.deepEqual(magnet({ x: 4, z: 6 }, foe), foe);
+  assert.deepEqual(magnet({ x: 6, z: 6 }, foe), { x: 6, z: 6 });
+  assert.deepEqual(magnet({ x: 2, z: 2 }, null), { x: 2, z: 2 });
 });

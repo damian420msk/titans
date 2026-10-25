@@ -3,7 +3,7 @@ import { Sfx } from './audio';
 import { Controls } from './controls';
 import { PHRASES } from '../../shared/net';
 import type { RoomView } from '../../shared/net';
-import { touchAim, mouseAim, type Pt } from '../../shared/aim';
+import { touchAim, mouseAim, magnet, type Pt } from '../../shared/aim';
 import { Battle, kindForHold, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
@@ -57,7 +57,7 @@ const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
-  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт · C оглянуться · Z/X повернуть камеру';
+  $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт · C оглянуться';
   const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
   // a tap on a battle button is the only moment a browser allows fullscreen and the landscape lock; phones that cannot do it just ignore this
   const goFullscreen = () => { if (!touchDevice || document.fullscreenElement || !document.fullscreenEnabled || store.get('nofs') === '1') return; document.documentElement.requestFullscreen().then(() => (screen.orientation as any)?.lock?.('landscape')).catch(() => {}); };
@@ -213,11 +213,7 @@ async function boot() {
       const b = battle, me = b.actors[0];
       // while looking back the view is turned around, so the stick is turned too
       const flip = controls.lookHeld ? -1 : 1;
-      // PC camera swing (Z/X): hold to turn, it drifts back to the default view; the stick is turned with the view
-      const yi = controls.yawInput;
-      world.yawGoal = Math.max(-.7, Math.min(.7, yi ? world.yawGoal + yi * dt * 1.3 : world.yawGoal * Math.exp(-dt / 2.5)));
-      const yc = Math.cos(world.yaw), ys = Math.sin(world.yaw), mx0 = controls.move.x * flip, mz0 = controls.move.z * flip;
-      b.setMove(0, b.canAct(0) ? mx0 * yc - mz0 * ys : 0, b.canAct(0) ? mx0 * ys + mz0 * yc : 0);
+      b.setMove(0, b.canAct(0) ? controls.move.x * flip : 0, b.canAct(0) ? controls.move.z * flip : 0);
       if (online) {
         const mx = Math.round(b.input[0].x * 100) / 100, mz = Math.round(b.input[0].z * 100) / 100;
         if ((mx !== lastMove.x || mz !== lastMove.z) && nowS - lastMove.t > .04 || nowS - lastMove.t > 1) { lastMove = { x: mx, z: mz, t: nowS }; net.send({ t: 'move', x: mx, z: mz }); }
@@ -255,7 +251,7 @@ async function boot() {
         else if (me.stones < 1) toast('Нет камней — иди к арсеналу'); else if (me.cooldown > 0) toast('Рука отдыхает'); else if (!b.canAct(0)) { /* knocked down */ }
       }
       if (charging && !b.charges[0]) { charging = false; controls.held = false; controls.cancelled = false; controls.released = false; }
-      if (charging) { const c = pick(); if (c) { b.setTarget(0, c); const k = `${c.x},${c.z}`; if (online && k !== lastTarget) { lastTarget = k; net.send({ t: 'target', x: c.x, z: c.z }); } } }
+      if (charging) { const c0 = pick(), c = c0 && magnet(c0, b.cellOf(1)); if (c) { b.setTarget(0, c); const k = `${c.x},${c.z}`; if (online && k !== lastTarget) { lastTarget = k; net.send({ t: 'target', x: c.x, z: c.z }); } } }
       if (controls.released) {
         controls.released = false;
         if (charging) {
@@ -330,4 +326,4 @@ async function boot() {
     setTimeout(() => { $('end').hidden = false; }, 900);
   }
 }
-boot().catch(e => { console.error(e); $('loading').querySelector('h1')!.textContent = 'Ошибка загрузки'; });
+boot().catch(e => { console.error(e); $('loading').hidden = false; $('loading').querySelector('h1')!.textContent = 'Ошибка загрузки: ' + String(e?.message ?? e).slice(0, 90); });
