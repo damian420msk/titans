@@ -138,12 +138,25 @@ test('sprint does nothing while standing still, charging or repairing; stamina r
   b.setSprint(0, false); b.setMove(0, 0, 0); run(b, 1.5); assert.ok(b.actors[0].stamina > low);
 });
 
-test('jump: arc of the configured height and length, one cooldown, events in order', () => {
+test('jump: arc of the configured height and length, events in order', () => {
   const b = new Battle(); place(b, 0, 4, 6); assert.equal(b.jump(0), true); assert.equal(b.jump(0), false, 'already airborne');
   let peak = 0; for (let i = 0; i < Math.round(JP.duration_s * 60) + 2; i++) { b.step(1 / 60); peak = Math.max(peak, b.actors[0].y); }
   assert.ok(Math.abs(peak - JP.height_m) < .08, `peak ${peak}`); assert.equal(b.actors[0].y, 0); assert.equal(b.actors[0].air, 0);
   assert.deepEqual(b.events.filter(e => e.type === 'jump' || e.type === 'land').map(e => e.type), ['jump', 'land']);
-  assert.equal(b.jump(0), false, 'cooldown'); run(b, JP.cooldown_s + .05); assert.equal(b.jump(0), true);
+  assert.equal(JP.cooldown_s, 0, 'no timer between hops'); assert.equal(b.jump(0), true, 'right after landing, stamina allows it');
+});
+
+test('jump: costs stamina instead of a timer (two quick hops, then it must be earned back), shared with sprint', () => {
+  const hop = (b: Battle) => { const ok = b.jump(0); run(b, JP.duration_s + .02); return ok; };
+  const b = new Battle(); place(b, 0, 4, 6); const full = SP.stamina_s;
+  assert.equal(b.actors[0].stamina, full);
+  assert.equal(hop(b), true); assert.ok(Math.abs(b.actors[0].stamina - (full - JP.stamina_cost_s)) < .06, 'one hop paid');
+  assert.equal(hop(b), true, 'second hop at once');
+  assert.equal(hop(b), false, 'not enough stamina left for a third');
+  run(b, 2); assert.equal(hop(b), true, 'earned back after a short rest');
+  // sprinting spends the same pool
+  const s = new Battle(); place(s, 0, 4, 6); s.setMove(0, 0, 1); s.setSprint(0, true); run(s, 1.5); s.setSprint(0, false); s.setMove(0, 0, 0);
+  assert.equal(s.jump(0), false, 'a winded sprinter cannot hop yet'); run(s, 1.5); assert.equal(s.jump(0), true);
 });
 
 test('jump is refused while charging, knocked down or falling; charging and repairing are refused in the air; a hop cancels a repair', () => {

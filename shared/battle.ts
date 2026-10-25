@@ -123,7 +123,8 @@ export class Battle {
   /** Hop: a short airborne arc. Floor is ignored while in the air (cross a hole, land on the far side) and shots that land meanwhile miss. */
   jump(side: Side) {
     const a = this.actors[side];
-    if (!this.canAct(side) || a.air > 0 || a.jumpCd > 0 || this.charges[side]) return false;
+    if (!this.canAct(side) || a.air > 0 || a.jumpCd > 0 || this.charges[side] || a.stamina < JUMP.stamina_cost_s) return false;
+    a.stamina -= JUMP.stamina_cost_s; a.sprintWait = SPRINT.regen_delay_s; // no timer: every hop costs stamina (shared with sprint), so hopping stays steady but cannot be endless
     this.repairs[side] = null; a.air = JUMP.duration_s; this.events.push({ type: 'jump', side }); return true;
   }
   setTarget(side: Side, c: Cell | null) { const ch = this.charges[side]; if (ch) ch.target = valid(c) ? { ...c } : null; }

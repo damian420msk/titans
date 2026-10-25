@@ -56,6 +56,7 @@ const TOUCH_PX_X = 24, TOUCH_PX_Z = 15; // finger px per cell at sensitivity 1
 async function boot() {
   const world = await World.create(canvas), controls = new Controls(canvas);
   const touchDevice = matchMedia('(pointer: coarse)').matches;
+  { const j = rules.character.jump.stamina_cost_s / rules.character.sprint.stamina_s * 100; $('stamina').style.setProperty('--c1', j + '%'); $('stamina').style.setProperty('--c2', 2 * j + '%'); } // notches = one hop each
   $('hint').textContent = touchDevice ? '' : 'ЛКМ бросок · держи — сильнее · ПКМ отмена · Пробел прыжок · Shift бег · E ремонт';
   const net = new Online(); let menu!: ReturnType<typeof initMenu>; net.nick = () => menu.nick(); net.token = () => token;
   // a tap on a battle button is the only moment a browser allows fullscreen and the landscape lock; phones that cannot do it just ignore this
@@ -291,8 +292,8 @@ async function boot() {
       $('repair').textContent = rp ? `${Math.round(100 * rp.t / rp.need)}%` : 'РЕМОНТ';
       const bar = $('charge'); bar.classList.toggle('on', !!ch);
       if (ch) { const k = kindForHold(ch.t), tgt = k === 'heavy' ? 1 : k === 'spin' ? (ch.t - .9) / 1.7 : ch.t / .9; (bar.firstElementChild as HTMLElement).style.width = `${Math.min(1, ch.t / 2.6) * 100}%`; (bar.firstElementChild as HTMLElement).style.background = KIND_COLOR[k]; bar.lastElementChild!.textContent = KIND_LABEL[k]; void tgt; }
-      $('cancel').hidden = !(charging && controls.touch); $('jump').style.visibility = charging ? 'hidden' : ''; $('jump').classList.toggle('cool', b.actors[0].jumpCd > 0 || b.actors[0].air > 0);
-      const me0 = b.actors[0], st = $('stamina'), frac = me0.stamina / rules.character.sprint.stamina_s; st.classList.toggle('on', mode === 'playing' && (frac < .999 || me0.running)); st.classList.toggle('low', frac < .35 && !me0.winded); st.classList.toggle('winded', me0.winded);
+      $('cancel').hidden = !(charging && controls.touch); $('jump').style.visibility = charging ? 'hidden' : ''; $('jump').classList.toggle('cool', b.actors[0].air > 0 || b.actors[0].stamina < rules.character.jump.stamina_cost_s);
+      const me0 = b.actors[0], st = $('stamina'), frac = me0.stamina / rules.character.sprint.stamina_s; st.classList.toggle('on', mode === 'playing'); st.classList.toggle('use', frac < .999 || me0.running); st.classList.toggle('low', me0.stamina < rules.character.jump.stamina_cost_s && !me0.winded); st.classList.toggle('winded', me0.winded);
       (st.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(1, frac)) * 100}%`;
       if ((toastTimer -= dt) <= 0) $('toast').classList.remove('on');
     }

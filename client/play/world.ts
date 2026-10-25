@@ -321,9 +321,9 @@ export class World {
       else { const kf = 1 - Math.exp(-dt / f0.tau); f0.x += (a0.pos.x - f0.x) * kf; f0.z += (a0.pos.z - f0.z) * kf; }
     }
     const portrait = this.engine.getRenderWidth() < this.engine.getRenderHeight();
-    this.camera.fov = (48 + (portrait ? 14 : 0)) * Math.PI / 180;
+    this.camera.fov = (40 + (portrait ? 14 : 0)) * Math.PI / 180;
     const px = f0.x * .9, pz = f0.z;
-    const pos = new Vector3(px, 20, pz - 16), target = new Vector3(px, 0, pz + 13.1);
+    const pos = new Vector3(px, 16, pz - 20), target = new Vector3(px, 0, pz + 14);
     const k = this.snapCamera ? 1 : Math.min(1, dt * 12); this.snapCamera = false;
     this.camera.position.copyFrom(Vector3.Lerp(this.camera.position, pos, k));
     this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, k));
