@@ -368,7 +368,7 @@ input::placeholder{color:rgba(255,255,255,.6)}
 .nav{flex:none;width:40px;height:40px;margin:0;padding:0;border-radius:50%;font-size:26px;line-height:1;background:linear-gradient(rgba(96,70,190,.9),rgba(58,40,130,.92));border:2px solid rgba(255,255,255,.55);box-shadow:0 3px 0 rgba(40,20,100,.55);display:grid;place-items:center}
 .act{align-self:center;min-width:min(78%,300px);margin:0;padding:12px 26px;font-size:20px;font-weight:800;border-radius:18px;background:linear-gradient(#ffcf5a,#f08a1c);border:3px solid #fff3d2;color:#4a2300;box-shadow:0 5px 0 #8a4508}
 .act.ok{background:linear-gradient(#6be28f,#2f9d57);border-color:#e6ffee;color:#06361a;box-shadow:0 5px 0 #17653a}
-.act.on{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.35);color:#c9f5d8;box-shadow:none}
+.act.on{opacity:1;background:rgba(47,157,87,.42);border-color:rgba(230,255,238,.7);color:#eafff1;box-shadow:none;text-shadow:0 1px 2px rgba(0,0,0,.35)}
 .act:disabled:not(.on){opacity:.5}
 .act .coin{vertical-align:-4px}
 @media (max-height:480px){.strip{--cw:clamp(104px,15vw,140px);padding-top:10px;gap:10px}.card{padding:5px 5px 6px}.card b{font-size:13px;margin-top:4px}.card .tag{left:9px;top:9px;font-size:11px;padding:2px 7px}.act{padding:8px 22px;font-size:17px}.nav{width:34px;height:34px;font-size:22px}}
