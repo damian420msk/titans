@@ -1,6 +1,6 @@
 // Presentation policy only: no device names, no combat rules. Adapted from the Codex mobile pass (v06).
-// Phones render at most 1 pixel per CSS pixel (a DPR 2-3 phone used to draw 4-9x that), with a pixel budget on top;
-// desktops keep the sharp DPR-based picture. Slow frames step the picture down for good (never back up, no flicker).
+// Phones start a little sharper than 1 pixel per CSS pixel (1.5, within a pixel budget: 1 looked blurry on DPR 2-3 screens) and the first
+// slow-frame step brings them back to 1, the old default; desktops keep the sharp DPR-based picture. Slow frames step down for good (never back up).
 export type QualitySettings = {
   scale: number;        // render pixels per CSS pixel on phones (desktop: multiplier on top of the device pixel ratio)
   maxDpr: number;       // device pixel ratio actually used: phones 1, desktops up to 2
@@ -11,11 +11,13 @@ export type QualitySettings = {
 
 export function settings(mobile: boolean, degradation = 0): QualitySettings {
   const d = Math.min(degradation, 3);
+  // phones have one extra step on top (the sharper picture); below it the old phone ladder, shifted by one
+  const m = mobile ? Math.max(0, d - 1) : d;
   return {
-    scale: Math.pow(.85, d),
-    maxDpr: mobile ? 1 : 2, maxPixels: mobile ? 921600 : 3686400, maxEdge: mobile ? 1280 : 3000,
-    clouds: mobile ? (d >= 2 ? 16 : 30) : 70, farIslands: mobile ? (d >= 2 ? 3 : 5) : 8, particles: mobile ? 56 : 128, fragments: mobile ? 24 : 64, tilePieces: mobile ? 24 : 64, trailEvery: mobile ? .05 : 0,
-    shadows: !mobile || d < 2, shadowEvery: mobile ? 2 : 1, glow: !mobile || d < 1,
+    scale: Math.pow(.85, m),
+    maxDpr: mobile ? (d === 0 ? 1.5 : 1) : 2, maxPixels: mobile ? 1310720 : 3686400, maxEdge: mobile ? 1600 : 3000,
+    clouds: mobile ? (m >= 2 ? 16 : 30) : 70, farIslands: mobile ? (m >= 2 ? 3 : 5) : 8, particles: mobile ? 56 : 128, fragments: mobile ? 24 : 64, tilePieces: mobile ? 24 : 64, trailEvery: mobile ? .05 : 0,
+    shadows: !mobile || m < 2, shadowEvery: mobile ? 2 : 1, glow: !mobile || m < 1,
   };
 }
 

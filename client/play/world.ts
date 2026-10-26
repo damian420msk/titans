@@ -41,7 +41,9 @@ const STONE_HAND = .5;
 /** Sky crystals (GDD: «светящийся голубой кристалл»); the plain one can be recoloured by the stone cosmetic. */
 const STONE_COLOR: Record<Kind, string> = { normal: '#A9E4FF', spin: '#FFB45E', heavy: '#B394FF' };
 /** The foe is drawn a little larger than the player: it stands ~35 m away and is the one figure the duel is about. Presentation only. */
-const FOE_SCALE = 1.22;
+const FOE_SCALE = 1.32;
+/** The own titan is drawn a little larger too (presentation only, the rules never read it): on a phone the old 1.0 read as small. */
+const OWN_SCALE = 1.12;
 type TitanView = { id: TitanId; mats: Material[]; meshes: AbstractMesh[]; holder: TransformNode; body: TransformNode; rig: TitanRig; stone: Mesh; ring: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
   cheer: number; flail: number; cheerTarget: boolean; squash: number };
 /** Local rotation offset from Euler angles in degrees (x, y, z). */
@@ -276,7 +278,7 @@ export class World {
       t.yaw = side === 0 ? 0 : Math.PI; t.stone.material = this.mats['stone_normal' + side]!;
       (t.ring.material as StandardMaterial).emissiveColor = Color3.FromHexString(TEAM[side]!);
       // the foe: larger and outlined in its team colour, so it reads at a glance even on a phone
-      t.holder.scaling.setAll(side === 1 ? FOE_SCALE : 1);
+      t.holder.scaling.setAll(side === 1 ? FOE_SCALE : OWN_SCALE);
       for (const m of t.meshes) { m.renderOutline = side === 1; m.outlineColor = Color3.FromHexString(TEAM[1]!); m.outlineWidth = .022; }
     });
     this.titans = pair;
@@ -396,9 +398,10 @@ export class World {
       else { const kf = 1 - Math.exp(-dt / f0.tau); f0.x += (a0.pos.x - f0.x) * kf; f0.z += (a0.pos.z - f0.z) * kf; }
     }
     const portrait = this.engine.getRenderWidth() < this.engine.getRenderHeight();
-    this.camera.fov = (40 + (portrait ? 14 : 0)) * Math.PI / 180;
+    // 36°, not wider: the titans read larger on a phone, and with the titan at the back edge the far edge of the enemy island still fits
+    this.camera.fov = (36 + (portrait ? 14 : 0)) * Math.PI / 180;
     const px = f0.x * .9, pz = f0.z;
-    const pos = new Vector3(px, 16, pz - 20), target = new Vector3(px, 0, pz + 14);
+    const pos = new Vector3(px, 16, pz - 20), target = new Vector3(px, 0, pz + 15);
     const k = this.snapCamera ? 1 : Math.min(1, dt * 12); this.snapCamera = false;
     this.camera.position.copyFrom(Vector3.Lerp(this.camera.position, pos, k));
     this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, k));
