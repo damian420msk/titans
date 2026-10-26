@@ -54,6 +54,9 @@ export function cellsFor(kind: Kind, target: Cell): Cell[] {
 export type Mods = { capacity: number; cooldown: number; refill: number; walk: number; tileHp: number; repair: number; stam: number; thrift: number };
 export const DEFAULT_MODS: Mods = { capacity: rules.inventory.capacity, cooldown: rules.shot.min_release_interval_s, refill: rules.interaction.refill_per_stone_s, walk: 1, tileHp: rules.arena.start_normal_cell_hp, repair: 1, stam: 1, thrift: 1 };
 export const makeMods = (m?: Partial<Mods>): Mods => ({ ...DEFAULT_MODS, ...m });
+/** Training sandbox: no time limit, falls cost no life, the `anchor` titan never falls or slides and its damaged plates heal after `healS`. */
+export type Practice = { anchor: Side; healS: number };
+export const PRACTICE: Practice = { anchor: 1, healS: rules.practice.anchor_heal_s };
 
 export class Battle {
   mods: [Mods, Mods] = [makeMods(), makeMods()];
@@ -70,6 +73,9 @@ export class Battle {
   time = 0;
   phase: 'playing' | 'over' = 'playing';
   winner: Side | null = null;
+  practice: Practice | null = null;
+  /** practice only: cell key → time when the anchored side's damaged plate heals */
+  private heals = new Map<string, number>();
   private shotId = 0;
 
   constructor(mods?: [Partial<Mods>?, Partial<Mods>?]) {
@@ -156,17 +162,30 @@ export class Battle {
   step(dt: number) {
     if (this.phase !== 'playing') return;
     this.time += dt;
-    for (const side of [0, 1] as Side[]) this.stepActor(side, dt);
+    const sunk = ([0, 1] as Side[]).filter(side => this.stepActor(side, dt));
+    // both titans reach the bottom in the same step: a draw, nobody loses a life
+    if (sunk.length === 2) for (const side of sunk) this.respawn(side, this.actors[side].lives);
+    else for (const side of sunk) this.afterFall(side);
     this.stepShots(dt);
-    if (this.phase === 'playing' && this.time >= MATCH_SECONDS) this.finish(this.byTime());
+    this.stepHeals();
+    if (this.phase === 'playing' && !this.practice && this.time >= MATCH_SECONDS) this.finish(this.byTime());
   }
 
-  private stepActor(side: Side, dt: number) {
+  private stepHeals() {
+    const pr = this.practice; if (!pr || !this.heals.size) return;
+    for (const [k, t] of this.heals) {
+      if (this.time < t) continue;
+      this.heals.delete(k); this.floors[pr.anchor].set(k, this.mods[pr.anchor].tileHp);
+      const [x, z] = k.split(',').map(Number); this.events.push({ type: 'repaired', side: pr.anchor, cell: { x, z } });
+    }
+  }
+
+  /** Returns true when a falling titan reached the bottom this step (the caller resolves both sides together). */
+  private stepActor(side: Side, dt: number): boolean {
     const a = this.actors[side];
     if (a.falling) {
       a.running = false; a.air = 0; a.vy -= GRAVITY * dt; a.y += a.vy * dt;
-      if (a.y < FALL_DEPTH) this.afterFall(side);
-      return;
+      return a.y < FALL_DEPTH;
     }
     a.cooldown = Math.max(0, a.cooldown - dt); a.stun = Math.max(0, a.stun - dt); a.inv = Math.max(0, a.inv - dt); a.jumpCd = Math.max(0, a.jumpCd - dt);
     const ch = this.charges[side]; if (ch) ch.t += dt;
@@ -200,20 +219,24 @@ export class Battle {
       while (this.refills[side] >= this.mods[side].refill && a.stones < this.mods[side].capacity) { this.refills[side] -= this.mods[side].refill; a.stones++; this.events.push({ type: 'refill', side }); }
     } else this.refills[side] = 0;
     this.checkSupport(side);
+    return false;
   }
 
   private checkSupport(side: Side) {
     const a = this.actors[side];
-    if (a.falling || a.air > 0 || this.supported(a.pos, side)) return;
+    if (a.falling || a.air > 0 || this.practice?.anchor === side || this.supported(a.pos, side)) return;
     a.falling = true; a.vy = 0; this.charges[side] = null; this.repairs[side] = null; a.slide = null;
     this.events.push({ type: 'fall', side });
   }
 
   private afterFall(side: Side) {
     const a = this.actors[side];
-    a.lives--;
+    if (!this.practice) a.lives--; // training: a fall teaches, it does not cost a life
     if (a.lives <= 0) { a.y = FALL_DEPTH; this.finish(sideOther(side)); return; }
-    this.actors[side] = { ...this.newActor(side, RESPAWN_CELL), lives: a.lives, inv: rules.recovery.respawn_invulnerable_s };
+    this.respawn(side, a.lives);
+  }
+  private respawn(side: Side, lives: number) {
+    this.actors[side] = { ...this.newActor(side, RESPAWN_CELL), lives, inv: rules.recovery.respawn_invulnerable_s };
     this.input[side] = { x: 0, z: 0 }; this.events.push({ type: 'respawn', side });
   }
 
@@ -232,13 +255,16 @@ export class Battle {
       const after = Number.isFinite(before) ? Math.max(0, before - t.damage_per_cell) : before;
       if (Number.isFinite(before)) this.floors[side].set(cellKey(c), after);
       this.events.push({ type: 'impact', side, cell: c, kind: s.kind, hpBefore: before, hpAfter: after });
+      if (this.practice?.anchor === side && after < before) this.heals.set(cellKey(c), this.time + this.practice.healS);
     }
-    const v = this.actors[side], here = this.cellOf(side);
+    const v = this.actors[side], here = this.cellOf(side), anchored = this.practice?.anchor === side;
+    if (anchored && here && this.hp(here, side) <= 0) this.heals.set(cellKey(here), this.time); // never leave the training titan standing over a hole
+
     if (!v.falling && (v.air > 0 || v.inv > 0) && here && hitCells.has(cellKey(here)) && this.phase === 'playing') this.events.push({ type: 'dodge', side });
     else if (!v.falling && here && hitCells.has(cellKey(here)) && this.phase === 'playing') {
       v.stun = rules.recovery.knockdown_and_stand_s; this.charges[side] = null; this.repairs[side] = null;
       const dist = t.knockback_cells * size, dir = side === 0 ? -1 : 1;
-      v.slide = { dx: 0, dz: dir * dist, t: SLIDE_S };
+      if (!anchored) v.slide = { dx: 0, dz: dir * dist, t: SLIDE_S };
       this.events.push({ type: 'hit', side, kind: s.kind });
     }
     for (const sd of [0, 1] as Side[]) this.checkSupport(sd);

@@ -7,7 +7,7 @@ import { initOrientation, lockLandscape, isPortrait } from './orientation';
 import { pickBot, DISGUISE_BOT } from '../../shared/quick';
 import type { RoomView } from '../../shared/net';
 import { touchAim, magnet } from '../../shared/aim';
-import { Battle, kindForHold, cellKey, MATCH_SECONDS, LIVES, type Kind } from '../../shared/battle';
+import { Battle, kindForHold, cellKey, MATCH_SECONDS, LIVES, PRACTICE, type Kind } from '../../shared/battle';
 import { Training, STEPS, DIRS, type StepId } from './training';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
@@ -77,6 +77,7 @@ async function boot() {
     sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); level = l; disguise = null; if (matchesPlayed > 0) await ya.interstitial(); training = null; paintTrain(); startMatch(); },
     onTrain: () => {
       goFullscreen(); level = 'easy'; disguise = null; startMatch();
+      battle.practice = PRACTICE; // the training titan cannot be knocked off, falls cost no life, no time limit
       training = new Training(menu.trainDone() ? [] : savedSteps(), battle.actors[0].pos); trainDoneShown = false;
       for (const c of [{ x: 2, z: 6 }, { x: 6, z: 5 }]) battle.floors[0].set(cellKey(c), 1); // two cracked tiles of our own to repair
       paintTrain();
@@ -338,7 +339,7 @@ async function boot() {
     // HUD
     if (mode !== 'menu') {
       const hk = `${b.actors[0].lives}${b.actors[1].lives}`; if (hk !== heartsKey) { heartsKey = hk; $('hearts0').innerHTML = hearts(b.actors[0].lives); $('hearts1').innerHTML = hearts(b.actors[1].lives); }
-      const left = Math.max(0, Math.ceil(MATCH_SECONDS - b.time)); $('timer').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      const left = Math.max(0, Math.ceil(MATCH_SECONDS - b.time)); $('timer').textContent = b.practice ? '∞' : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       [...slots.children].forEach((s, i) => s.classList.toggle('e', i >= b.actors[0].stones));
       const rp = b.repairs[0], can = b.canRepair(0) || !!rp; $('repair').hidden = !can && !controls.repairHeld;
       $('repair').classList.toggle('busy', !!rp);

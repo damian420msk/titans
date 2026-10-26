@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Battle, kindForHold, cellsFor, LIVES, MATCH_SECONDS } from '../shared/battle.ts';
+import { Battle, kindForHold, cellsFor, LIVES, MATCH_SECONDS, PRACTICE } from '../shared/battle.ts';
 import { Bot, mulberry32 } from '../shared/bot.ts';
 import { cellCentre, rules } from '../shared/world.ts';
 
@@ -217,4 +217,28 @@ test('arsenal stands 3 cells in from the back edge; only it and the respawn cell
   throwAt(b, 1, { x: 3, z: 0 }, .05); run(b, 1.6); throwAt(b, 1, { x: 3, z: 0 }, .05); run(b, 1.6);
   assert.equal(b.floors[0].get('3,0'), 0, 'the old guard cells are ordinary cells now');
   assert.equal(b.floors[0].get('4,3'), Infinity);
+});
+
+test('both titans reaching the bottom in the same step is a draw: nobody loses a life, the match goes on', () => {
+  const b = new Battle(); place(b, 0, 2, 6); place(b, 1, 6, 6);
+  b.actors[0].lives = 1; b.actors[1].lives = 1;
+  b.floors[0].set('2,6', 0); b.floors[1].set('6,6', 0);
+  run(b, 3);
+  assert.equal(b.phase, 'playing'); assert.equal(b.winner, null);
+  assert.equal(b.actors[0].lives, 1); assert.equal(b.actors[1].lives, 1);
+  assert.equal(b.actors[0].falling, false); assert.equal(b.actors[1].falling, false);
+});
+
+test('practice: the training titan never falls or slides, its plates heal, falls cost no life, no time limit', () => {
+  const b = new Battle(); b.practice = PRACTICE; place(b, 1, 4, 6);
+  throwAt(b, 0, { x: 4, z: 6 }, 2.7); run(b, 1.5); // heavy straight at it: hole under it and next to it
+  assert.equal(b.actors[1].falling, false); assert.equal(b.actors[1].slide, null);
+  assert.equal(b.hp({ x: 4, z: 6 }, 1), rules.arena.start_normal_cell_hp, 'the cell under it heals at once');
+  assert.equal(b.hp({ x: 5, z: 6 }, 1), 0, 'the neighbour is still a hole');
+  run(b, PRACTICE.healS + .1);
+  assert.equal(b.hp({ x: 5, z: 6 }, 1), rules.arena.start_normal_cell_hp, 'and heals after a while');
+  // the player walks into a hole: respawns with all lives
+  b.floors[0].set('2,6', 0); place(b, 0, 2, 6); run(b, 3);
+  assert.equal(b.actors[0].lives, LIVES); assert.equal(b.actors[0].falling, false);
+  run(b, MATCH_SECONDS + 5); assert.equal(b.phase, 'playing');
 });

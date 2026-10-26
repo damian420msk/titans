@@ -121,6 +121,10 @@
     "floor_damage_during_stability": true,
     "respawn_invulnerable_s": 3.0
   },
+  "practice": {
+    "anchor_heal_s": 3.0,
+    "note": "training sandbox: no time limit, falls cost no life, the anchored (training) titan never falls or slides and its plates heal by themselves"
+  },
   "interaction": {
     "arsenal_range_m": 3.4,
     "refill_per_stone_s": 0.7,
