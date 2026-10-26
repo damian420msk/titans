@@ -2,7 +2,7 @@
 // Tasks go top to bottom: only the current task counts. Progress is stored by the caller so the player can leave and come back.
 import type { GameEvent } from '../../shared/battle.ts';
 
-export type StepId = 'move' | 'throw' | 'hit' | 'heavy' | 'refill' | 'jump' | 'repair';
+export type StepId = 'move' | 'throw' | 'hit' | 'heavy' | 'refill' | 'jump' | 'repair' | 'drop';
 export type Step = { id: StepId; text: string; pc: string; touch: string };
 export const STEPS: Step[] = [
   { id: 'move', text: 'Пройдись во все стороны', pc: 'Клавиши W A S D: вперёд, влево, назад, вправо. Нужно пройти пару шагов в каждую сторону', touch: 'Веди левым пальцем: джойстик появится под ним. Нужно пройти пару шагов в каждую сторону' },
@@ -12,6 +12,8 @@ export const STEPS: Step[] = [
   { id: 'refill', text: 'Возьми камни у кучи', pc: 'Подойди к куче камней в углу своего острова', touch: 'Подойди к куче камней в углу своего острова' },
   { id: 'jump', text: 'Прыгни', pc: 'Пробел. Бег: держи Shift', touch: 'Кнопка ⤒. Бег: тяни джойстик за край круга' },
   { id: 'repair', text: 'Почини треснувшую плиту', pc: 'Встань рядом с трещиной и держи E', touch: 'Встань рядом с трещиной и держи кнопку РЕМОНТ' },
+  // the finale: the training titan can fall now (it comes back at once, no lives are lost)
+  { id: 'drop', text: 'Сбрось учебного титана в облака', pc: 'Разбей плиту прямо под ним: две трещины или один мощный бросок', touch: 'Разбей плиту прямо под ним: две трещины или один мощный бросок' },
 ];
 export type Dir = 'up' | 'left' | 'down' | 'right';
 export const DIRS: Dir[] = ['up', 'left', 'down', 'right'];
@@ -28,6 +30,7 @@ const matches = (id: StepId, e: GameEvent): boolean => {
     case 'refill': return e.type === 'refill' && e.side === 0;
     case 'jump': return e.type === 'jump' && e.side === 0;
     case 'repair': return e.type === 'repaired' && e.side === 0;
+    case 'drop': return e.type === 'fall' && e.side === 1;
     default: return false;
   }
 };

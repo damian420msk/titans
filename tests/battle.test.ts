@@ -258,3 +258,11 @@ test('playtest switches: a shorter heavy hold, and a fall that repairs the falle
     assert.equal(c.hp({ x: 7, z: 8 }, 0), restore === 'all' ? 2 : 0, `${restore}: hole`);
   }
 });
+
+test('practice finale: with drop on, the training titan falls through a hole, loses no life and comes back on its start cell', () => {
+  const b = new Battle(); b.practice = { ...PRACTICE, drop: true }; place(b, 1, 4, 6);
+  throwAt(b, 0, { x: 4, z: 6 }, 2.7); run(b, 1.5);
+  assert.equal(b.actors[1].falling, true);
+  run(b, 2); assert.equal(b.actors[1].falling, false); assert.equal(b.actors[1].lives, LIVES);
+  assert.deepEqual(b.cellOf(1), { x: 4, z: 6 }); assert.equal(b.hp({ x: 4, z: 6 }, 1), rules.arena.start_normal_cell_hp);
+});

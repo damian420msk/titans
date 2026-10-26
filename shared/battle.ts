@@ -62,8 +62,9 @@ export function cellsFor(kind: Kind, target: Cell): Cell[] {
 export type Mods = { capacity: number; cooldown: number; refill: number; walk: number; tileHp: number; repair: number; stam: number; thrift: number };
 export const DEFAULT_MODS: Mods = { capacity: rules.inventory.capacity, cooldown: rules.shot.min_release_interval_s, refill: rules.interaction.refill_per_stone_s, walk: 1, tileHp: rules.arena.start_normal_cell_hp, repair: 1, stam: 1, thrift: 1 };
 export const makeMods = (m?: Partial<Mods>): Mods => ({ ...DEFAULT_MODS, ...m });
-/** Training sandbox: no time limit, falls cost no life, the `anchor` titan never falls or slides and its damaged plates heal after `healS`. */
-export type Practice = { anchor: Side; healS: number };
+/** Training sandbox: no time limit, falls cost no life, the `anchor` titan never falls or slides and its damaged plates heal after `healS`.
+ *  `drop`: the finale of the training — the anchor may fall now (it comes straight back to its start cell). */
+export type Practice = { anchor: Side; healS: number; drop?: boolean };
 export const PRACTICE: Practice = { anchor: 1, healS: rules.practice.anchor_heal_s };
 
 export class Battle {
@@ -233,7 +234,7 @@ export class Battle {
 
   private checkSupport(side: Side) {
     const a = this.actors[side];
-    if (a.falling || a.air > 0 || this.practice?.anchor === side || this.supported(a.pos, side)) return;
+    if (a.falling || a.air > 0 || (this.practice?.anchor === side && !this.practice.drop) || this.supported(a.pos, side)) return;
     a.falling = true; a.vy = 0; this.charges[side] = null; this.repairs[side] = null; a.slide = null;
     this.events.push({ type: 'fall', side });
   }
@@ -242,6 +243,9 @@ export class Battle {
     const a = this.actors[side];
     if (!this.practice) a.lives--; // training: a fall teaches, it does not cost a life
     if (a.lives <= 0) { a.y = FALL_DEPTH; this.finish(sideOther(side)); return; }
+    if (this.practice?.anchor === side) { // the training titan comes back where it stood, on a whole plate
+      this.floors[side].set(cellKey(START_CELL), this.mods[side].tileHp); this.heals.delete(cellKey(START_CELL)); this.respawn(side, a.lives, START_CELL); return;
+    }
     this.restoreAfterFall(side); this.respawn(side, a.lives);
   }
   /** Playtest: the faller's island gets its cracks (or everything) back, against a snowballing match. */
@@ -249,8 +253,8 @@ export class Battle {
     const mode = this.tune.restore, full = this.mods[side].tileHp; if (mode === 'none') return;
     for (const [k, hp] of this.floors[side]) if (Number.isFinite(hp) && hp < full && (mode === 'all' || hp > 0)) this.floors[side].set(k, full);
   }
-  private respawn(side: Side, lives: number) {
-    this.actors[side] = { ...this.newActor(side, RESPAWN_CELL), lives, inv: rules.recovery.respawn_invulnerable_s };
+  private respawn(side: Side, lives: number, at: Cell = RESPAWN_CELL) {
+    this.actors[side] = { ...this.newActor(side, at), lives, inv: rules.recovery.respawn_invulnerable_s };
     this.input[side] = { x: 0, z: 0 }; this.events.push({ type: 'respawn', side });
   }
 
@@ -272,7 +276,7 @@ export class Battle {
       if (this.practice?.anchor === side && after < before) this.heals.set(cellKey(c), this.time + this.practice.healS);
     }
     const v = this.actors[side], here = this.cellOf(side), anchored = this.practice?.anchor === side;
-    if (anchored && here && this.hp(here, side) <= 0) this.heals.set(cellKey(here), this.time); // never leave the training titan standing over a hole
+    if (anchored && !this.practice!.drop && here && this.hp(here, side) <= 0) this.heals.set(cellKey(here), this.time); // never leave the training titan standing over a hole
 
     if (!v.falling && (v.air > 0 || v.inv > 0) && here && hitCells.has(cellKey(here)) && this.phase === 'playing') this.events.push({ type: 'dodge', side });
     else if (!v.falling && here && hitCells.has(cellKey(here)) && this.phase === 'playing') {

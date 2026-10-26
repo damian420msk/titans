@@ -87,7 +87,7 @@ async function boot() {
     sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); level = l; botSkill = null; disguise = null; if (matchesPlayed > 0) await ya.interstitial(); training = null; paintTrain(); startMatch(); },
     onTrain: () => {
       goFullscreen(); level = 'easy'; botSkill = null; disguise = null; startMatch(); markFight(false);
-      battle.practice = PRACTICE; // the training titan cannot be knocked off, falls cost no life, no time limit
+      battle.practice = { ...PRACTICE }; // the training titan cannot be knocked off, falls cost no life, no time limit
       training = new Training(menu.trainDone() ? [] : savedSteps(), battle.actors[0].pos); trainDoneShown = false;
       for (const c of [{ x: 2, z: 6 }, { x: 6, z: 5 }]) battle.floors[0].set(cellKey(c), 1); // two cracked tiles of our own to repair
       paintTrain();
@@ -219,6 +219,8 @@ async function boot() {
   const trainTick = (dt: number, events: GameEvent[]) => {
     if (!training || online || mode !== 'playing') return;
     const got = training.update(dt, events, battle.actors[0].pos);
+    // the last task lets the training titan fall (it comes straight back)
+    if (battle.practice) battle.practice.drop = training.current?.id === 'drop';
     if (got.length) { store.set('train.steps', [...training.done].join(',')); toast('✓ Задание выполнено'); sfx.repaired(); }
     paintTrain();
     if (training.complete && $('train-done').hidden && !trainDoneShown) { trainDoneShown = true; finishTraining(); }

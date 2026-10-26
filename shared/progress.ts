@@ -211,7 +211,8 @@ export function applyOnline(a: Profile, b: Profile, winner: 0 | 1 | null) {
   return [give(a, da, winner === null ? null : winner === 0), give(b, db, winner === null ? null : winner === 1)] as const;
 }
 
-export const LEAGUES = [{ min: 0, name: 'Бронза', color: '#c98a52' }, { min: 1100, name: 'Серебро', color: '#c9d2e0' }, { min: 1250, name: 'Золото', color: '#ffd25a' }, { min: 1450, name: 'Платина', color: '#7ee8d8' }, { min: 1650, name: 'Алмаз', color: '#8fc8ff' }];
+/** Sky leagues: the tournament climbs into the sky (GDD). Thresholds unchanged; the bot-win cap (1250) ends at the Storm league. */
+export const LEAGUES = [{ min: 0, name: 'Каменная', color: '#c98a52' }, { min: 1100, name: 'Облачная', color: '#c9d2e0' }, { min: 1250, name: 'Грозовая', color: '#b49bff' }, { min: 1450, name: 'Звёздная', color: '#7ee8d8' }, { min: 1650, name: 'Солнечная', color: '#ffd25a' }];
 export const league = (r: number) => [...LEAGUES].reverse().find(l => r >= l.min)!;
 /** What the client may see of another player. */
 export type PublicEntry = { nick: string; rating: number; wins: number; losses: number };

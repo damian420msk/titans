@@ -29,7 +29,8 @@ test('training: tasks go top to bottom, an action for a later task does not coun
   assert.deepEqual(t.update(.1, [{ type: 'refill', side: 0 }], p), ['refill']);
   assert.deepEqual(t.update(.1, [{ type: 'jump', side: 0 }], p), ['jump']);
   assert.equal(t.complete, false);
-  assert.deepEqual(t.update(.1, [{ type: 'repaired', side: 0, cell: { x: 2, z: 6 } }], p), ['repair']); assert.equal(t.complete, true);
+  assert.deepEqual(t.update(.1, [{ type: 'repaired', side: 0, cell: { x: 2, z: 6 } }], p), ['repair']); assert.equal(t.complete, false);
+  assert.deepEqual(t.update(.1, [{ type: 'fall', side: 0 }], p), [], 'my own fall does not count'); assert.deepEqual(t.update(.1, [{ type: 'fall', side: 1 }], p), ['drop']); assert.equal(t.complete, true);
 });
 
 test('training: the enemy side and own-island hits do not count; a task is reported once', () => {

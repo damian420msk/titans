@@ -30,7 +30,7 @@ test('Elo: equal players move by about half K, upsets pay more, the sum is zero 
 test('daily bonus once per day, rewards by difficulty, leagues', () => {
   const p = newProfile('x'), day = dayIndex(Date.UTC(2026, 9, 25, 12)); assert.equal(claimDaily(p, day), DAILY_BONUS); assert.equal(claimDaily(p, day), 0); assert.equal(claimDaily(p, day + 1), DAILY_BONUS);
   const c0 = p.coins; assert.ok(rewardBot(p, 'hard', true, 1) > rewardBot(p, 'easy', true, 1)); assert.ok(p.coins > c0);
-  assert.equal(league(900).name, 'Бронза'); assert.equal(league(1250).name, 'Золото'); assert.equal(league(3000).name, 'Алмаз');
+  assert.equal(league(900).name, 'Каменная'); assert.equal(league(1250).name, 'Грозовая'); assert.equal(league(3000).name, 'Солнечная');
 });
 test('sanitizeProfile repairs garbage and never grants unowned items', () => {
   const p = sanitizeProfile({ nick: 5, rating: 'x', coins: -50, up: { bag: 99, legs: 1.6 }, own: ['tiles_moss', 'bogus', 7], eq: { tiles: 'stone_ice', stone: 'stone_grey' } }, 'id1');
