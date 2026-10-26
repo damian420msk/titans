@@ -103,3 +103,12 @@ test('bad nicks and room names are refused by the server', () => {
   const c = fake(); lobby.connect(c); lobby.handle(c, { t: 'hello', nick: 'fuck' });
   assert.equal(c.last('profile')?.p.nick, 'Игрок');
 });
+
+test('a profile leaves server memory when its last connection closes, and comes back from the store', async () => {
+  const { MemoryStore } = await import('../server/store.ts');
+  const store = new MemoryStore(), lobby = new Lobby(store), log: any[] = [], c = { send: (m: any) => log.push(m) };
+  lobby.connect(c); lobby.handle(c, { t: 'hello', nick: 'Аня', token: 'tok_abcdefghijklmnop' }); lobby.handle(c, { t: 'claim' });
+  assert.equal(lobby.loaded, 1); lobby.disconnect(c); assert.equal(lobby.loaded, 0);
+  const c2 = { send: (m: any) => log.push(m) }; lobby.connect(c2); lobby.handle(c2, { t: 'hello', nick: 'Аня', token: 'tok_abcdefghijklmnop' });
+  const p = [...log].reverse().find(m => m.t === 'profile').p; assert.equal(p.coins, 150, 'the gift is still there');
+});

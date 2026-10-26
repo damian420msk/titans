@@ -30,6 +30,7 @@ export class MemoryStore implements Store {
 /** Supabase REST (PostgREST). Table: profiles(id text pk, rating int, games int, data jsonb). Use the service_role key, server side only.
  * Saves go through one queue: a failed save is retried with a growing pause (2 s … 60 s) and a newer save of the same profile replaces the waiting one,
  * so a short Supabase outage does not lose purchases or rewards (they stay in memory meanwhile). */
+const CACHE_MAX = 5000;
 export class SupabaseStore implements Store {
   private cache = new Map<string, Profile>();
   private url: string; private key: string; private fetch: typeof fetch;
@@ -49,7 +50,9 @@ export class SupabaseStore implements Store {
     if (p) this.cache.set(id, p); return p;
   }
   save(p: Profile) {
-    const copy = structuredClone(p); this.cache.set(p.id, copy); this.pending.set(p.id, copy);
+    const copy = structuredClone(p); this.cache.delete(p.id); this.cache.set(p.id, copy); this.pending.set(p.id, copy);
+    // keep the read cache bounded: the oldest entries go first (never one that still waits to be written)
+    for (const id of this.cache.keys()) { if (this.cache.size <= CACHE_MAX) break; if (!this.pending.has(id)) this.cache.delete(id); }
     return this.queue();
   }
   private queue() { this.chain = this.chain.then(() => this.flush()); return this.chain; }

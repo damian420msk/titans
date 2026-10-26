@@ -64,7 +64,11 @@ export class Lobby {
       room.players[c.seat === 0 ? 1 : 0]?.conn.send({ t: 'away', on: true }); return;
     }
     this.leave(c);
+    // nobody else is signed in with this profile: drop it from memory (the store keeps it; the next hello loads it again)
+    if (c.pid && ![...this.clients.values()].some(x => x.pid === c.pid) && ![...this.rooms.values()].some(r => r.players.some(p => p?.pid === c.pid))) this.profiles.delete(c.pid);
   }
+  /** Profiles held in memory right now (for tests and /health). */
+  get loaded() { return this.profiles.size; }
 
   /** A client that says hello with the token of an away player takes that seat back. */
   private resume(c: Client) {
