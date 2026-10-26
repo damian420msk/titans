@@ -2,7 +2,7 @@
 // The server runs the only real Battle. Guests (seat 1) receive a mirrored snapshot, so every client sees itself as side 0.
 import { map, type Cell, type Side } from './world.ts';
 import { Battle, cellKey, type GameEvent, type Kind, type Mods } from './battle.ts';
-import type { Profile, PublicEntry, CosmeticKind } from './progress.ts';
+import type { Profile, PublicEntry, CosmeticKind, FightStats } from './progress.ts';
 import type { Difficulty } from './bot.ts';
 
 export type RoomInfo = { id: string; name: string; host: string; players: number; locked: boolean; playing: boolean; ranked: boolean };
@@ -19,7 +19,7 @@ export type C2S =
   | { t: 'claim' }
   | { t: 'trained' }
   | { t: 'top' }
-  | { t: 'result'; level: Difficulty; won: boolean; foe?: string; dur?: number; quit?: boolean }
+  | { t: 'result'; level: Difficulty; won: boolean; foe?: string; dur?: number; quit?: boolean; st?: Partial<FightStats> }
   | { t: 'quick'; on: boolean }
   | { t: 'list' }
   | { t: 'create'; name: string; pass: string; ranked?: boolean }

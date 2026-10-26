@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Lobby, type Conn } from '../server/lobby.ts';
 import { MemoryStore } from '../server/store.ts';
+import { questDef } from '../shared/progress.ts';
 import type { S2C, MyProfile, RoomInfo } from '../shared/net.ts';
 
 type Fake = Conn & { log: S2C[]; last<T extends S2C['t']>(t: T): Extract<S2C, { t: T }> | undefined };
@@ -9,6 +10,9 @@ const fake = (): Fake => { const log: S2C[] = []; return { log, send: m => { log
 const tokenOf = (n: string) => (Buffer.from(n).toString('hex') + 'x0123456789abcdefghijklmnop').slice(0, 32);
 const player = (lobby: Lobby, nick: string) => { const c = fake(); lobby.connect(c); lobby.handle(c, { t: 'hello', nick, token: tokenOf(nick) }); return c; };
 const prof = (c: Fake) => c.last('profile')!.p as MyProfile;
+/** coins paid by today's daily tasks so far (the tasks differ per player, so tests subtract them) */
+const questPaid = (p: MyProfile) => p.quest.ids.reduce((s, id, i) => s + (p.quest.paid[i] ? questDef(id)!.reward : 0), 0);
+const fightCoins = (p: MyProfile) => p.coins - questPaid(p);
 const roomId = (c: Fake) => (c.last('rooms')!.rooms as RoomInfo[])[0].id;
 const startRanked = (lobby: Lobby, a: Fake, b: Fake, ranked = true) => {
   lobby.handle(a, { t: 'create', name: 'R', pass: '', ranked }); lobby.handle(b, { t: 'join', id: roomId(b), pass: '' });
@@ -44,7 +48,7 @@ test('upgrades reach the match: bigger bag in the start message and in the battl
 test('ranked room: the winner gains rating and coins, the loser drops; both profiles are saved', () => {
   const store = new MemoryStore(), lobby = new Lobby(store), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
   startRanked(lobby, a, b); finish(lobby, b);
-  assert.equal(a.last('end')!.gain!.ranked, true); assert.ok(prof(a).rating > 1000); assert.equal(prof(a).wins, 1); assert.equal(prof(a).coins, 100 + 60 + 80, "win reward plus the online-win daily task");
+  assert.equal(a.last('end')!.gain!.ranked, true); assert.ok(prof(a).rating > 1000); assert.equal(prof(a).wins, 1); assert.equal(fightCoins(prof(a)), 100 + 60, 'win reward (plus whatever daily task it completed)');
   const b2 = player(lobby, 'Боря'); assert.ok(prof(b2).rating < 1000); assert.equal(prof(b2).losses, 1);
 });
 test('unranked room: only coins change; farming the same opponent stops giving rating', () => {
@@ -59,8 +63,8 @@ test('unranked room: only coins change; farming the same opponent stops giving r
 });
 test('bot results pay coins but not twice in a row', () => {
   let t = 1e9; const lobby = new Lobby(new MemoryStore(), () => t), a = player(lobby, 'Аня');
-  lobby.handle(a, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a).coins, 100 + 60 + 80, 'win plus the hard-bot daily task'); lobby.handle(a, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a).coins, 240);
-  t += 26000; lobby.handle(a, { t: 'result', level: 'nonsense' as any, won: true }); assert.equal(prof(a).coins, 240); lobby.handle(a, { t: 'result', level: 'easy', won: false }); assert.equal(prof(a).coins, 245);
+  lobby.handle(a, { t: 'result', level: 'hard', won: true }); assert.equal(fightCoins(prof(a)), 160); const c1 = prof(a).coins; lobby.handle(a, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a).coins, c1);
+  t += 26000; lobby.handle(a, { t: 'result', level: 'nonsense' as any, won: true }); assert.equal(prof(a).coins, c1); lobby.handle(a, { t: 'result', level: 'easy', won: false }); assert.equal(fightCoins(prof(a)), 165);
 });
 test('quick match pairs two queued players of similar rating into a ranked match', () => {
   let t = 1e9; const lobby = new Lobby(new MemoryStore(), () => t), a = player(lobby, 'Аня'), b = player(lobby, 'Боря'), c = player(lobby, 'Вася');
@@ -119,10 +123,10 @@ test('quick match marks the start message so the client can offer "search again"
 test('rewarded bonus repeats the last reward once, capped, and only for saved accounts', () => {
   const lobby = new Lobby(new MemoryStore(), () => 1e9), a = player(lobby, 'Аня');
   lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, 100, 'nothing to double yet');
-  lobby.handle(a, { t: 'result', level: 'hard', won: true }); const after = prof(a).coins; assert.equal(after, 100 + 60 + 80);
-  lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + 140, 'fight and task doubled'); lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + 140, 'only once');
+  lobby.handle(a, { t: 'result', level: 'hard', won: true }); const after = prof(a).coins, gain = after - 100; assert.equal(fightCoins(prof(a)), 160);
+  lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + Math.min(gain, 150), 'fight and task doubled, capped'); lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + Math.min(gain, 150), 'only once');
   const g = fake(); lobby.connect(g); lobby.handle(g, { t: 'hello', nick: 'Гость' }); lobby.handle(g, { t: 'result', level: 'hard', won: true }); lobby.handle(g, { t: 'bonus' });
-  assert.equal(g.last('profile')!.p.coins, 100 + 60 + 80, 'guest got only the plain reward');
+  assert.equal(fightCoins(g.last('profile')!.p), 100 + 60, 'guest got only the plain reward');
 });
 
 test('a bot win raises rating, a bot loss lowers it (after the anti-spam gap); the message says so', () => {
@@ -204,6 +208,6 @@ test('leaving a bot fight is a loss: rating goes down, no coins, no quest progre
   let t = Date.UTC(2026, 9, 27, 12); const lobby = new Lobby(new MemoryStore(), () => t), a = player(lobby, 'Аня');
   lobby.handle(a, { t: 'result', level: 'normal', won: true }); const after = prof(a);
   lobby.handle(a, { t: 'result', level: 'normal', won: false, quit: true }); const q = prof(a);
-  assert.ok(q.rating < after.rating, 'rating lost right away'); assert.equal(q.coins, after.coins); assert.equal(q.quest.played, after.quest.played);
+  assert.ok(q.rating < after.rating, 'rating lost right away'); assert.equal(q.coins, after.coins); assert.deepEqual(q.quest.prog, after.quest.prog);
   assert.equal(q.losses, after.losses + 1); assert.match((a.last('shop') as any).text, /поражение/);
 });

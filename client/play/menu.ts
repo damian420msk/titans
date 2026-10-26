@@ -9,7 +9,7 @@ import { checkNick, checkText } from '../../shared/names';
 import { QUICK_SEARCH_S, BOT_OFFER_S } from '../../shared/quick';
 import { DAILY_REWARDS } from '../../shared/progress';
 import { icon, ico, hydrateIcons, type IconName } from './icons';
-import { UPGRADES, COSMETICS, QUESTS, LEAGUES, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
+import { UPGRADES, COSMETICS, questDef, LEAGUES, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
 export type { RoomInfo, RoomView };
 export type Screen = 'main' | 'bot' | 'online' | 'create' | 'room' | 'rating' | 'settings' | 'howto' | 'shop' | 'quick' | 'quests' | 'play';
 
@@ -172,12 +172,12 @@ export function initMenu(h: MenuHooks) {
     paintLocks(); $('shop-coins').textContent = String(p?.coins ?? 0);
     $('gift-btn').classList.toggle('alert', !!p?.dailyReady); $('gift-btn').querySelector('.dot')!.toggleAttribute('hidden', !p?.dailyReady);
     if (!$('gift').hidden) renderGift(); else maybeAutoGift();
-    $('quests-count').textContent = `${p ? p.quest.paid.filter(Boolean).length : 0}/${QUESTS.length}`;
+    $('quests-count').textContent = `${p ? p.quest.paid.filter(Boolean).length : 0}/3`;
     $('rate-pts').textContent = String(r); $('rate-wins').textContent = String(p?.wins ?? 0);
   };
   function renderQuests() {
     const q = prof?.quest;
-    $('quests-list').innerHTML = QUESTS.map((d, i) => { const v = Math.min(d.goal, q?.[d.key] ?? 0), done = !!q?.paid[i]; return `<div class="item quest${done ? ' eq' : ''}"><span class="ic">${ico(done ? 'check' : (['target', 'trophy', 'robot'] as IconName[])[i] ?? 'star')}</span><div class="tx"><b>${esc(d.text)}</b><span class="bar"><i style="width:${100 * v / d.goal}%"></i></span><em>${v} / ${d.goal}</em></div><span class="${done ? 'maxed' : 'rw'}">${done ? 'ГОТОВО' : '+' + d.reward + ' <i class="coin"></i>'}</span></div>`; }).join('');
+    $('quests-list').innerHTML = (q?.ids ?? []).map((id, i) => { const d = questDef(id); if (!d) return ''; const v = Math.min(d.goal, q!.prog[i] ?? 0), done = !!q!.paid[i]; return `<div class="item quest${done ? ' eq' : ''}"><span class="ic">${ico(done ? 'check' : d.icon as IconName)}</span><div class="tx"><b>${esc(d.text)}</b><span class="bar"><i style="width:${100 * v / d.goal}%"></i></span><em>${v} / ${d.goal}</em></div><span class="${done ? 'maxed' : 'rw'}">${done ? 'ГОТОВО' : '+' + d.reward + ' <i class="coin"></i>'}</span></div>`; }).join('');
   }
   function setProfile(p: MyProfile) { prof = p; paintProfile(); if (current === 'quests') renderQuests(); if (current === 'shop') renderShop(); if (current === 'rating') renderTop(); }
   function renderShop() {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BOT_RATING_CAP, BOT_DAILY_COINS, BOT_REWARD, newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dailyStreak, DAILY_REWARDS, dayIndex, rewardBot, botRatingDelta, recordQuest, QUESTS, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
+import { BOT_RATING_CAP, BOT_DAILY_COINS, BOT_REWARD, newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dailyStreak, DAILY_REWARDS, dayIndex, rewardBot, botRatingDelta, recordQuest, QUEST_POOL, questDef, pickQuests, noStats, countEvents, cleanStats, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
 import { Battle } from '../shared/battle.ts';
 
 test('new profile: 1000 rating, starter coins, free cosmetics equipped', () => {
@@ -52,15 +52,19 @@ test('old plates upgrade is refunded once and then gone', () => {
   const again = sanitizeProfile(JSON.parse(JSON.stringify(p)), 'x'); assert.equal(again.coins, 810);
 });
 
-test('daily quests pay once when done, count only ranked wins as online wins, and reset on a new day', () => {
-  const p = newProfile('x'), c0 = p.coins;
-  assert.equal(recordQuest(p, 5, { won: true, ranked: false }), 0); assert.equal(recordQuest(p, 5, { won: true, ranked: false }), QUESTS[1].reward, '2 wins');
-  assert.equal(recordQuest(p, 5, { won: false, ranked: false }), QUESTS[0].reward, '3 played'); assert.equal(recordQuest(p, 5, { won: true, ranked: false }), 0, 'paid once');
-  assert.equal(p.quest.strong, 0); assert.equal(recordQuest(p, 5, { won: true, ranked: true }), QUESTS[2].reward);
-  assert.equal(p.coins, c0 + 60 + 40 + 80);
-  assert.equal(recordQuest(p, 6, { won: false, ranked: false }), 0); assert.equal(p.quest.day, 6); assert.equal(p.quest.played, 1); assert.deepEqual(p.quest.paid, [false, false, false]);
+test('daily tasks: one per tier, fixed for the day and the player, paid once, reset on a new day, survive a reload', () => {
+  const p = newProfile('x'), ids = pickQuests(5, 'x');
+  assert.deepEqual(ids, pickQuests(5, 'x')); ids.forEach((id, i) => assert.ok(QUEST_POOL[i]!.some(d => d.id === id)));
+  const days = new Set<string>(); for (let d = 0; d < 30; d++) days.add(pickQuests(d, 'x').join()); assert.ok(days.size > 5, 'the tasks change from day to day');
+  const c0 = p.coins; let paid = 0;
+  for (let i = 0; i < 12; i++) paid += recordQuest(p, 5, { ...noStats(true, true, true), heavy: 5, knock: 6, repair: 4, holes: 10, dodge: 3, falls: 4 });
+  assert.equal(p.quest.day, 5); assert.deepEqual(p.quest.paid, [true, true, true], 'a strong run finishes all three');
+  assert.equal(paid, p.quest.ids.reduce((s, id) => s + questDef(id)!.reward, 0)); assert.equal(p.coins, c0 + paid);
+  assert.equal(recordQuest(p, 5, noStats(true, true, true)), 0, 'paid once');
   const back = sanitizeProfile(JSON.parse(JSON.stringify(p)), 'x'); assert.deepEqual(back.quest, p.quest);
-  assert.deepEqual(sanitizeProfile({ quest: 'junk' }, 'x').quest, freshQuest(-1));
+  recordQuest(p, 6, noStats(false)); assert.equal(p.quest.day, 6); assert.deepEqual(p.quest.paid, [false, false, false]);
+  assert.deepEqual(sanitizeProfile({ quest: 'junk' }, 'x').quest, freshQuest(-1, 'x'));
+  assert.equal(sanitizeProfile({ quest: { day: 3, played: 1, won: 1, online: 1, paid: [false, false, true] } }, 'x').quest.day, -1, 'old-format tasks start afresh');
 });
 test('mods stay finite for an old or damaged profile (missing or junk upgrade levels)', () => {
   for (const up of [{ bag: 1, plates: 1 }, { bag: NaN, hands: 'x', legs: 99, quarry: -3 }, {}, null]) {
@@ -143,9 +147,13 @@ test('bot fights: rating never climbs above the cap, coins stop at the daily lim
   assert.deepEqual(sanitizeProfile(JSON.parse(JSON.stringify(p)), 'cap').bot, p.bot);
 });
 
-test('the third daily task is done by beating the hard bot or a live player; old profiles keep their progress', () => {
-  const p = newProfile('q3'); assert.equal(recordQuest(p, 3, { won: true, ranked: false, hard: false }), 0);
-  assert.equal(recordQuest(p, 3, { won: false, ranked: false, hard: true }), 0, 'a loss does not count');
-  assert.ok(recordQuest(p, 3, { won: true, ranked: false, hard: true }) >= QUESTS[2].reward);
-  assert.equal(sanitizeProfile({ quest: { day: 3, played: 1, won: 1, online: 1, paid: [false, false, true] } }, 'x').quest.strong, 1);
+test('fight stats: events are counted for the right side; untrusted stats are capped', () => {
+  const st = noStats(true);
+  countEvents(st, [{ type: 'throw', side: 0, kind: 'heavy' }, { type: 'throw', side: 1, kind: 'heavy' }, { type: 'hit', side: 1, kind: 'normal' }, { type: 'repaired', side: 0, cell: { x: 1, z: 1 } },
+    { type: 'impact', side: 1, cell: { x: 2, z: 2 }, kind: 'normal', hpBefore: 1, hpAfter: 0 }, { type: 'impact', side: 0, cell: { x: 2, z: 2 }, kind: 'normal', hpBefore: 1, hpAfter: 0 },
+    { type: 'dodge', side: 0 }, { type: 'fall', side: 1 }, { type: 'fall', side: 0 }], 0);
+  assert.deepEqual([st.heavy, st.knock, st.repair, st.holes, st.dodge, st.falls, st.lost], [1, 1, 1, 1, 1, 1, 1]);
+  const c = cleanStats({ heavy: 1e6, holes: -5, falls: 'x' }, true, false); assert.equal(c.heavy, 40); assert.equal(c.holes, 0); assert.equal(c.falls, 0); assert.equal(c.ranked, false);
+  const p = newProfile('q3'), strong = p.quest.ids.indexOf('strong1');
+  if (strong >= 0) { recordQuest(p, -1, noStats(true, false, false)); assert.equal(p.quest.prog[strong], 0); recordQuest(p, -1, noStats(true, false, true)); assert.equal(p.quest.prog[strong], 1); }
 });

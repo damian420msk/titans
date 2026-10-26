@@ -6,7 +6,7 @@ import { Battle, type GameEvent } from '../shared/battle.ts';
 import { cellsValid } from './validate.ts';
 import { MemoryStore, type Store } from './store.ts';
 import { PHRASES, REMATCH_S, snapshot, mirrorSnap, mirrorEvents, type C2S, type S2C, type RoomInfo, type RoomView, type Seat, type ErrCode, type MyProfile } from '../shared/net.ts';
-import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dailyStreak, claimTrained, dayIndex, rewardBot, botRatingDelta, BOT_REWARD, applyOnline, recordQuest, pushRecent, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
+import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dailyStreak, claimTrained, dayIndex, rewardBot, botRatingDelta, BOT_REWARD, applyOnline, recordQuest, pushRecent, freshQuest, countEvents, cleanStats, noStats, type FightStats, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
 
 export interface Conn { send(m: S2C): void }
 type Client = {
@@ -17,6 +17,8 @@ type Phase = 'lobby' | 'count' | 'playing';
 type Room = {
   id: string; name: string; pass: string; ranked: boolean; hidden: boolean; players: [Client | null, Client | null]; ready: [boolean, boolean];
   until: number; phase: Phase; count: number; countLeft: number; battle: Battle | null; acc: number; sinceSnap: number; pending: GameEvent[];
+  /** what each seat did in the current fight, for the daily tasks */
+  stats: [FightStats, FightStats];
 };
 
 const STEP = 1 / 60, SNAP_EVERY = 3, COUNT_FROM = 3, MAX_ROOMS = 60, BOT_RESULT_GAP_MS = 25000, FARM_LIMIT = 6, TOP_TTL_MS = 10000, GRACE_MS = 15000;
@@ -98,7 +100,7 @@ export class Lobby {
       case 'claim': return this.claim(c);
       case 'trained': return this.trained(c);
       case 'top': return this.sendTop(c);
-      case 'result': return this.botResult(c, m.level, !!m.won, m.foe, m.dur, m.quit === true);
+      case 'result': return this.botResult(c, m.level, !!m.won, m.foe, m.dur, m.quit === true, m.st);
       case 'bonus': return this.bonus(c);
       case 'emote': {
         const room = c.room, id = Number(m.id);
@@ -132,7 +134,7 @@ export class Lobby {
     if (cached !== undefined) done(cached); else this.store.load(pid).then(done, e => { console.error('profile load failed', e); done(null); });
   }
   private persist(p: Profile) { if (p.id.startsWith('guest-')) return; this.topCache = null; this.store.save(p).catch(e => console.error('profile save failed', e)); }
-  private view(p: Profile): MyProfile { const { id: _id, ...rest } = p; const day = dayIndex(this.now()); return { ...rest, streak: dailyStreak(p, day), quest: p.quest.day === day ? p.quest : freshQuest(day), dailyReady: p.daily < day }; }
+  private view(p: Profile): MyProfile { const { id: _id, ...rest } = p; const day = dayIndex(this.now()); return { ...rest, streak: dailyStreak(p, day), quest: p.quest.day === day ? p.quest : freshQuest(day, p.id), dailyReady: p.daily < day }; }
   private sendProfile(c: Client) { if (c.profile) c.conn.send({ t: 'profile', p: this.view(c.profile) }); }
   private shop(c: Client, ok: boolean, text: string) { c.conn.send({ t: 'shop', ok, text }); }
 
@@ -144,7 +146,7 @@ export class Lobby {
   private doEquip(c: Client, id: string) { const p = c.profile; if (!p) return; const r = equip(p, id); if (r.ok) this.persist(p); this.sendProfile(c); if (!r.ok) this.shop(c, false, r.error); }
   private claim(c: Client) { const p = c.profile; if (!p) return; const g = claimDaily(p, dayIndex(this.now())); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Подарок дня: +${g} монет` : 'Подарок уже получен сегодня'); }
   private trained(c: Client) { const p = c.profile; if (!p) return; const g = claimTrained(p); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Обучение пройдено: +${g} монет` : 'Награда за обучение уже получена'); }
-  private botResult(c: Client, level: unknown, won: boolean, foe?: unknown, dur?: unknown, quit = false) {
+  private botResult(c: Client, level: unknown, won: boolean, foe?: unknown, dur?: unknown, quit = false, st?: unknown) {
     const p = c.profile; if (!p || !['easy', 'normal', 'hard'].includes(level as string)) return;
     const lv = level as Difficulty, key = c.pid ?? c.id, day = dayIndex(this.now());
     if (quit) { // left the fight (button or closed tab): a loss without coins or quest progress, never skipped by the anti-spam gap
@@ -158,7 +160,7 @@ export class Lobby {
     c.lastResult = this.now(); this.lastBot.set(key, this.now());
     const dr = botRatingDelta(p, lv, won); p.rating += dr;
     pushRecent(p, { nick: typeof foe === 'string' && checkNick(clean(foe, 14)).ok ? clean(foe, 14) : BOT_NAMES[lv], won, delta: dr, online: false });
-    const r = rewardBot(p, lv, won, day), qc = recordQuest(p, day, { won, ranked: false, hard: lv === 'hard' });
+    const r = rewardBot(p, lv, won, day), qc = recordQuest(p, day, cleanStats(st, won, lv === 'hard'));
     this.onBot?.({ nick: p.nick, level: lv, won, dur: typeof dur === 'number' && Number.isFinite(dur) ? Math.round(dur) : null, coins: r });
     this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0;
     const capped = r === 0 && BOT_REWARD[lv][won ? 'win' : 'loss'] > 0;
@@ -185,7 +187,7 @@ export class Lobby {
   private broadcastList() { const rooms = this.list(); for (const c of this.clients.values()) if (!c.room) c.conn.send({ t: 'rooms', rooms }); }
   private err(c: Client, code: ErrCode, text: string) { c.conn.send({ t: 'err', code, text }); }
   private makeRoom(name: string, pass: string, ranked: boolean, hidden: boolean): Room {
-    const room: Room = { id: Math.random().toString(36).slice(2, 7), name, pass, ranked, hidden, players: [null, null], ready: [false, false], until: 0, phase: 'lobby', count: 0, countLeft: 0, battle: null, acc: 0, sinceSnap: 0, pending: [] };
+    const room: Room = { id: Math.random().toString(36).slice(2, 7), name, pass, ranked, hidden, players: [null, null], ready: [false, false], until: 0, phase: 'lobby', count: 0, countLeft: 0, battle: null, acc: 0, sinceSnap: 0, pending: [], stats: [noStats(false), noStats(false)] };
     this.rooms.set(room.id, room); return room;
   }
 
@@ -268,7 +270,7 @@ export class Lobby {
   // ---- match ----
   private startMatch(room: Room) {
     const [p0, p1] = room.players as [Client, Client], m0 = modsFor(p0.profile ?? newProfile('x')), m1 = modsFor(p1.profile ?? newProfile('x'));
-    room.phase = 'playing'; room.battle = new Battle([m0, m1]); room.acc = 0; room.sinceSnap = SNAP_EVERY; room.pending = [];
+    room.phase = 'playing'; room.battle = new Battle([m0, m1]); room.acc = 0; room.sinceSnap = SNAP_EVERY; room.pending = []; room.stats = [noStats(false), noStats(false)];
     p0.conn.send(this.startMsg(room, 0)); p1.conn.send(this.startMsg(room, 1));
     this.broadcastList();
   }
@@ -291,7 +293,7 @@ export class Lobby {
     }
     pushRecent(pa, { nick: b.nick, won: winner === null ? null : winner === 0, delta: g[0].rating, online: true }); pushRecent(pb, { nick: a.nick, won: winner === null ? null : winner === 1, delta: g[1].rating, online: true });
     const day = dayIndex(this.now());
-    g[0].coins += recordQuest(pa, day, { won: winner === 0, ranked }); g[1].coins += recordQuest(pb, day, { won: winner === 1, ranked });
+    g[0].coins += recordQuest(pa, day, { ...room.stats[0], won: winner === 0, ranked }); g[1].coins += recordQuest(pb, day, { ...room.stats[1], won: winner === 1, ranked });
     if (a.pid) a.lastGain = g[0].coins; if (b.pid) b.lastGain = g[1].coins;
     this.persist(pa); this.persist(pb);
     return { ranked, g };
@@ -331,7 +333,7 @@ export class Lobby {
       if (gone) { gone.away = null; this.leave(gone); continue; }
       const b = room.battle; room.acc += Math.min(dt, .25);
       while (room.acc >= STEP && b.phase === 'playing') {
-        room.acc -= STEP; b.step(STEP); room.pending.push(...b.events); b.events.length = 0;
+        room.acc -= STEP; b.step(STEP); countEvents(room.stats[0], b.events, 0); countEvents(room.stats[1], b.events, 1); room.pending.push(...b.events); b.events.length = 0;
         if (++room.sinceSnap >= SNAP_EVERY) { room.sinceSnap = 0; this.sendSnap(room); }
       }
       if (b.phase === 'over') this.finishMatch(room);

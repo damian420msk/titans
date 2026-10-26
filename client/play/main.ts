@@ -19,7 +19,7 @@ import type { Snap, MyProfile, Look } from '../../shared/net';
 import { icon, ico, EMOTE_ICONS, hydrateIcons } from './icons';
 import { titanOf, foeTitan, botTitan } from '../../shared/titans';
 import { kitOfTiles, PLATFORM_KITS, type KitId } from '../../shared/platformKits';
-import { modsFor, newProfile, sanitizeProfile, DEFAULT_EQUIP } from '../../shared/progress';
+import { modsFor, newProfile, sanitizeProfile, DEFAULT_EQUIP, countEvents, noStats, type FightStats } from '../../shared/progress';
 import type { Mods } from '../../shared/battle';
 import { Predictor } from '../../shared/predict';
 import type { GameEvent } from '../../shared/battle';
@@ -41,7 +41,7 @@ const token = (() => {
   return t;
 })();
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const { id: _id, ...p } = sanitizeProfile(r, 'local'); return { ...p, dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
-let pendingResult: { level: Difficulty; won: boolean; foe?: string; dur?: number; quit?: boolean } | null = null, disguise: string | null = null;
+let pendingResult: { level: Difficulty; won: boolean; foe?: string; dur?: number; quit?: boolean; st?: FightStats } | null = null, disguise: string | null = null;
 let training: Training | null = null, pendingTrained = false, trainDoneShown = false;
 /** Kit of the next bot's island: rolled ahead so it can be preloaded while the menu is open. */
 let botKit: KitId = PLATFORM_KITS[Math.floor(Math.random() * PLATFORM_KITS.length)]!.id;
@@ -55,6 +55,8 @@ const forceHq = new URLSearchParams(location.search).has('hq');
 let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
 const srvEvents: GameEvent[] = [];
 let pendingSnap: { s: Snap; at: number } | null = null;
+/** what the player did in the current bot fight (daily tasks; online the server counts it) */
+let fightStats = noStats(false);
 /** quick-match bot strength fitted to the player (null: the chosen level) */
 let botSkill: number | null = null;
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
@@ -155,7 +157,7 @@ async function boot() {
     world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, botSkill ?? level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = `<div class="slot">${icon('stone')}</div>`.repeat(battle.mods[0].capacity); paintNotches();
     $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
-    markFight(!online);
+    markFight(!online); fightStats = noStats(false);
     if (online) disguise = null; const shown = online ? foe! : (disguise ?? NAMES[level]); $('foe-name').textContent = shown; $('foe-face').textContent = online || disguise ? shown.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
@@ -331,6 +333,7 @@ async function boot() {
     world.smoothFoe = online;
     world.update(b, isPaused ? 0 : dt, { aiming: charging, kind, aimCell: ch ? ch.target : hover, cancel: controls.cancelled || controls.overCancel });
     trainTick(isPaused ? 0 : dt, b.events);
+    if (!online && !training && mode === 'playing') countEvents(fightStats, b.events, 0);
     for (const e of b.events) {
       if (e.type === 'hit' && e.side === 0) toast('Сбили с ног!'); if (e.type === 'fall' && e.side === 0) toast('Падаешь!'); if (e.type === 'fall' && e.side === 1) toast('Враг упал!');
       if (e.type === 'over' && training && !online) { const fin = training.complete; endTraining(fin); toMenu(); menu.notice('Тренировка закончилась. Прогресс сохранён, можно начать снова'); break; }
@@ -376,7 +379,7 @@ async function boot() {
     if (!online) markFight(false);
     if (!online && why !== 'conn') {
       if (winner === 0) menu.botWin();
-      pendingResult = { level, won: winner === 0, foe: disguise ?? undefined, dur: Math.round(battle.time) };
+      pendingResult = { level, won: winner === 0, foe: disguise ?? undefined, dur: Math.round(battle.time), st: fightStats };
       if (net.state === 'on') { hello(); net.send({ t: 'result', ...pendingResult }); pendingResult = null; } else net.connect();
     }
     if (why === 'left') { sfx.win(); }
