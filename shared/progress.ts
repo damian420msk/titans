@@ -38,6 +38,8 @@ export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { titan: 'titan_blue'
 export type Profile = {
   id: string; nick: string; rating: number; wins: number; losses: number; games: number; coins: number;
   up: Record<UpgradeId, number>; own: string[]; eq: Record<CosmeticKind, string>; daily: number; streak: number; quest: Quest; recent: Recent[];
+  /** Coins earned from bot fights on `day` (Moscow day index): capped by BOT_DAILY_COINS. */
+  bot: { day: number; coins: number };
   /** The training checklist was finished and its one-time reward paid. */
   trained: boolean;
 };
@@ -47,16 +49,18 @@ export const RECENT_KEEP = 8;
 export function pushRecent(p: Profile, r: Recent) { p.recent = [r, ...(p.recent ?? [])].slice(0, RECENT_KEEP); }
 
 /** Daily tasks: the same three every day, progress resets at midnight (Moscow). Coins are paid the moment a task completes. */
-export type Quest = { day: number; played: number; won: number; online: number; paid: [boolean, boolean, boolean] };
+export type Quest = { day: number; played: number; won: number; strong: number; paid: [boolean, boolean, boolean] };
 export const QUESTS = [
   { text: 'Сыграй 3 боя', goal: 3, reward: 40, key: 'played' },
   { text: 'Выиграй 2 боя', goal: 2, reward: 60, key: 'won' },
-  { text: 'Победи живого игрока в рейтинговом бою', goal: 1, reward: 80, key: 'online' },
+  // a live opponent is rare while few play, so a hard bot counts too (return to 'live only' in 1.1)
+  { text: 'Победи сложного бота или живого игрока', goal: 1, reward: 80, key: 'strong' },
 ] as const;
-export const freshQuest = (day: number): Quest => ({ day, played: 0, won: 0, online: 0, paid: [false, false, false] });
-export function recordQuest(p: Profile, day: number, r: { won: boolean; ranked: boolean }): number {
+export const freshQuest = (day: number): Quest => ({ day, played: 0, won: 0, strong: 0, paid: [false, false, false] });
+/** `ranked`: a rated fight against a live player; `hard`: a fight against the hard bot. */
+export function recordQuest(p: Profile, day: number, r: { won: boolean; ranked: boolean; hard?: boolean }): number {
   if (p.quest.day !== day) p.quest = freshQuest(day);
-  const q = p.quest; q.played++; if (r.won) q.won++; if (r.won && r.ranked) q.online++;
+  const q = p.quest; q.played++; if (r.won) q.won++; if (r.won && (r.ranked || r.hard)) q.strong++;
   let coins = 0; QUESTS.forEach((d, i) => { if (!q.paid[i] && q[d.key] >= d.goal) { q.paid[i] = true; coins += d.reward; } });
   p.coins += coins; return coins;
 }
@@ -64,7 +68,7 @@ export function recordQuest(p: Profile, day: number, r: { won: boolean; ranked: 
 export const START_RATING = 1000;
 export const newProfile = (id: string, nick = 'Игрок'): Profile => ({
   id, nick, rating: START_RATING, wins: 0, losses: 0, games: 0, coins: 100,
-  up: { bag: 0, hands: 0, legs: 0, quarry: 0, mender: 0, lungs: 0, thrift: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1, streak: 0, quest: freshQuest(-1), recent: [], trained: false,
+  up: { bag: 0, hands: 0, legs: 0, quarry: 0, mender: 0, lungs: 0, thrift: 0 }, own: COSMETICS.filter(c => c.cost === 0).map(c => c.id), eq: { ...DEFAULT_EQUIP }, daily: -1, streak: 0, quest: freshQuest(-1), recent: [], trained: false, bot: { day: -1, coins: 0 },
 });
 
 const num = (v: unknown, d: number, lo = 0, hi = 1e9) => typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : d;
@@ -79,8 +83,9 @@ export function sanitizeProfile(raw: any, id: string): Profile {
   const known = new Set(COSMETICS.map(c => c.id));
   p.own = [...new Set([...p.own, ...(Array.isArray(r.own) ? r.own.filter((x: unknown) => typeof x === 'string' && known.has(x)) : [])])];
   for (const k of ['titan', 'tiles', 'stone'] as CosmeticKind[]) { const e = r.eq?.[k]; p.eq[k] = typeof e === 'string' && p.own.includes(e) && COSMETICS.find(c => c.id === e)?.kind === k ? e : DEFAULT_EQUIP[k]; }
-  const q = r.quest; if (q && typeof q === 'object') p.quest = { day: num(q.day, -1, -1), played: num(q.played, 0, 0, 99), won: num(q.won, 0, 0, 99), online: num(q.online, 0, 0, 99), paid: [0, 1, 2].map(i => q.paid?.[i] === true) as Quest['paid'] };
+  const q = r.quest; if (q && typeof q === 'object') p.quest = { day: num(q.day, -1, -1), played: num(q.played, 0, 0, 99), won: num(q.won, 0, 0, 99), strong: num(q.strong ?? q.online, 0, 0, 99), paid: [0, 1, 2].map(i => q.paid?.[i] === true) as Quest['paid'] };
   p.trained = r.trained === true;
+  if (r.bot && typeof r.bot === 'object') p.bot = { day: num(r.bot.day, -1, -1), coins: num(r.bot.coins, 0) };
   if (Array.isArray(r.recent)) p.recent = r.recent.slice(0, RECENT_KEEP).filter((x: any) => x && typeof x.nick === 'string').map((x: any): Recent => ({ nick: x.nick.slice(0, 14), won: x.won === true ? true : x.won === false ? false : null, delta: num(x.delta, 0, -999, 999), online: x.online === true }));
   return p;
 }
@@ -131,12 +136,20 @@ export function claimDaily(p: Profile, day: number): number {
 }
 /** Rating for a bot fight: Elo against a fixed bot rating, then halved (a bot is worth half a live player). A win always gives at least +1, a loss costs at least 1. */
 export const BOT_RATING: Record<Difficulty, number> = { easy: 850, normal: 1050, hard: 1250 };
+/** Bot wins never lift the rating above this (Gold): the higher leagues are earned against live players. */
+export const BOT_RATING_CAP = 1250;
 export function botRatingDelta(p: Pick<Profile, 'rating' | 'games'>, level: Difficulty, won: boolean): number {
   const [d] = elo(p.rating, BOT_RATING[level], won ? 1 : 0, p.games, 99), half = Math.round(d / 2);
-  const delta = won ? Math.max(1, half) : Math.min(-1, half);
+  const delta = won ? Math.min(Math.max(1, half), Math.max(0, BOT_RATING_CAP - p.rating)) : Math.min(-1, half);
   return Math.max(delta, -p.rating) || 0;
 }
-export function rewardBot(p: Profile, level: Difficulty, won: boolean): number { const r = BOT_REWARD[level][won ? 'win' : 'loss']; p.coins += r; p.games++; if (won) p.wins++; else p.losses++; return r; }
+/** Most coins a player can earn from bot fights in one day; quests and the daily gift are separate. */
+export const BOT_DAILY_COINS = 600;
+export function rewardBot(p: Profile, level: Difficulty, won: boolean, day: number): number {
+  if (p.bot.day !== day) p.bot = { day, coins: 0 };
+  const r = Math.min(BOT_REWARD[level][won ? 'win' : 'loss'], Math.max(0, BOT_DAILY_COINS - p.bot.coins));
+  p.bot.coins += r; p.coins += r; p.games++; if (won) p.wins++; else p.losses++; return r;
+}
 
 /** Elo with a larger step for the first games. Returns the two rating changes. */
 export function elo(ra: number, rb: number, scoreA: number, gamesA = 99, gamesB = 99): [number, number] {

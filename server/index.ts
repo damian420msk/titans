@@ -8,7 +8,8 @@ const PORT = Number(process.env.PORT) || 8787;
 const store: Store = process.env.SUPABASE_URL && process.env.SUPABASE_KEY ? new SupabaseStore(process.env.SUPABASE_URL.replace(/\/$/, ''), process.env.SUPABASE_KEY) : new MemoryStore(process.env.DATA_FILE);
 console.log(`profiles: ${store instanceof SupabaseStore ? 'Supabase' : 'memory' + (process.env.DATA_FILE ? ' + ' + process.env.DATA_FILE : ' (lost on restart)')}`);
 const lobby = new Lobby(store);
-lobby.onResult = r => console.log(`[match] ${r.names[0]} vs ${r.names[1]}: ${r.winner === null ? 'draw' : r.names[r.winner] + ' won'} (${r.reason}${r.ranked ? ', ranked' : ''})`);
+lobby.onResult = r => console.log(`[match] ${r.names[0]} vs ${r.names[1]}: ${r.winner === null ? 'draw' : r.names[r.winner] + ' won'} (${r.reason}${r.ranked ? ', ranked' : ''}, ${r.dur} s)`);
+lobby.onBot = r => console.log(`[bot] ${r.nick} vs ${r.level}: ${r.won ? 'won' : 'lost'}${r.dur !== null ? `, ${r.dur} s` : ''}, +${r.coins} coins`);
 const started = Date.now();
 
 const http = createServer((req, res) => {

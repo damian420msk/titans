@@ -40,7 +40,7 @@ const token = (() => {
   return t;
 })();
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const { id: _id, ...p } = sanitizeProfile(r, 'local'); return { ...p, dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
-let pendingResult: { level: Difficulty; won: boolean; foe?: string } | null = null, disguise: string | null = null;
+let pendingResult: { level: Difficulty; won: boolean; foe?: string; dur?: number } | null = null, disguise: string | null = null;
 let training: Training | null = null, pendingTrained = false, trainDoneShown = false;
 /** Kit of the next bot's island: rolled ahead so it can be preloaded while the menu is open. */
 let botKit: KitId = PLATFORM_KITS[Math.floor(Math.random() * PLATFORM_KITS.length)]!.id;
@@ -124,7 +124,7 @@ async function boot() {
       case 'profile': {
         myProfile = m.p; store.set('profile', JSON.stringify(m.p)); menu.setProfile(m.p); world.preloadPlates(kitOfTiles(m.p.eq.tiles), botKit);
         if (pendingTrained) { net.send({ t: 'trained' }); pendingTrained = false; }
-        if (pendingResult) { net.send({ t: 'result', level: pendingResult.level, won: pendingResult.won, foe: pendingResult.foe }); pendingResult = null; }
+        if (pendingResult) { net.send({ t: 'result', ...pendingResult }); pendingResult = null; }
         break;
       }
       case 'top': menu.setTop(m.list, m.rank); break;
@@ -363,8 +363,8 @@ async function boot() {
     $('end-gain').innerHTML = online ? endGain.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!)).replace('🪙', ico('coin')) : ''; $('end-foe').textContent = ''; $('rematch').hidden = $('end-say').hidden = true; if (online && !why) setTimeout(updateRematch, 0);
     if (!online && why !== 'conn') {
       if (winner === 0) menu.botWin();
-      pendingResult = { level, won: winner === 0, foe: disguise ?? undefined };
-      if (net.state === 'on') { hello(); net.send({ t: 'result', level, won: winner === 0, foe: disguise ?? undefined }); pendingResult = null; } else net.connect();
+      pendingResult = { level, won: winner === 0, foe: disguise ?? undefined, dur: Math.round(battle.time) };
+      if (net.state === 'on') { hello(); net.send({ t: 'result', ...pendingResult }); pendingResult = null; } else net.connect();
     }
     if (why === 'left') { sfx.win(); }
     setTimeout(() => { $('end').hidden = false; }, 900);

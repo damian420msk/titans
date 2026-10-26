@@ -1,11 +1,12 @@
 // Rooms, quick-match queue, profiles and authoritative matches.
 // Transport-agnostic: index.ts feeds it WebSocket messages, tests feed it fake connections.
 import { createHash } from 'node:crypto';
+import type { Difficulty } from '../shared/bot.ts';
 import { Battle, type GameEvent } from '../shared/battle.ts';
 import { cellsValid } from './validate.ts';
 import { MemoryStore, type Store } from './store.ts';
 import { PHRASES, REMATCH_S, snapshot, mirrorSnap, mirrorEvents, type C2S, type S2C, type RoomInfo, type RoomView, type Seat, type ErrCode, type MyProfile } from '../shared/net.ts';
-import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dailyStreak, claimTrained, dayIndex, rewardBot, botRatingDelta, applyOnline, recordQuest, pushRecent, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
+import { newProfile, modsFor, buyUpgrade, buyCosmetic, equip, claimDaily, dailyStreak, claimTrained, dayIndex, rewardBot, botRatingDelta, BOT_REWARD, applyOnline, recordQuest, pushRecent, freshQuest, ONLINE_REWARD, UPGRADES, type Profile, type PublicEntry } from '../shared/progress.ts';
 
 export interface Conn { send(m: S2C): void }
 type Client = {
@@ -30,12 +31,16 @@ export class Lobby {
   private profiles = new Map<string, Profile>();
   private queue: Client[] = [];
   private pairLog = new Map<string, number[]>();
+  /** last paid bot fight per player (profile id, or socket id for a guest) */
+  private lastBot = new Map<string, number>();
   private topCache: { at: number; list: PublicEntry[] } | null = null;
   private seq = 0;
   private store: Store;
   private now: () => number;
   /** Finished matches, for logs. */
-  onResult?: (r: { names: [string, string]; winner: 0 | 1 | null; reason: 'over' | 'left'; ranked: boolean }) => void;
+  onResult?: (r: { names: [string, string]; winner: 0 | 1 | null; reason: 'over' | 'left'; ranked: boolean; dur: number }) => void;
+  /** Paid bot fights, for logs. */
+  onBot?: (r: { nick: string; level: Difficulty; won: boolean; dur: number | null; coins: number }) => void;
 
   constructor(store: Store = new MemoryStore(), now: () => number = Date.now) { this.store = store; this.now = now; }
 
@@ -93,7 +98,7 @@ export class Lobby {
       case 'claim': return this.claim(c);
       case 'trained': return this.trained(c);
       case 'top': return this.sendTop(c);
-      case 'result': return this.botResult(c, m.level, !!m.won, m.foe);
+      case 'result': return this.botResult(c, m.level, !!m.won, m.foe, m.dur);
       case 'bonus': return this.bonus(c);
       case 'emote': {
         const room = c.room, id = Number(m.id);
@@ -139,10 +144,19 @@ export class Lobby {
   private doEquip(c: Client, id: string) { const p = c.profile; if (!p) return; const r = equip(p, id); if (r.ok) this.persist(p); this.sendProfile(c); if (!r.ok) this.shop(c, false, r.error); }
   private claim(c: Client) { const p = c.profile; if (!p) return; const g = claimDaily(p, dayIndex(this.now())); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Подарок дня: +${g} монет` : 'Подарок уже получен сегодня'); }
   private trained(c: Client) { const p = c.profile; if (!p) return; const g = claimTrained(p); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Обучение пройдено: +${g} монет` : 'Награда за обучение уже получена'); }
-  private botResult(c: Client, level: unknown, won: boolean, foe?: unknown) {
+  private botResult(c: Client, level: unknown, won: boolean, foe?: unknown, dur?: unknown) {
     const p = c.profile; if (!p || !['easy', 'normal', 'hard'].includes(level as string)) return;
-    if (this.now() - c.lastResult < BOT_RESULT_GAP_MS) return this.shop(c, false, 'Награда за слишком быстрый бой не засчитана');
-    c.lastResult = this.now(); const dr = botRatingDelta(p, level as any, won); p.rating += dr; pushRecent(p, { nick: typeof foe === 'string' && checkNick(clean(foe, 14)).ok ? clean(foe, 14) : BOT_NAMES[level as 'easy' | 'normal' | 'hard'], won, delta: dr, online: false }); const r = rewardBot(p, level as any, won), qc = recordQuest(p, dayIndex(this.now()), { won, ranked: false }); this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0; this.shop(c, true, `+${r} монет · ${dr > 0 ? '+' : ''}${dr} рейтинг` + (qc ? ` · задание +${qc}` : ''));
+    const lv = level as Difficulty, key = c.pid ?? c.id, day = dayIndex(this.now());
+    // the gap is kept per player, not per socket: a reconnect or a second tab does not reset it
+    if (this.now() - Math.max(c.lastResult, this.lastBot.get(key) ?? 0) < BOT_RESULT_GAP_MS) return this.shop(c, false, 'Награда за слишком быстрый бой не засчитана');
+    c.lastResult = this.now(); this.lastBot.set(key, this.now());
+    const dr = botRatingDelta(p, lv, won); p.rating += dr;
+    pushRecent(p, { nick: typeof foe === 'string' && checkNick(clean(foe, 14)).ok ? clean(foe, 14) : BOT_NAMES[lv], won, delta: dr, online: false });
+    const r = rewardBot(p, lv, won, day), qc = recordQuest(p, day, { won, ranked: false, hard: lv === 'hard' });
+    this.onBot?.({ nick: p.nick, level: lv, won, dur: typeof dur === 'number' && Number.isFinite(dur) ? Math.round(dur) : null, coins: r });
+    this.persist(p); this.sendProfile(c); c.lastGain = c.pid ? r + qc : 0;
+    const capped = r === 0 && BOT_REWARD[lv][won ? 'win' : 'loss'] > 0;
+    this.shop(c, true, (capped ? 'Лимит монет за ботов на сегодня исчерпан' : `+${r} монет`) + ` · ${dr > 0 ? '+' : ''}${dr} рейтинг` + (qc ? ` · задание +${qc}` : ''));
   }
   /** Rewarded-ad bonus: repeats the last reward once. The server cannot see the ad, so it only trusts one claim per match. */
   private bonus(c: Client) {
@@ -199,7 +213,7 @@ export class Lobby {
     if (wasPlaying && rival) gains = this.settle(room, seat === 0 ? 1 : 0);
     c.room = null; room.players[seat] = null; room.ready = [false, false];
     if (wasPlaying) {
-      this.onResult?.({ names, winner: seat === 0 ? 1 : 0, reason: 'left', ranked: gains?.ranked ?? false });
+      this.onResult?.({ names, winner: seat === 0 ? 1 : 0, reason: 'left', ranked: gains?.ranked ?? false, dur: Math.round(room.battle?.time ?? 0) });
       rival?.conn.send({ t: 'end', winner: 0, reason: 'left', gain: gains ? gains.g[seat === 0 ? 1 : 0] : null });
       if (rival) this.sendProfile(rival);
       this.sendProfile(c); // the one who left lost the fight: show the new rating at once
@@ -328,7 +342,7 @@ export class Lobby {
   private finishMatch(room: Room) {
     const b = room.battle!, [p0, p1] = room.players as [Client, Client]; this.sendSnap(room);
     const res = this.settle(room, b.winner);
-    this.onResult?.({ names: [p0.nick, p1.nick], winner: b.winner, reason: 'over', ranked: res.ranked });
+    this.onResult?.({ names: [p0.nick, p1.nick], winner: b.winner, reason: 'over', ranked: res.ranked, dur: Math.round(b.time) });
     p0.conn.send({ t: 'end', winner: b.winner, reason: 'over', gain: res.g[0] });
     p1.conn.send({ t: 'end', winner: b.winner === null ? null : b.winner === 0 ? 1 : 0, reason: 'over', gain: res.g[1] });
     this.sendProfile(p0); this.sendProfile(p1);

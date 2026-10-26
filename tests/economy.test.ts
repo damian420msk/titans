@@ -59,8 +59,8 @@ test('unranked room: only coins change; farming the same opponent stops giving r
 });
 test('bot results pay coins but not twice in a row', () => {
   let t = 1e9; const lobby = new Lobby(new MemoryStore(), () => t), a = player(lobby, 'Аня');
-  lobby.handle(a, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a).coins, 160); lobby.handle(a, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a).coins, 160);
-  t += 26000; lobby.handle(a, { t: 'result', level: 'nonsense' as any, won: true }); assert.equal(prof(a).coins, 160); lobby.handle(a, { t: 'result', level: 'easy', won: false }); assert.equal(prof(a).coins, 165);
+  lobby.handle(a, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a).coins, 100 + 60 + 80, 'win plus the hard-bot daily task'); lobby.handle(a, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a).coins, 240);
+  t += 26000; lobby.handle(a, { t: 'result', level: 'nonsense' as any, won: true }); assert.equal(prof(a).coins, 240); lobby.handle(a, { t: 'result', level: 'easy', won: false }); assert.equal(prof(a).coins, 245);
 });
 test('quick match pairs two queued players of similar rating into a ranked match', () => {
   let t = 1e9; const lobby = new Lobby(new MemoryStore(), () => t), a = player(lobby, 'Аня'), b = player(lobby, 'Боря'), c = player(lobby, 'Вася');
@@ -119,10 +119,10 @@ test('quick match marks the start message so the client can offer "search again"
 test('rewarded bonus repeats the last reward once, capped, and only for saved accounts', () => {
   const lobby = new Lobby(new MemoryStore(), () => 1e9), a = player(lobby, 'Аня');
   lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, 100, 'nothing to double yet');
-  lobby.handle(a, { t: 'result', level: 'hard', won: true }); const after = prof(a).coins; assert.equal(after, 100 + 60);
-  lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + 60); lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + 60, 'only once');
+  lobby.handle(a, { t: 'result', level: 'hard', won: true }); const after = prof(a).coins; assert.equal(after, 100 + 60 + 80);
+  lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + 140, 'fight and task doubled'); lobby.handle(a, { t: 'bonus' }); assert.equal(prof(a).coins, after + 140, 'only once');
   const g = fake(); lobby.connect(g); lobby.handle(g, { t: 'hello', nick: 'Гость' }); lobby.handle(g, { t: 'result', level: 'hard', won: true }); lobby.handle(g, { t: 'bonus' });
-  assert.equal(g.last('profile')!.p.coins, 100 + 60 , 'guest got only the plain reward');
+  assert.equal(g.last('profile')!.p.coins, 100 + 60 + 80, 'guest got only the plain reward');
 });
 
 test('a bot win raises rating, a bot loss lowers it (after the anti-spam gap); the message says so', () => {
@@ -190,4 +190,12 @@ test('training reward: paid once, never gives rating, survives reconnect', () =>
   assert.equal(a.last('shop')!.ok, true); assert.equal(prof(a).coins, 200); assert.equal(prof(a).trained, true); assert.equal(prof(a).rating, 1000); assert.equal(prof(a).games, 0);
   lobby.handle(a, { t: 'trained' }); assert.equal(a.last('shop')!.ok, false); assert.equal(prof(a).coins, 200, 'second claim pays nothing');
   lobby.disconnect(a); const a2 = player(lobby, 'Аня'); assert.equal(prof(a2).trained, true); assert.equal(prof(a2).coins, 200);
+});
+
+test('the bot-fight gap is kept per player: a reconnect or a second tab does not reset it', () => {
+  let t = Date.UTC(2026, 9, 26, 12); const lobby = new Lobby(new MemoryStore(), () => t), a = player(lobby, 'Аня');
+  lobby.handle(a, { t: 'result', level: 'hard', won: true }); const c1 = prof(a).coins;
+  const a2 = player(lobby, 'Аня'); lobby.handle(a2, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a2).coins, c1, 'second tab');
+  lobby.disconnect(a); const a3 = player(lobby, 'Аня'); lobby.handle(a3, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a3).coins, c1, 'reconnect');
+  t += 26000; lobby.handle(a3, { t: 'result', level: 'hard', won: true }); assert.ok(prof(a3).coins > c1);
 });

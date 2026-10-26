@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dailyStreak, DAILY_REWARDS, dayIndex, rewardBot, botRatingDelta, recordQuest, QUESTS, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
+import { BOT_RATING_CAP, BOT_DAILY_COINS, BOT_REWARD, newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dailyStreak, DAILY_REWARDS, dayIndex, rewardBot, botRatingDelta, recordQuest, QUESTS, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
 import { Battle } from '../shared/battle.ts';
 
 test('new profile: 1000 rating, starter coins, free cosmetics equipped', () => {
@@ -29,7 +29,7 @@ test('Elo: equal players move by about half K, upsets pay more, the sum is zero 
 });
 test('daily bonus once per day, rewards by difficulty, leagues', () => {
   const p = newProfile('x'), day = dayIndex(Date.UTC(2026, 9, 25, 12)); assert.equal(claimDaily(p, day), DAILY_BONUS); assert.equal(claimDaily(p, day), 0); assert.equal(claimDaily(p, day + 1), DAILY_BONUS);
-  const c0 = p.coins; assert.ok(rewardBot(p, 'hard', true) > rewardBot(p, 'easy', true)); assert.ok(p.coins > c0);
+  const c0 = p.coins; assert.ok(rewardBot(p, 'hard', true, 1) > rewardBot(p, 'easy', true, 1)); assert.ok(p.coins > c0);
   assert.equal(league(900).name, 'Бронза'); assert.equal(league(1250).name, 'Золото'); assert.equal(league(3000).name, 'Алмаз');
 });
 test('sanitizeProfile repairs garbage and never grants unowned items', () => {
@@ -56,7 +56,7 @@ test('daily quests pay once when done, count only ranked wins as online wins, an
   const p = newProfile('x'), c0 = p.coins;
   assert.equal(recordQuest(p, 5, { won: true, ranked: false }), 0); assert.equal(recordQuest(p, 5, { won: true, ranked: false }), QUESTS[1].reward, '2 wins');
   assert.equal(recordQuest(p, 5, { won: false, ranked: false }), QUESTS[0].reward, '3 played'); assert.equal(recordQuest(p, 5, { won: true, ranked: false }), 0, 'paid once');
-  assert.equal(p.quest.online, 0); assert.equal(recordQuest(p, 5, { won: true, ranked: true }), QUESTS[2].reward);
+  assert.equal(p.quest.strong, 0); assert.equal(recordQuest(p, 5, { won: true, ranked: true }), QUESTS[2].reward);
   assert.equal(p.coins, c0 + 60 + 40 + 80);
   assert.equal(recordQuest(p, 6, { won: false, ranked: false }), 0); assert.equal(p.quest.day, 6); assert.equal(p.quest.played, 1); assert.deepEqual(p.quest.paid, [false, false, false]);
   const back = sanitizeProfile(JSON.parse(JSON.stringify(p)), 'x'); assert.deepEqual(back.quest, p.quest);
@@ -76,7 +76,7 @@ test('bot fights move rating, half as much as a live player; a win always gives 
   assert.ok(botRatingDelta(p, 'normal', false) < 0);
   assert.ok(botRatingDelta(p, 'hard', true) > botRatingDelta(p, 'easy', true), 'a harder bot pays more');
   assert.ok(botRatingDelta(p, 'easy', false) < botRatingDelta(p, 'hard', false), 'losing to an easy bot costs more');
-  assert.equal(botRatingDelta({ rating: 2000, games: 50 }, 'easy', true), 1); assert.ok(botRatingDelta({ rating: 2000, games: 50 }, 'easy', false) <= -1);
+  assert.ok(botRatingDelta({ rating: 1240, games: 50 }, 'easy', true) >= 1); assert.equal(botRatingDelta({ rating: 2000, games: 50 }, 'easy', true), 0, 'bots do not lift above the cap'); assert.ok(botRatingDelta({ rating: 2000, games: 50 }, 'easy', false) <= -1);
   assert.equal(botRatingDelta({ rating: 0, games: 50 }, 'hard', false), 0, 'never below zero');
 });
 
@@ -132,4 +132,20 @@ test('plate kits: free starter, then terracotta < jade < basalt; an old plate ti
   assert.equal(p.eq.tiles, 'tiles_basalt'); assert.equal(p.coins, 5000 - 250 - 450 - 700); assert.equal(equip(p, 'tiles_jade').ok, true); assert.equal(p.eq.tiles, 'tiles_jade');
   const old = sanitizeProfile({ coins: 0, own: ['tiles_sand', 'tiles_granite', 'tiles_dusk'], eq: { tiles: 'tiles_dusk' } }, 'o');
   assert.equal(old.coins, 250 + 300); assert.equal(old.eq.tiles, 'tiles_starter'); assert.deepEqual(old.own.filter(x => x.startsWith('tiles_')), ['tiles_starter']);
+});
+
+test('bot fights: rating never climbs above the cap, coins stop at the daily limit and start again the next day', () => {
+  const p = newProfile('cap'); p.rating = BOT_RATING_CAP - 3; p.games = 50;
+  assert.equal(botRatingDelta(p, 'hard', true), 3); p.rating = BOT_RATING_CAP; assert.equal(botRatingDelta(p, 'hard', true), 0); assert.ok(botRatingDelta(p, 'hard', false) < 0, 'losses still count');
+  let got = 0; for (let i = 0; i < 30; i++) got += rewardBot(p, 'hard', true, 7);
+  assert.equal(got, BOT_DAILY_COINS); assert.equal(rewardBot(p, 'hard', true, 7), 0);
+  assert.equal(rewardBot(p, 'hard', true, 8), BOT_REWARD.hard.win, 'a new day');
+  assert.deepEqual(sanitizeProfile(JSON.parse(JSON.stringify(p)), 'cap').bot, p.bot);
+});
+
+test('the third daily task is done by beating the hard bot or a live player; old profiles keep their progress', () => {
+  const p = newProfile('q3'); assert.equal(recordQuest(p, 3, { won: true, ranked: false, hard: false }), 0);
+  assert.equal(recordQuest(p, 3, { won: false, ranked: false, hard: true }), 0, 'a loss does not count');
+  assert.ok(recordQuest(p, 3, { won: true, ranked: false, hard: true }) >= QUESTS[2].reward);
+  assert.equal(sanitizeProfile({ quest: { day: 3, played: 1, won: 1, online: 1, paid: [false, false, true] } }, 'x').quest.strong, 1);
 });
