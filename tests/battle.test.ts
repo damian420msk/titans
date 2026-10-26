@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Battle, kindForHold, cellsFor, LIVES, MATCH_SECONDS, PRACTICE } from '../shared/battle.ts';
+import { Battle, kindForHold, cellsFor, tuneFrom, DEFAULT_TUNE, LIVES, MATCH_SECONDS, PRACTICE } from '../shared/battle.ts';
 import { Bot, mulberry32 } from '../shared/bot.ts';
 import { cellCentre, rules } from '../shared/world.ts';
 
@@ -241,4 +241,20 @@ test('practice: the training titan never falls or slides, its plates heal, falls
   b.floors[0].set('2,6', 0); place(b, 0, 2, 6); run(b, 3);
   assert.equal(b.actors[0].lives, LIVES); assert.equal(b.actors[0].falling, false);
   run(b, MATCH_SECONDS + 5); assert.equal(b.phase, 'playing');
+});
+
+test('playtest switches: a shorter heavy hold, and a fall that repairs the faller\'s cracks or whole island', () => {
+  assert.deepEqual(tuneFrom(new URLSearchParams('')), DEFAULT_TUNE);
+  assert.deepEqual(tuneFrom(new URLSearchParams('restore=cracks&heavy=1.8')), { restore: 'cracks', heavyFrom: 1.8 });
+  assert.equal(tuneFrom(new URLSearchParams('heavy=0.5')).heavyFrom, DEFAULT_TUNE.heavyFrom, 'not below the spin hold');
+  assert.equal(kindForHold(2, 1.8), 'heavy'); assert.equal(kindForHold(2), 'spin');
+  const b = new Battle(); b.tune = { restore: 'none', heavyFrom: 1.8 }; place(b, 1, 0, 10);
+  throwAt(b, 0, { x: 3, z: 5 }, 1.9); run(b, 1.5); assert.equal(b.hp({ x: 3, z: 5 }, 1), 0, 'heavy after 1.9 s');
+  for (const restore of ['cracks', 'all'] as const) {
+    const c = new Battle(); c.tune = { restore, heavyFrom: DEFAULT_TUNE.heavyFrom };
+    c.floors[0].set('1,8', 1); c.floors[0].set('7,8', 0); c.floors[0].set('4,6', 0); run(c, 3); // titan 0 starts on 4,6: falls
+    assert.equal(c.actors[0].lives, LIVES - 1);
+    assert.equal(c.hp({ x: 1, z: 8 }, 0), 2, `${restore}: crack repaired`);
+    assert.equal(c.hp({ x: 7, z: 8 }, 0), restore === 'all' ? 2 : 0, `${restore}: hole`);
+  }
 });

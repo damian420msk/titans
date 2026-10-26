@@ -80,7 +80,7 @@ export class Bot {
     const target = this.pickTarget();
     if (!target || !b.beginCharge(s)) return;
     const r = this.rnd(), kind: Kind = r < this.p.heavy ? 'heavy' : r < this.p.heavy + this.p.spin ? 'spin' : 'normal';
-    const hold = kind === 'heavy' ? rules.shot.types.heavy.hold_from_s + .1 : kind === 'spin' ? rules.shot.types.spin.hold_from_s + .1 : .2;
+    const hold = kind === 'heavy' ? b.tune.heavyFrom + .1 : kind === 'spin' ? rules.shot.types.spin.hold_from_s + .1 : .2;
     this.plan = { target, hold }; this.sinceFire = 0;
     b.setTarget(s, target);
     // a little repositioning while charging keeps the bot alive but unpredictable

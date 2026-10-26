@@ -39,9 +39,17 @@ const valid = (c: Cell | null): c is Cell => !!c && Number.isInteger(c.x) && Num
 
 const KIND_RANK: Record<Kind, number> = { normal: 0, spin: 1, heavy: 2 };
 export const HOLD_SLACK_S = .25;
-/** Which throw a hold of `t` seconds produces. */
-export function kindForHold(t: number): Kind {
-  return t >= KINDS.heavy.hold_from_s ? 'heavy' : t >= KINDS.spin.hold_from_s ? 'spin' : 'normal';
+/** Which throw a hold of `t` seconds produces (`heavyFrom`: the playtest can try a shorter heavy hold, see Tune). */
+export function kindForHold(t: number, heavyFrom: number = KINDS.heavy.hold_from_s): Kind {
+  return t >= heavyFrom ? 'heavy' : t >= KINDS.spin.hold_from_s ? 'spin' : 'normal';
+}
+/** Playtest switches (bot fights only, from the page address): what a fall repairs on the faller's island, and the heavy-throw hold. Defaults = the rules. */
+export type Tune = { restore: 'none' | 'cracks' | 'all'; heavyFrom: number };
+export const DEFAULT_TUNE: Tune = { restore: 'none', heavyFrom: KINDS.heavy.hold_from_s };
+/** Reads ?restore=none|cracks|all and ?heavy=<seconds> (kept above the spin hold, at most the rules value + 1 s). */
+export function tuneFrom(q: { get(k: string): string | null }): Tune {
+  const r = q.get('restore'), h = Number(q.get('heavy'));
+  return { restore: r === 'cracks' || r === 'all' ? r : 'none', heavyFrom: Number.isFinite(h) && h > KINDS.spin.hold_from_s + .3 && h <= KINDS.heavy.hold_from_s + 1 ? h : KINDS.heavy.hold_from_s };
 }
 /** Cells hit by a throw: the target plus its x+1 neighbour (x-1 at the right edge) for spin and heavy. */
 export function cellsFor(kind: Kind, target: Cell): Cell[] {
@@ -74,6 +82,7 @@ export class Battle {
   phase: 'playing' | 'over' = 'playing';
   winner: Side | null = null;
   practice: Practice | null = null;
+  tune: Tune = { ...DEFAULT_TUNE };
   /** practice only: cell key → time when the anchored side's damaged plate heals */
   private heals = new Map<string, number>();
   private shotId = 0;
@@ -145,8 +154,8 @@ export class Battle {
     const ch = this.charges[side]; this.charges[side] = null;
     const a = this.actors[side];
     if (!ch || !valid(ch.target) || !this.canAct(side) || a.stones < rules.inventory.shot_cost) return null;
-    let kind = kindForHold(ch.t);
-    if (claimed && KIND_RANK[claimed] > KIND_RANK[kind] && KIND_RANK[kindForHold(ch.t + HOLD_SLACK_S)] >= KIND_RANK[claimed]) kind = claimed;
+    let kind = kindForHold(ch.t, this.tune.heavyFrom);
+    if (claimed && KIND_RANK[claimed] > KIND_RANK[kind] && KIND_RANK[kindForHold(ch.t + HOLD_SLACK_S, this.tune.heavyFrom)] >= KIND_RANK[claimed]) kind = claimed;
     const shot: Shot = { id: ++this.shotId, owner: side, kind, cells: cellsFor(kind, ch.target), start: { ...a.pos }, elapsed: 0 };
     this.shots.push(shot); a.stones -= rules.inventory.shot_cost; a.cooldown = this.mods[side].cooldown;
     this.events.push({ type: 'throw', side, kind }); return shot;
@@ -233,7 +242,12 @@ export class Battle {
     const a = this.actors[side];
     if (!this.practice) a.lives--; // training: a fall teaches, it does not cost a life
     if (a.lives <= 0) { a.y = FALL_DEPTH; this.finish(sideOther(side)); return; }
-    this.respawn(side, a.lives);
+    this.restoreAfterFall(side); this.respawn(side, a.lives);
+  }
+  /** Playtest: the faller's island gets its cracks (or everything) back, against a snowballing match. */
+  private restoreAfterFall(side: Side) {
+    const mode = this.tune.restore, full = this.mods[side].tileHp; if (mode === 'none') return;
+    for (const [k, hp] of this.floors[side]) if (Number.isFinite(hp) && hp < full && (mode === 'all' || hp > 0)) this.floors[side].set(k, full);
   }
   private respawn(side: Side, lives: number) {
     this.actors[side] = { ...this.newActor(side, RESPAWN_CELL), lives, inv: rules.recovery.respawn_invulnerable_s };

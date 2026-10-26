@@ -416,9 +416,9 @@ export class World {
       const ch = b.charges[side];
       t.stone.setEnabled(!!ch && !a.falling && t.rig.layer > .35);
       if (ch) {
-        const k = kindForHold(ch.t);
+        const k = kindForHold(ch.t, b.tune.heavyFrom);
         t.stone.material = this.stoneMat(k, side);
-        const grow = .8 + Math.min(1, ch.t / 2.6) * .8 + (k !== 'normal' ? Math.sin(this.time * 18) * .06 : 0);
+        const grow = .8 + Math.min(1, ch.t / b.tune.heavyFrom) * .8 + (k !== 'normal' ? Math.sin(this.time * 18) * .06 : 0);
         t.stone.scaling.setAll(grow * STONE_HAND); t.stone.rotation.y += dt * 3;
       }
     }

@@ -8,7 +8,7 @@ import { pickBot, DISGUISE_BOT } from '../../shared/quick';
 import { report, watchErrors } from './report';
 import type { RoomView } from '../../shared/net';
 import { touchAim, magnet } from '../../shared/aim';
-import { Battle, kindForHold, cellKey, MATCH_SECONDS, LIVES, PRACTICE, type Kind } from '../../shared/battle';
+import { Battle, kindForHold, tuneFrom, cellKey, MATCH_SECONDS, LIVES, PRACTICE, type Kind } from '../../shared/battle';
 import { Training, STEPS, DIRS, type StepId } from './training';
 import { Bot, mulberry32, type Difficulty } from '../../shared/bot';
 import { rules, type Cell } from '../../shared/world';
@@ -55,6 +55,8 @@ const forceHq = new URLSearchParams(location.search).has('hq');
 let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
 const srvEvents: GameEvent[] = [];
 let pendingSnap: { s: Snap; at: number } | null = null;
+/** playtest switches from the address (?restore=, ?heavy=): bot fights only, online keeps the server's rules */
+const PLAYTEST = tuneFrom(new URLSearchParams(location.search));
 /** what the player did in the current bot fight (daily tasks; online the server counts it) */
 let fightStats = noStats(false);
 /** quick-match bot strength fitted to the player (null: the chosen level) */
@@ -154,7 +156,7 @@ async function boot() {
     world.setPlates(kitOfTiles(info ? info.look[0]?.tiles : myProfile?.eq.tiles), info ? kitOfTiles(info.look[1]?.tiles) : botKit);
     if (!info) { botKit = PLATFORM_KITS[Math.floor(Math.random() * PLATFORM_KITS.length)]!.id; world.preloadPlates(kitOfTiles(myProfile?.eq.tiles), botKit); }
     { const mineModel = titanOf(info ? info.look[0]?.titan : myProfile?.eq.titan); world.assignTitans(mineModel, info ? foeTitan(mineModel, titanOf(info.look[1]?.titan)) : botTitan(mineModel, mulberry32(seed * 104729 + 17))); }
-    world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, botSkill ?? level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
+    world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); if (!info) battle.tune = PLAYTEST; bot = new Bot(battle, 1, botSkill ?? level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = `<div class="slot">${icon('stone')}</div>`.repeat(battle.mods[0].capacity); paintNotches();
     $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
     markFight(!online); fightStats = noStats(false);
@@ -311,7 +313,7 @@ async function boot() {
         controls.released = false;
         if (charging) {
           if (controls.cancelled || controls.overCancel) { b.cancelCharge(0); if (online) net.send({ t: 'cancel' }); pred.lastEnd = nowS; }
-          else if (online) { const tg = b.charges[0]?.target; if (tg) { net.send({ t: 'release', x: tg.x, z: tg.z, k: kindForHold(b.charges[0]!.t) }); b.cancelCharge(0); pred.lastEnd = nowS; } else toast('Цель вне острова'); }
+          else if (online) { const tg = b.charges[0]?.target; if (tg) { net.send({ t: 'release', x: tg.x, z: tg.z, k: kindForHold(b.charges[0]!.t, b.tune.heavyFrom) }); b.cancelCharge(0); pred.lastEnd = nowS; } else toast('Цель вне острова'); }
           else if (!b.releaseCharge(0)) toast('Цель вне острова');
           charging = false;
         }
@@ -329,7 +331,7 @@ async function boot() {
       while (acc >= 1 / 60) { acc -= 1 / 60; if (!online && !training) bot.update(1 / 60); b.step(1 / 60); if (online) b.events.length = 0; if (b.phase !== 'playing') break; }
     }
     if (online && srvEvents.length) { battle.events.push(...srvEvents); srvEvents.length = 0; }
-    const b = battle, ch = b.charges[0], kind: Kind | null = ch ? kindForHold(ch.t) : hover ? 'normal' : null;
+    const b = battle, ch = b.charges[0], kind: Kind | null = ch ? kindForHold(ch.t, b.tune.heavyFrom) : hover ? 'normal' : null;
     world.smoothFoe = online;
     world.update(b, isPaused ? 0 : dt, { aiming: charging, kind, aimCell: ch ? ch.target : hover, cancel: controls.cancelled || controls.overCancel });
     trainTick(isPaused ? 0 : dt, b.events);
@@ -361,7 +363,7 @@ async function boot() {
       const rh = $('repairhud'); rh.classList.toggle('on', !!rp);
       if (rp) { const f = Math.min(1, rp.t / rp.need); (rh.querySelector('.rbar i') as HTMLElement).style.width = `${f * 100}%`; rh.querySelector('em')!.textContent = `${Math.round(f * 100)}%`; }
       const bar = $('charge'); bar.classList.toggle('on', !!ch);
-      if (ch) { const k = kindForHold(ch.t), tgt = k === 'heavy' ? 1 : k === 'spin' ? (ch.t - .9) / 1.7 : ch.t / .9; (bar.firstElementChild as HTMLElement).style.width = `${Math.min(1, ch.t / 2.6) * 100}%`; (bar.firstElementChild as HTMLElement).style.background = KIND_COLOR[k]; bar.lastElementChild!.textContent = KIND_LABEL[k]; void tgt; }
+      if (ch) { const k = kindForHold(ch.t, b.tune.heavyFrom), tgt = k === 'heavy' ? 1 : k === 'spin' ? (ch.t - .9) / 1.7 : ch.t / .9; (bar.firstElementChild as HTMLElement).style.width = `${Math.min(1, ch.t / b.tune.heavyFrom) * 100}%`; (bar.firstElementChild as HTMLElement).style.background = KIND_COLOR[k]; bar.lastElementChild!.textContent = KIND_LABEL[k]; void tgt; }
       $('cancel').hidden = !(charging && controls.touch); $('jump').style.visibility = charging ? 'hidden' : ''; $('jump').classList.toggle('cool', b.actors[0].air > 0 || b.actors[0].stamina < b.jumpCost(0));
       const me0 = b.actors[0], st = $('stamina'), frac = me0.stamina / b.staminaMax(0); st.classList.toggle('on', mode === 'playing'); st.classList.toggle('use', frac < .999 || me0.running); st.classList.toggle('low', me0.stamina < b.jumpCost(0) && !me0.winded); st.classList.toggle('winded', me0.winded);
       (st.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(1, frac)) * 100}%`;
