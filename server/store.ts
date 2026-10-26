@@ -27,26 +27,48 @@ export class MemoryStore implements Store {
   async top(n: number) { return topOf(this.map.values(), n); }
 }
 
-/** Supabase REST (PostgREST). Table: profiles(id text pk, rating int, games int, data jsonb). Use the service_role key, server side only. */
+/** Supabase REST (PostgREST). Table: profiles(id text pk, rating int, games int, data jsonb). Use the service_role key, server side only.
+ * Saves go through one queue: a failed save is retried with a growing pause (2 s … 60 s) and a newer save of the same profile replaces the waiting one,
+ * so a short Supabase outage does not lose purchases or rewards (they stay in memory meanwhile). */
 export class SupabaseStore implements Store {
   private cache = new Map<string, Profile>();
-  private url: string; private key: string;
-  constructor(url: string, key: string) { this.url = url; this.key = key; }
+  private url: string; private key: string; private fetch: typeof fetch;
+  private pending = new Map<string, Profile>();
+  private chain: Promise<void> = Promise.resolve();
+  private retry: ReturnType<typeof setTimeout> | null = null;
+  private baseDelay: number; private delay: number;
+  constructor(url: string, key: string, fetchFn: typeof fetch = fetch, retryMs = 2000) { this.url = url; this.key = key; this.fetch = fetchFn; this.baseDelay = this.delay = retryMs; }
   private h(extra: Record<string, string> = {}) { return { apikey: this.key, Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json', ...extra }; }
+  /** Profiles not yet written to Supabase (for /health and tests). */
+  get unsaved() { return this.pending.size; }
   peek(id: string) { return this.cache.get(id); }
   async load(id: string) {
-    const r = await fetch(`${this.url}/rest/v1/profiles?id=eq.${encodeURIComponent(id)}&select=data`, { headers: this.h() });
+    const r = await this.fetch(`${this.url}/rest/v1/profiles?id=eq.${encodeURIComponent(id)}&select=data`, { headers: this.h() });
     if (!r.ok) throw new Error(`supabase load ${r.status}`);
     const rows = await r.json() as { data: unknown }[]; const p = rows[0] ? sanitizeProfile(rows[0].data, id) : null;
     if (p) this.cache.set(id, p); return p;
   }
-  async save(p: Profile) {
-    this.cache.set(p.id, structuredClone(p));
-    const r = await fetch(`${this.url}/rest/v1/profiles?on_conflict=id`, { method: 'POST', headers: this.h({ Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify({ id: p.id, rating: p.rating, games: p.games, data: p }) });
-    if (!r.ok) throw new Error(`supabase save ${r.status} ${await r.text()}`);
+  save(p: Profile) {
+    const copy = structuredClone(p); this.cache.set(p.id, copy); this.pending.set(p.id, copy);
+    return this.queue();
+  }
+  private queue() { this.chain = this.chain.then(() => this.flush()); return this.chain; }
+  private async flush() {
+    for (const [id, p] of [...this.pending]) {
+      try {
+        const r = await this.fetch(`${this.url}/rest/v1/profiles?on_conflict=id`, { method: 'POST', headers: this.h({ Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify({ id: p.id, rating: p.rating, games: p.games, data: p }) });
+        if (!r.ok) throw new Error(`supabase save ${r.status} ${await r.text()}`);
+        if (this.pending.get(id) === p) this.pending.delete(id);
+        this.delay = this.baseDelay;
+      } catch (e) {
+        console.error(`profile save failed, retry in ${Math.round(this.delay / 1000)} s (${this.pending.size} waiting)`, e);
+        if (!this.retry) { this.retry = setTimeout(() => { this.retry = null; void this.queue(); }, this.delay); this.retry.unref?.(); }
+        this.delay = Math.min(this.delay * 2, 60000); return;
+      }
+    }
   }
   async top(n: number) {
-    const r = await fetch(`${this.url}/rest/v1/profiles?select=data&games=gt.0&order=rating.desc&limit=${n}`, { headers: this.h() });
+    const r = await this.fetch(`${this.url}/rest/v1/profiles?select=data&games=gt.0&order=rating.desc&limit=${n}`, { headers: this.h() });
     if (!r.ok) throw new Error(`supabase top ${r.status}`);
     return topOf((await r.json() as { data: unknown }[]).map(x => sanitizeProfile(x.data, '')), n);
   }

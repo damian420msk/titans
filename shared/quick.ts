@@ -1,7 +1,8 @@
-// When quick search finds nobody in QUICK_SEARCH_S seconds the player gets a bot with a human-looking nick.
-// Flip DISGUISE_BOT to false to show the bot honestly ("ИИ · …") instead.
+// When quick search finds nobody in QUICK_SEARCH_S seconds the player is offered a bot (after BOT_OFFER_S more seconds) or a server to invite a friend.
+// The bot is shown honestly (decision 2026-10-26); DISGUISE_BOT = true would give it a human-looking nick.
 export const QUICK_SEARCH_S = 20;
-export const DISGUISE_BOT = true;
+export const BOT_OFFER_S = 5;
+export const DISGUISE_BOT = false;
 
 export const BOT_NICKS = ['Рубен', 'Тёма_77', 'Облачко', 'Громила', 'Алиса', 'Кирилл', 'SkyWolf', 'Макс', 'Дана', 'Витя_Pro', 'Каменщик', 'Lex', 'Мира', 'Шторм', 'Антон', 'Nika', 'Борис', 'Тимур', 'Ёжик', 'Dron4ik', 'Саня', 'Лиза', 'Rocky', 'Гоша', 'Титан_X', 'Влад', 'Ксюша', 'Zeus', 'Олег', 'Юля'];
 

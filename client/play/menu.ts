@@ -6,7 +6,7 @@ import type { NetState } from './online';
 
 import type { RoomInfo, RoomView, MyProfile } from '../../shared/net';
 import { checkNick, checkText } from '../../shared/names';
-import { QUICK_SEARCH_S } from '../../shared/quick';
+import { QUICK_SEARCH_S, BOT_OFFER_S } from '../../shared/quick';
 import { DAILY_REWARDS } from '../../shared/progress';
 import { icon, ico, hydrateIcons, type IconName } from './icons';
 import { UPGRADES, COSMETICS, QUESTS, LEAGUES, league, type PublicEntry, type CosmeticKind } from '../../shared/progress';
@@ -89,6 +89,8 @@ export function initMenu(h: MenuHooks) {
     if (t.id === 'quick-btn') { h.onQuick(true); quickSearch(); }
     if (t.id === 'train-btn') h.onTrain();
     if (t.id === 'quick-cancel') { qStop(); h.onQuick(false); open('online'); }
+    if (t.id === 'quick-bot') { qStop(); h.onQuickTimeout(); }
+    if (t.id === 'quick-friend') { qStop(); h.onQuick(false); open('create'); }
     if (t.id === 'gift-btn') openGift();
     if (t.id === 'gift-claim') { (t as HTMLButtonElement).disabled = true; h.onClaim(); }
     if (t.id === 'gift-close') $('gift').hidden = true;
@@ -242,16 +244,22 @@ export function initMenu(h: MenuHooks) {
     const w = prof?.wins ?? 0, l = prof?.losses ?? 0; $('rc-wl').textContent = `${w} поб · ${l} пор${w + l ? ` · ${Math.round(w / (w + l) * 100)}%` : ''}`;
     $('recent-list').innerHTML = prof?.recent?.length ? prof.recent.map(x => `<div class="rrow ${x.won === true ? 'w' : x.won === false ? 'l' : 'd'}"><b>${x.won === true ? 'Победа' : x.won === false ? 'Поражение' : 'Ничья'}</b><span>${x.online ? '' : '🤖 '}${esc(x.nick)}</span><em>${x.delta ? (x.delta > 0 ? '+' : '') + x.delta : '·'}</em></div>`).join('') : '<div class="empty">Здесь появятся твои последние бои</div>';
   }
-  // quick search: 20 → 0; a found opponent freezes the number, nobody found at 0 → the host app starts a bot match
+  // quick search: 20 → 0; a found opponent freezes the number. Nobody found: offer a bot (starts by itself after BOT_OFFER_S) or a server to invite a friend; the queue stays on meanwhile
   let qT = 0, qLeft = 0, qGone = 0;
   const qPaint = () => { $('quick-count').textContent = String(qLeft); };
   const qStop = () => { window.clearInterval(qT); qT = 0; window.clearTimeout(qGone); };
   function quickSearch() {
-    qStop(); qLeft = QUICK_SEARCH_S; qPaint(); $('quick-ring').classList.remove('found'); $('quick-title').textContent = 'Ищем соперника…'; $('quick-note').textContent = 'Подбираем игрока близкого к тебе по рейтингу.';
+    qStop(); qLeft = QUICK_SEARCH_S; qPaint(); $('quick-ring').classList.remove('found'); $('quick-alt').hidden = true; $('quick-title').textContent = 'Ищем соперника…'; $('quick-note').textContent = 'Подбираем игрока близкого к тебе по рейтингу.';
     open('quick');
-    qT = window.setInterval(() => { qLeft--; qPaint(); if (qLeft <= 0) { qStop(); h.onQuickTimeout(); } }, 1000);
+    let offer = false;
+    qT = window.setInterval(() => {
+      qLeft--; qPaint(); if (qLeft > 0) return;
+      if (offer) { qStop(); h.onQuickTimeout(); return; }
+      offer = true; qLeft = BOT_OFFER_S; qPaint(); $('quick-alt').hidden = false;
+      $('quick-title').textContent = 'Живого соперника пока нет'; $('quick-note').textContent = `Через ${BOT_OFFER_S} с начнётся бой с ИИ. Или создай сервер и позови друга.`;
+    }, 1000);
   }
-  const quickFound = (foe?: string) => { $('quick-ring').classList.add('found'); $('quick-title').textContent = 'Соперник найден!'; if (foe) $('quick-note').textContent = `Играем с ${foe}`; };
+  const quickFound = (foe?: string) => { $('quick-ring').classList.add('found'); $('quick-alt').hidden = true; $('quick-title').textContent = 'Соперник найден!'; if (foe) $('quick-note').textContent = `Играем с ${foe}`; };
   const setQueue = (on: boolean) => {
     if (on && current !== 'quick') quickSearch();
     if (!on && current === 'quick' && qT) { qStop(); quickFound(); qGone = window.setTimeout(() => { if (current === 'quick') open('online'); }, 6000); }

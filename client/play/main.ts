@@ -5,6 +5,7 @@ import { PHRASES } from '../../shared/net';
 import { createChat } from './chat';
 import { initOrientation, lockLandscape, isPortrait } from './orientation';
 import { pickBot, DISGUISE_BOT } from '../../shared/quick';
+import { report, watchErrors } from './report';
 import type { RoomView } from '../../shared/net';
 import { touchAim, magnet } from '../../shared/aim';
 import { Battle, kindForHold, cellKey, MATCH_SECONDS, LIVES, PRACTICE, type Kind } from '../../shared/battle';
@@ -370,4 +371,5 @@ async function boot() {
     setTimeout(() => { $('end').hidden = false; }, 900);
   }
 }
-boot().catch(e => { console.error(e); $('loading').hidden = false; $('loading').querySelector('h1')!.textContent = 'Ошибка загрузки: ' + String(e?.message ?? e).slice(0, 90); });
+watchErrors();
+boot().catch(e => { console.error(e); report('boot', e); $('loading').hidden = false; $('loading').querySelector('h1')!.textContent = 'Ошибка загрузки: ' + String(e?.message ?? e).slice(0, 90); });
