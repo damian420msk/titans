@@ -68,8 +68,8 @@ test('every kit: each underrock remains inside its owner cell and below the unch
   for(const kit of kitIds)for(const id of [1,2,3])for(const [x,y,z] of geometry(`underrock_${id}`,kit).positions){assert.ok(Math.abs(x)<=1.4&&Math.abs(z)<=1.4);assert.ok(y<=-.39999&&y>=-1.65001);}
 });
 
-test('kits: four kits in price order, every file present with its textures, unknown ids fall back to the free kit',()=>{
-  assert.deepEqual(kitIds,['starter','terracotta','jade','basalt']);
+test('kits: five kits in price order, every file present with its textures, unknown ids fall back to the free kit',()=>{
+  assert.deepEqual(kitIds,['starter','terracotta','jade','basalt','olympus']);
   const names=kitAssetNames(platformCatalog.surfaces,platformCatalog.fractures,platformCatalog.underrocks,['teal','coral']);
   assert.equal(names.length,28);
   for(const k of PLATFORM_KITS){
@@ -84,4 +84,11 @@ test('kits: four kits in price order, every file present with its textures, unkn
 test('cell style distribution is unchanged by the kit switch (golden values from platform-v05.1)',()=>{
   const got=([['arena-island-0',0,0],['arena-island-0',4,5],['arena-island-1',8,10],['arena-island-1',3,7]] as const).map(([i,x,z])=>{const s=cellStyle(i,{x,z},'teal');return [i,x,z,s.surfaceId,s.fractureId,s.rotation,s.seed,s.underrockId];});
   assert.deepEqual(got,[["arena-island-0",0,0,"a","f2",1,3067981233,3],["arena-island-0",4,5,"a","f2",1,3896423802,3],["arena-island-1",8,10,"a","f0",0,1388735670,2],["arena-island-1",3,7,"a","f1",1,1451986351,3]]);
+});
+
+test('island decor: every prop the game places has its file', () => {
+  const src = readFileSync(new URL('../client/play/decor.ts', import.meta.url), 'utf8');
+  const props = JSON.parse(src.match(/const PROPS = (\[[^\]]+\])/)![1]!.replace(/'/g, '"')) as string[];
+  assert.ok(props.includes('plinth') && props.length >= 8);
+  for (const p of props) assert.ok(existsSync(new URL(`../public/art/decor-v01/${p}.glb`, import.meta.url)), p);
 });

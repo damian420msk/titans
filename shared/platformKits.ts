@@ -1,5 +1,5 @@
 // Plate kits sold in the shop: a kit is only a look (stone, cracks, fragments, under-rocks, trim). Rules and HP never depend on it.
-export type KitId = 'starter' | 'terracotta' | 'jade' | 'basalt';
+export type KitId = 'starter' | 'terracotta' | 'jade' | 'basalt' | 'olympus';
 export type PlatformKit = Readonly<{ id: KitId; cosmetic: string; name: string; dir: string }>;
 /** Order = price order in the shop (the first one is free). */
 export const PLATFORM_KITS: readonly PlatformKit[] = [
@@ -7,6 +7,7 @@ export const PLATFORM_KITS: readonly PlatformKit[] = [
   { id: 'terracotta', cosmetic: 'tiles_terracotta', name: 'Терракотовый бастион', dir: 'art/platform-skins-v01/terracotta/' },
   { id: 'jade', cosmetic: 'tiles_jade', name: 'Нефритовая арена', dir: 'art/platform-skins-v01/jade/' },
   { id: 'basalt', cosmetic: 'tiles_basalt', name: 'Базальтовая крепость', dir: 'art/platform-skins-v01/basalt/' },
+  { id: 'olympus', cosmetic: 'tiles_olympus', name: 'Олимп', dir: 'art/platform-skins-v01/olympus/' },
 ];
 export const DEFAULT_KIT: KitId = 'starter';
 /** Kit for a cosmetic id from a profile or from the network (anything unknown falls back to the free kit). */

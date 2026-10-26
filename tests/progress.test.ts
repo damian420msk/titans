@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BOT_RATING_CAP, BOT_DAILY_COINS, BOT_REWARD, newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dailyStreak, DAILY_REWARDS, dayIndex, rewardBot, botRatingDelta, recordQuest, QUEST_POOL, QUESTS_PER_TIER, QUESTS_A_DAY, questDef, pickQuests, noStats, countEvents, cleanStats, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
 import { mulberry32 } from '../shared/bot.ts';
+import { PLATFORM_KITS } from '../shared/platformKits.ts';
 import { Battle } from '../shared/battle.ts';
 
 test('new profile: 1000 rating, starter coins, free cosmetics equipped', () => {
@@ -150,11 +151,12 @@ test('retired titan and plate tints are refunded once when an old profile is loa
   assert.equal(sanitizeProfile(JSON.parse(JSON.stringify(old)), 'r').coins, old.coins, 'a saved profile is not refunded again');
 });
 
-test('plate kits: free starter, then terracotta < jade < basalt; an old plate tint owner gets the money back and the starter kit', () => {
-  const kits = COSMETICS.filter(c => c.kind === 'tiles'); assert.deepEqual(kits.map(c => c.id), ['tiles_starter', 'tiles_terracotta', 'tiles_jade', 'tiles_basalt']);
-  assert.equal(kits[0]!.cost, 0); assert.ok(kits[1]!.cost > 0 && kits[1]!.cost < kits[2]!.cost && kits[2]!.cost < kits[3]!.cost);
+test('plate kits: free starter, then terracotta < jade < basalt < olympus; an old plate tint owner gets the money back and the starter kit', () => {
+  const kits = COSMETICS.filter(c => c.kind === 'tiles'); assert.deepEqual(kits.map(c => c.id), ['tiles_starter', 'tiles_terracotta', 'tiles_jade', 'tiles_basalt', 'tiles_olympus']);
+  assert.equal(kits[0]!.cost, 0); for (let i = 1; i < kits.length; i++) assert.ok(kits[i]!.cost > kits[i - 1]!.cost, 'each kit costs more than the one before');
+  assert.deepEqual(PLATFORM_KITS.map(k => k.cosmetic), kits.map(c => c.id), 'every shop kit has its art folder');
   const p = newProfile('k'); p.coins = 5000; for (const k of kits.slice(1)) assert.equal(buyCosmetic(p, k.id).ok, true);
-  assert.equal(p.eq.tiles, 'tiles_basalt'); assert.equal(p.coins, 5000 - 250 - 450 - 700); assert.equal(equip(p, 'tiles_jade').ok, true); assert.equal(p.eq.tiles, 'tiles_jade');
+  assert.equal(p.eq.tiles, 'tiles_olympus'); assert.equal(p.coins, 5000 - 250 - 450 - 700 - 1000); assert.equal(equip(p, 'tiles_jade').ok, true); assert.equal(p.eq.tiles, 'tiles_jade');
   const old = sanitizeProfile({ coins: 0, own: ['tiles_sand', 'tiles_granite', 'tiles_dusk'], eq: { tiles: 'tiles_dusk' } }, 'o');
   assert.equal(old.coins, 250 + 300); assert.equal(old.eq.tiles, 'tiles_starter'); assert.deepEqual(old.own.filter(x => x.startsWith('tiles_')), ['tiles_starter']);
 });

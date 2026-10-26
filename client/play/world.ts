@@ -27,10 +27,11 @@ import { createEnvironment } from '../environment';
 import { TitanRig, readClips, CLIP } from './rig';
 import { QualityPolicy, renderScale } from './quality';
 import { PlatformRenderer } from './platform';
+import { IslandDecor } from './decor';
 import type { KitId } from '../../shared/platformKits';
 import { assetUrl } from './assets';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
-import { rules, map, size, cellCentre, type Cell, type Point, type Side } from '../../shared/world';
+import { rules, map, size, halfWidth, front, depth, cellCentre, type Cell, type Point, type Side } from '../../shared/world';
 import { Battle, cellKey, cellsFor, kindForHold, shotPosition, sideOther, type GameEvent, type Kind } from '../../shared/battle';
 
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
@@ -58,6 +59,7 @@ export class World {
   private trailAt = new Map<number, number>();
   private casters: Mesh[] = [];
   private platform!: PlatformRenderer;
+  private decor: IslandDecor | null = null;
   private titans: [TitanView, TitanView] = [] as unknown as [TitanView, TitanView];
   private views: Partial<Record<TitanId, TitanView>> = {};
   private loading = new Map<TitanId, Promise<TitanView>>();
@@ -198,6 +200,8 @@ export class World {
   private async buildIslands() {
     // plates, cracks, fragments, under-rocks and team edges: platform-skins-v01 kits (presentation only, instanced, budgeted; each island wears its owner kit)
     this.platform = await PlatformRenderer.create(this.scene, map.cells, cellCentre, size);
+    // columns, braziers, banners and plants on ledges around both islands; a missing file must not stop the match
+    this.decor = await IslandDecor.create(this.scene, halfWidth, front, depth, TEAM).catch(e => { console.warn('island decor failed to load', e); return null; });
     for (const side of [0, 1] as Side[]) {
       // arsenal: pile of sky stones
       const a = cellCentre({ x: rules.arena.arsenal_cell[0], z: rules.arena.arsenal_cell[1] }, side);
@@ -312,7 +316,9 @@ export class World {
     this.glow.customEmissiveColorSelector = (mesh, _sub, material, result) => {
       const emits = material === this.mats.sky || material === this.mats.skyCore || material === this.mats.trim0 || material === this.mats.trim1 || (material && (material.name.startsWith('aim_') || material.name.startsWith('wave') || material.name === 'warnE'));
       const crystal = material && material.name.startsWith('rock_'); // sky crystals: a soft halo
-      if ((emits || crystal) && material instanceof StandardMaterial) { const k = crystal ? .7 : 1; result.set(material.emissiveColor.r * k, material.emissiveColor.g * k, material.emissiveColor.b * k, 1); } else result.set(0, 0, 0, 0);
+      const fire = material && material.name.includes('Flame') && 'emissiveColor' in material; // brazier fire on the island ledges (decor.ts)
+      if (fire) { const c = (material as unknown as { emissiveColor: Color3 }).emissiveColor; result.set(c.r * .8, c.g * .8, c.b * .8, 1); }
+      else if ((emits || crystal) && material instanceof StandardMaterial) { const k = crystal ? .7 : 1; result.set(material.emissiveColor.r * k, material.emissiveColor.g * k, material.emissiveColor.b * k, 1); } else result.set(0, 0, 0, 0);
       void mesh;
     };
     this.shadows.getShadowMap()!.renderList = this.casters;
@@ -398,7 +404,7 @@ export class World {
     this.camera.setTarget(Vector3.Lerp(this.camera.getTarget(), target, k));
   }
 
-  private updateCells(b: Battle, dt: number) { this.platform.update(b.floors, dt); }
+  private updateCells(b: Battle, dt: number) { this.platform.update(b.floors, dt); this.decor?.update(this.time); }
 
   private updateTitans(b: Battle, dt: number) {
     for (const side of [0, 1] as Side[]) {
