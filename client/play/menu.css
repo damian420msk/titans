@@ -52,8 +52,8 @@ button:active:not(:disabled){transform:translateY(2px) scale(.98)}
 .actions{display:flex;gap:12px;align-items:center;flex:none}
 
 /* bot */
-.levels{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:6px}
-.lvl{display:flex;flex-direction:column;align-items:center;gap:3px;width:min(230px,28vw);min-width:170px;margin:0;padding:16px 12px;text-align:center;border-radius:20px;background:rgba(32,30,58,.62);border:3px solid rgba(255,255,255,.3);box-shadow:0 5px 0 rgba(30,16,70,.4);transition:transform .1s,border-color .1s}
+.levels{display:flex;gap:14px;justify-content:center;flex-wrap:nowrap;margin-top:6px;width:min(740px,100%)}
+.lvl{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1 1 0;min-width:0;max-width:230px;margin:0;padding:16px 12px;text-align:center;border-radius:20px;background:rgba(32,30,58,.62);border:3px solid rgba(255,255,255,.3);box-shadow:0 5px 0 rgba(30,16,70,.4);transition:transform .1s,border-color .1s}
 .lvl .face{width:46px;height:46px;font-size:20px}
 .lvl b{font-size:18px;letter-spacing:.06em;margin-top:6px}.lvl i{font-style:normal;font-size:12px;opacity:.8;font-weight:700}.lvl em{font-style:normal;font-weight:500;font-size:12px;line-height:1.4;opacity:.85;margin-top:6px}
 .lvl.sel{border-color:#ffd25a;background:rgba(70,50,130,.75);transform:translateY(-4px);color:#fff;box-shadow:0 8px 0 rgba(30,16,70,.4),0 0 24px rgba(255,210,90,.45)}
@@ -132,7 +132,7 @@ input.bad{border-color:#ff8a7a !important;box-shadow:0 0 0 3px rgba(255,138,122,
   .main-right{gap:6px}.mbtn{min-height:40px;padding:4px 10px;font-size:14px}.mbtn.online{min-height:48px;font-size:17px}
   .main-right .big{padding:10px;font-size:21px}
   .top h2{font-size:20px}.back{padding:6px 12px;font-size:13px}
-  .lvl{padding:10px 8px;min-width:150px}.lvl .face{width:36px;height:36px;font-size:16px}.lvl em{font-size:11px;margin-top:2px}
+  .lvl{padding:8px 8px}.lvl .face{width:36px;height:36px;font-size:16px}.lvl em{font-size:11px;margin-top:2px}
   .glass{padding:10px 12px}.list-wrap{max-height:55vh}
   .form{gap:8px}.form input:not([type=range]){height:38px}
   .seat{padding:12px 8px;gap:4px}.seat .face{width:48px;height:48px;font-size:20px}.seat .nm{font-size:15px}
@@ -374,3 +374,21 @@ input::placeholder{color:rgba(255,255,255,.6)}
 .act:disabled:not(.on){opacity:.5}
 .act .coin{vertical-align:-4px}
 @media (max-height:480px){.strip{--cw:clamp(104px,15vw,140px);padding-top:10px;gap:10px}.card{padding:5px 5px 6px}.card b{font-size:13px;margin-top:4px}.card .tag{left:9px;top:9px;font-size:11px;padding:2px 7px}.act{padding:8px 22px;font-size:17px}.nav{width:34px;height:34px;font-size:22px}}
+
+/* low phones (360–420 px tall): the three bot cards stay in one row and the start button stays on screen */
+@media (max-height:420px){.levels{gap:10px;margin-top:0}.lvl .face{width:30px;height:30px;font-size:14px}.lvl b{font-size:15px;margin-top:2px}.lvl em{font-size:10.5px;line-height:1.3}.lvl.sel{transform:translateY(-2px)}#start{padding:9px 20px;font-size:18px}}
+
+/* online: quick game is the main action on the left, a compact server list on the right */
+.online-grid{flex:0 1 auto;margin:auto 0;height:min(380px,100%);min-height:0;width:min(860px,100%);display:grid;grid-template-columns:minmax(200px,.9fr) 1.3fr;gap:14px;align-items:stretch}
+.online-side{display:flex;flex-direction:column;gap:12px;justify-content:center}
+.online-side .big{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 16px;font-size:17px;width:100%}
+.online-side .big i{font:600 11px Rubik,system-ui;font-style:normal;opacity:.85;letter-spacing:.03em}
+.online-side .big.hero{padding:18px 16px;font-size:21px}
+.online-side .big.blue{background:linear-gradient(#5db6ff,#2f74e0);border-color:#d9efff;box-shadow:0 5px 0 #1b4a9a,0 8px 18px rgba(40,20,90,.3);color:#fff}
+.online-grid .list-wrap{max-height:none;min-height:0}
+.online-grid .list-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:2px 4px 8px}
+.online-grid .room{grid-template-columns:1fr auto auto;padding:6px 8px;gap:8px}
+.online-grid .room .host{display:none}
+.online-grid .room b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.online-grid .room button{padding:6px 12px;font-size:13px}
+@media (max-height:420px){.online-side .big.hero{padding:12px 12px;font-size:18px}.online-side .big{padding:8px 12px;font-size:15px}.online-grid{gap:10px}}

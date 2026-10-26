@@ -112,7 +112,7 @@ export function initMenu(h: MenuHooks) {
   function setRooms(list: RoomInfo[]) {
     rooms = list; const el = $('rooms');
     if (!list.length) { el.innerHTML = `<div class="empty">${netState === 'on' ? 'Пока нет серверов. Нажми «Быстрая игра» или создай свой.' : netState === 'connecting' ? (slow ? 'Бесплатный сервер просыпается после простоя, это занимает до минуты. Подожди немного.' : 'Подключаемся к серверу…') : 'Не удалось подключиться к серверу. Проверь интернет и нажми «Обновить».'}</div>`; return; }
-    el.innerHTML = list.map(r => `<div class="room${r.players >= 2 ? ' full' : ''}"><b>${r.locked ? ico('lock') + ' ' : ''}${r.ranked ? ico('trophy') + ' ' : ''}${esc(r.name)}</b><span>${esc(r.host)}</span><span>${r.players}/2</span><button data-join="${esc(r.id)}" ${r.players >= 2 ? 'disabled' : ''}>${r.playing ? 'Идёт бой' : r.players >= 2 ? 'Занято' : 'Войти'}</button></div>`).join('');
+    el.innerHTML = list.map(r => `<div class="room${r.players >= 2 ? ' full' : ''}"><b title="${esc(r.host)}">${r.locked ? ico('lock') + ' ' : ''}${r.ranked ? ico('trophy') + ' ' : ''}${esc(r.name)}</b><span class="host">${esc(r.host)}</span><span>${r.players}/2</span><button data-join="${esc(r.id)}" ${r.players >= 2 ? 'disabled' : ''}>${r.playing ? 'Идёт бой' : r.players >= 2 ? 'Занято' : 'Войти'}</button></div>`).join('');
   }
   let joining: RoomInfo | null = null;
   $('rooms').addEventListener('click', e => {

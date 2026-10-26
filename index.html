@@ -46,7 +46,6 @@
       </div>
       <div class="hub-act">
         <button class="round" id="gift-btn" aria-label="Подарок дня"><span data-icon="gift"></span><i class="dot" hidden></i></button>
-        <button class="round" data-go="rating" aria-label="Рейтинг"><span data-icon="trophy"></span></button>
         <button class="round" data-go="settings" aria-label="Настройки"><span data-icon="gear"></span></button>
       </div>
     </header>
@@ -56,6 +55,7 @@
       <nav class="hub-bottom">
         <button class="tile" data-go="shop"><span data-icon="money"></span><b>Магазин</b></button>
         <button class="tile" id="quests-btn" data-go="quests"><span data-icon="tasks"></span><b>Задания</b><em id="quests-count">0/3</em></button>
+        <button class="tile" data-go="rating"><span data-icon="trophy"></span><b>Рейтинг</b></button>
       </nav>
     </div>
   </section>
@@ -86,10 +86,15 @@
 
   <section class="scr" data-scr="online" hidden>
     <header class="top"><button class="back" data-go="play">‹ Назад</button><h2>Онлайн</h2><span class="pill" id="net-pill"><i></i><span>сервер не подключён</span></span></header>
-    <div class="actions"><button id="quick-btn" class="big blue"><b><span data-icon="bolt"></span> БЫСТРАЯ ИГРА</b><i>соперник из твоей лиги</i></button><button class="big" data-go="create"><b>СОЗДАТЬ СЕРВЕР</b><i>свой, можно с паролем</i></button><button id="refresh" class="ghost">Обновить</button></div>
-    <div class="glass list-wrap">
-      <div class="list-head"><span>Сервер</span><span>Хозяин</span><span>Игроки</span><span></span></div>
-      <div id="rooms" class="rooms"></div>
+    <div class="online-grid">
+      <div class="online-side">
+        <button id="quick-btn" class="big blue hero"><b><span data-icon="bolt"></span> БЫСТРАЯ ИГРА</b><i>соперник из твоей лиги</i></button>
+        <button class="big" data-go="create"><b>СОЗДАТЬ СЕРВЕР</b><i>позови друга, можно с паролем</i></button>
+      </div>
+      <div class="glass list-wrap">
+        <div class="list-head"><span>Серверы</span><button id="refresh" class="ghost small">Обновить</button></div>
+        <div id="rooms" class="rooms"></div>
+      </div>
     </div>
   </section>
 
