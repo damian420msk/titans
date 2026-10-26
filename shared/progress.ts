@@ -18,9 +18,10 @@ export const UPGRADES: Upgrade[] = [
 ];
 
 export const COSMETICS: Cosmetic[] = [
-  // which titan model you play (free); the colour is only the shop swatch, the tint kinds below recolour the model
-  { id: 'titan_blue', kind: 'titan', name: 'Бирюзовый', cost: 0, color: '#2BB8AA' },
-  { id: 'titan_red', kind: 'titan', name: 'Красный', cost: 0, color: '#E8634E' },
+  // which titan you play (roster v1, docs/art/titan-rift-v1/ROSTER.md); price = rarity: starter free, common 200; the colour is only the shop swatch
+  { id: 'titan_novice', kind: 'titan', name: 'Новичок', cost: 0, color: '#C0714F' },
+  { id: 'titan_atlas', kind: 'titan', name: 'Атлас', cost: 200, color: '#8E8A86' },
+  { id: 'titan_oceanus', kind: 'titan', name: 'Океан', cost: 200, color: '#3FC1C9' },
   // plate kits (look only); order = price order, see shared/platformKits.ts
   { id: 'tiles_starter', kind: 'tiles', name: 'Стартовая арена', cost: 0, color: null },
   { id: 'tiles_terracotta', kind: 'tiles', name: 'Терракотовый бастион', cost: 250, color: '#d9826a' },
@@ -33,7 +34,7 @@ export const COSMETICS: Cosmetic[] = [
 ];
 /** Retired cosmetics (titan tints, plate tints): what players paid is returned once, when the profile is loaded. */
 export const RETIRED_COSMETICS: Record<string, number> = { skin_ember: 200, skin_gold: 350, skin_violet: 300, skin_jade: 300, skin_frost: 400, tiles_granite: 250, tiles_moss: 250, tiles_dusk: 300 };
-export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { titan: 'titan_blue', tiles: 'tiles_starter', stone: 'stone_grey' };
+export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { titan: 'titan_novice', tiles: 'tiles_starter', stone: 'stone_grey' };
 
 export type Profile = {
   id: string; nick: string; rating: number; wins: number; losses: number; games: number; coins: number;

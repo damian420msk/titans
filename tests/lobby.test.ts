@@ -33,7 +33,7 @@ test('both ready starts a 3-2-1 countdown, then a mirrored authoritative match',
   lobby.handle(b, { t: 'ready', on: true }); assert.equal(roomOf(a)!.count, 3);
   lobby.tick(1.01); assert.equal(roomOf(a)!.count, 2); lobby.tick(1); assert.equal(roomOf(a)!.count, 1); lobby.tick(1);
   assert.equal(a.last('start')!.foe, 'Боря'); assert.equal(b.last('start')!.foe, 'Аня');
-  assert.equal(a.last('start')!.look[0].titan, 'titan_blue'); assert.equal(a.last('start')!.look[1].titan, 'titan_blue'); // the titan pick travels with the look
+  assert.equal(a.last('start')!.look[0].titan, 'titan_novice'); assert.equal(a.last('start')!.look[1].titan, 'titan_novice'); // the titan pick travels with the look
   // Anna walks right-forward; Boris stands still. Both see themselves at the same world spot (mirror).
   lobby.handle(a, { t: 'move', x: 1, z: 0 }); for (let i = 0; i < 20; i++) lobby.tick(1 / 20);
   const sa = a.last('snap')!.s, sb = b.last('snap')!.s;

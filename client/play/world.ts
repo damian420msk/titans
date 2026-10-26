@@ -260,7 +260,8 @@ export class World {
       for (const m of t.meshes) { m.renderOutline = side === 1; m.outlineColor = Color3.FromHexString(TEAM[1]!); m.outlineWidth = .022; }
     });
     this.titans = pair;
-    for (const t of pair) t.holder.setEnabled(true);
+    // the roster has more models than a match needs: only the two that play are shown
+    for (const v of Object.values(this.views)) v.holder.setEnabled(pair.includes(v));
   }
 
   private stoneMat(kind: Kind, side: Side) { return kind === 'normal' ? this.mats['stone_normal' + side] : this.mats['stone_' + kind]; }

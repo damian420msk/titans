@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BOT_RATING_CAP, BOT_DAILY_COINS, BOT_REWARD, newProfile, sanitizeProfile, modsFor, buyUpgrade, buyCosmetic, equip, upgradeCost, elo, applyOnline, claimDaily, dailyStreak, DAILY_REWARDS, dayIndex, rewardBot, botRatingDelta, recordQuest, QUEST_POOL, QUESTS_PER_TIER, QUESTS_A_DAY, questDef, pickQuests, noStats, countEvents, cleanStats, freshQuest, league, UPGRADES, COSMETICS, DAILY_BONUS } from '../shared/progress.ts';
+import { mulberry32 } from '../shared/bot.ts';
 import { Battle } from '../shared/battle.ts';
 
 test('new profile: 1000 rating, starter coins, free cosmetics equipped', () => {
   const p = newProfile('x'); assert.equal(p.rating, 1000); assert.equal(p.coins, 100);
-  assert.deepEqual(p.eq, { titan: 'titan_blue', tiles: 'tiles_starter', stone: 'stone_grey' });
+  assert.deepEqual(p.eq, { titan: 'titan_novice', tiles: 'tiles_starter', stone: 'stone_grey' });
 });
 test('upgrades cost coins, stack to their cap and change the battle mods', () => {
   const p = newProfile('x'); p.coins = 9000;
@@ -36,7 +37,7 @@ test('sanitizeProfile repairs garbage and never grants unowned items', () => {
   const p = sanitizeProfile({ nick: 5, rating: 'x', coins: -50, up: { bag: 99, legs: 1.6 }, own: ['tiles_moss', 'bogus', 7], eq: { tiles: 'stone_ice', stone: 'stone_grey' } }, 'id1');
   assert.equal(p.id, 'id1'); assert.equal(p.nick, 'Игрок'); assert.equal(p.rating, 1000); assert.equal(p.coins, 250, 'moss was retired: 250 back'); assert.equal(p.up.bag, 2); assert.equal(p.up.legs, 2);
   assert.ok(!p.own.includes('tiles_moss') && !p.own.includes('bogus')); assert.equal(p.eq.tiles, 'tiles_starter');
-  assert.equal(COSMETICS.filter(c => c.cost === 0).length, 4); assert.equal(p.eq.titan, 'titan_blue');
+  assert.equal(COSMETICS.filter(c => c.cost === 0).length, 3); assert.equal(p.eq.titan, 'titan_novice');
 });
 
 test('mender shortens repairs for its owner only', () => {
@@ -127,14 +128,17 @@ test('gift calendar: seven days, a missed day or a finished week restarts the ru
 
 test('titan choice is free, validated and old profiles get the default', async () => {
   const t = await import('../shared/titans.ts');
-  const p = newProfile('t'); assert.ok(p.own.includes('titan_red') && p.own.includes('titan_blue')); assert.equal(equip(p, 'titan_red').ok, true); assert.equal(p.eq.titan, 'titan_red');
-  const old = sanitizeProfile({ eq: { tiles: 'tiles_starter', stone: 'stone_grey' } }, 'o'); assert.equal(old.eq.titan, 'titan_blue');
-  assert.equal(sanitizeProfile({ eq: { titan: 'titan_red' } }, 'x').eq.titan, 'titan_red');
-  assert.equal(sanitizeProfile({ eq: { titan: 'tiles_moss' }, own: ['tiles_moss'] }, 'x').eq.titan, 'titan_blue');
-  assert.equal(t.titanOf('titan_red'), 'red'); assert.equal(t.titanOf(undefined), 'blue'); assert.equal(t.titanOf('junk'), 'blue');
-  // opponents never look alike: a bot gets the other model, a human with the same pick is shown as the other one
-  assert.equal(t.botTitan('blue', Math.random), 'red'); assert.equal(t.botTitan('red', Math.random), 'blue');
-  assert.equal(t.foeTitan('blue', 'blue'), 'red'); assert.equal(t.foeTitan('red', 'red'), 'blue'); assert.equal(t.foeTitan('blue', 'red'), 'red');
+  const p = newProfile('t'); assert.ok(p.own.includes('titan_novice') && !p.own.includes('titan_atlas'), 'only the starter is free');
+  assert.equal(equip(p, 'titan_atlas').ok, false, 'not bought'); p.coins = 500; assert.equal(buyCosmetic(p, 'titan_atlas').ok, true); assert.equal(p.eq.titan, 'titan_atlas'); assert.equal(p.coins, 300);
+  const old = sanitizeProfile({ eq: { titan: 'titan_red', tiles: 'tiles_starter', stone: 'stone_grey' }, own: ['titan_red', 'titan_blue'] }, 'o');
+  assert.equal(old.eq.titan, 'titan_novice', 'the retired titans fall back to the starter'); assert.ok(!old.own.includes('titan_red'));
+  assert.equal(sanitizeProfile({ eq: { titan: 'titan_oceanus' }, own: ['titan_oceanus'] }, 'x').eq.titan, 'titan_oceanus');
+  assert.equal(sanitizeProfile({ eq: { titan: 'titan_oceanus' } }, 'x').eq.titan, 'titan_novice', 'not owned');
+  assert.equal(t.titanOf('titan_atlas'), 'atlas'); assert.equal(t.titanOf(undefined), 'novice'); assert.equal(t.titanOf('titan_red'), 'novice');
+  // the bot takes any other titan of the roster; a human with the same pick is shown as another one
+  const seen = new Set<string>(); const r = mulberry32(3); for (let i = 0; i < 50; i++) { const b = t.botTitan('novice', r); assert.notEqual(b, 'novice'); seen.add(b); }
+  assert.deepEqual([...seen].sort(), ['atlas', 'oceanus']);
+  assert.equal(t.foeTitan('atlas', 'atlas'), 'novice'); assert.equal(t.foeTitan('novice', 'oceanus'), 'oceanus');
 });
 
 test('retired titan and plate tints are refunded once when an old profile is loaded and are gone afterwards', () => {
