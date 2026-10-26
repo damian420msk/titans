@@ -17,6 +17,7 @@ import { ya } from './yandex';
 import type { Snap, MyProfile, Look } from '../../shared/net';
 import { icon, ico, EMOTE_ICONS, hydrateIcons } from './icons';
 import { titanOf, foeTitan, botTitan } from '../../shared/titans';
+import { kitOfTiles, PLATFORM_KITS, type KitId } from '../../shared/platformKits';
 import { modsFor, newProfile, sanitizeProfile, DEFAULT_EQUIP } from '../../shared/progress';
 import type { Mods } from '../../shared/battle';
 import { Predictor } from '../../shared/predict';
@@ -41,6 +42,8 @@ const token = (() => {
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const { id: _id, ...p } = sanitizeProfile(r, 'local'); return { ...p, dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
 let pendingResult: { level: Difficulty; won: boolean; foe?: string } | null = null, disguise: string | null = null;
 let training: Training | null = null, pendingTrained = false, trainDoneShown = false;
+/** Kit of the next bot's island: rolled ahead so it can be preloaded while the menu is open. */
+let botKit: KitId = PLATFORM_KITS[Math.floor(Math.random() * PLATFORM_KITS.length)]!.id;
 let matchesPlayed = 0, endGain = '', reconnectAt = 0, lastQuick = false;
 const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', heavy: '#C08CFF' };
 
@@ -99,6 +102,7 @@ async function boot() {
   });
   let retries = 0, quickWanted = false, inviteDone = false, inviteWait = false;
   if (myProfile) menu.setProfile(myProfile);
+  world.preloadPlates(kitOfTiles(myProfile?.eq.tiles), botKit);
   net.onState = st => {
     menu.setNet(st, net.slow);
     if (st === 'on' && inviteLink && !inviteDone) { inviteDone = true; inviteWait = true; hello(); menu.notice('Заходим на сервер друга…'); net.send({ t: 'join', id: inviteLink.id, pass: inviteLink.pw }); history.replaceState(null, '', location.pathname); }
@@ -117,7 +121,7 @@ async function boot() {
         break;
       case 'err': inviteWait = false; if (!$('pwd').hidden && m.code === 'wrong_pass') menu.pwdError(m.text); else menu.notice(m.text); break;
       case 'profile': {
-        myProfile = m.p; store.set('profile', JSON.stringify(m.p)); menu.setProfile(m.p);
+        myProfile = m.p; store.set('profile', JSON.stringify(m.p)); menu.setProfile(m.p); world.preloadPlates(kitOfTiles(m.p.eq.tiles), botKit);
         if (pendingTrained) { net.send({ t: 'trained' }); pendingTrained = false; }
         if (pendingResult) { net.send({ t: 'result', level: pendingResult.level, won: pendingResult.won, foe: pendingResult.foe }); pendingResult = null; }
         break;
@@ -137,6 +141,9 @@ async function boot() {
     sfx.unlock(); sfx.startMusic(); sfx.click(); ya.gameplay(true); $('double').hidden = true; if (typeof foe === 'string') { training = null; paintTrain(); }
     online = typeof foe === 'string'; lockLandscape(); pendingSnap = null; srvEvents.length = 0; pred.reset(); lastTarget = ''; setPause(false);
     world.configurePlatform(online ? (roomView?.me ?? 0) : 0);
+    // plates: every island wears its owner's kit; the bot island gets a random kit (a free look at the paid ones)
+    world.setPlates(kitOfTiles(info ? info.look[0]?.tiles : myProfile?.eq.tiles), info ? kitOfTiles(info.look[1]?.tiles) : botKit);
+    if (!info) { botKit = PLATFORM_KITS[Math.floor(Math.random() * PLATFORM_KITS.length)]!.id; world.preloadPlates(kitOfTiles(myProfile?.eq.tiles), botKit); }
     { const mineModel = titanOf(info ? info.look[0]?.titan : myProfile?.eq.titan); world.assignTitans(mineModel, info ? foeTitan(mineModel, titanOf(info.look[1]?.titan)) : botTitan(mineModel, mulberry32(seed * 104729 + 17))); }
     world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = `<div class="slot">${icon('stone')}</div>`.repeat(battle.mods[0].capacity); paintNotches();

@@ -25,6 +25,7 @@ import { createEnvironment } from '../environment';
 import { TitanRig, readClips, CLIP } from './rig';
 import { QualityPolicy, renderScale } from './quality';
 import { PlatformRenderer } from './platform';
+import type { KitId } from '../../shared/platformKits';
 import { assetUrl } from './assets';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { rules, map, size, cellCentre, type Cell, type Point, type Side } from '../../shared/world';
@@ -61,8 +62,6 @@ export class World {
   private dots: Mesh[] = [];
   private mats: Record<string, StandardMaterial> = {};
   private stoneTemplate!: Mesh;
-  private tileMats: [Material[], Material[]] = [[], []];
-  private baseAlbedo = new Map<Material, Color3>();
   private trailTemplate!: Mesh;
   private time = 0;
   /** Online: ease the foe's drawn position between snapshots. */
@@ -168,9 +167,8 @@ export class World {
   private cast<T extends Mesh>(m: T) { this.casters.push(m); m.receiveShadows = true; return m; }
 
   private async buildIslands() {
-    // plates, cracks, fragments, under-rocks and team edges: platform-v05 (presentation only, instanced, budgeted)
+    // plates, cracks, fragments, under-rocks and team edges: platform-skins-v01 kits (presentation only, instanced, budgeted; each island wears its owner kit)
     this.platform = await PlatformRenderer.create(this.scene, map.cells, cellCentre, size);
-    this.tileMats = [this.platform.materials(0), this.platform.materials(1)];
     for (const side of [0, 1] as Side[]) {
       // arsenal: pile of sky stones
       const a = cellCentre({ x: rules.arena.arsenal_cell[0], z: rules.arena.arsenal_cell[1] }, side);
@@ -235,19 +233,14 @@ export class World {
 
   private stoneMat(kind: Kind, side: Side) { return kind === 'normal' ? this.mats['stone_normal' + side] : this.mats['stone_' + kind]; }
 
-  /** Cosmetics: tint the island plates and the plain stones (projectiles) of one side. A null colour restores the original look. */
+  /** Plate kits of the two islands (own side 0, opponent side 1); loads what is missing. Await it before the match starts. */
+  setPlates(kit0: KitId, kit1: KitId) { return this.platform.setKits(kit0, kit1); }
+  /** Warm the equipped kit while the player is still in the menu, so the match does not wait for the download. */
+  preloadPlates(kit: KitId, keep?: KitId) { void this.platform?.preloadKit(kit, keep); }
+
+  /** Cosmetics: the colour of the plain stones (projectiles) of one side. Plates are not tinted any more, they come as kits (setPlates). */
   setLook(side: Side, look: Record<CosmeticKind, string>) {
-    const color = (kind: CosmeticKind) => COSMETICS.find(c => c.id === look[kind])?.color ?? null;
-    // a tint multiplies the colour the model came with (plate edges and cracks are not white); no tint restores exactly that colour
-    const tint = (list: Material[], hex: string | null) => {
-      for (const m of list) {
-        const pbr = m as Material & { albedoColor?: Color3 }; if (!pbr.albedoColor) continue;
-        const base = this.baseAlbedo.get(m) ?? (this.baseAlbedo.set(m, pbr.albedoColor.clone()), pbr.albedoColor.clone());
-        pbr.albedoColor = hex ? base.multiply(Color3.FromHexString(hex).toLinearSpace()) : base.clone();
-      }
-    };
-    tint(this.tileMats[side], color('tiles'));
-    const sm = this.mats['stone_normal' + side], hex = color('stone') ?? STONE_COLOR.normal;
+    const sm = this.mats['stone_normal' + side], hex = COSMETICS.find(c => c.id === look.stone)?.color ?? STONE_COLOR.normal;
     sm.diffuseColor = Color3.FromHexString(hex).toLinearSpace(); sm.emissiveColor = Color3.FromHexString(hex).scale(.12);
   }
 

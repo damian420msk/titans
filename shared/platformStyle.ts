@@ -1,9 +1,9 @@
 // Cosmetic catalog only. Never derives appearance from HP or a viewer's side.
-import catalog from '../public/art/platform-v05/style.json' with { type: 'json' };
+import catalog from '../public/art/platform-skins-v01/style.json' with { type: 'json' };
 
 export type SurfaceId = 'a' | 'b' | 'c';
 export type FractureId = 'f0' | 'f1' | 'f2';
-export type PaletteId = 'teal' | 'coral' | 'sand';
+export type PaletteId = 'teal' | 'coral';
 export type TileState = 'intact' | 'cracked' | 'hole';
 export type GridCell = { x: number; z: number };
 export type PlatformCellStyle = Readonly<{
@@ -20,9 +20,9 @@ export function styleHash(text: string): number {
 }
 
 export function cellStyle(islandId: string, c: GridCell, paletteId: PaletteId, seed = catalog.seed): PlatformCellStyle {
-  const h = styleHash(`${catalog.version}|${seed}|${islandId}|${c.x},${c.z}`);
+  const h = styleHash(`${catalog.distributionVersion}|${seed}|${islandId}|${c.x},${c.z}`);
   const surfaceId: SurfaceId = h % 10 < 5 ? 'a' : h % 10 < 7 ? 'b' : 'c';
-  return Object.freeze({ version: catalog.version, islandId, surfaceId,
+  return Object.freeze({ version: catalog.distributionVersion, islandId, surfaceId,
     fractureId: catalog.fractures[(h >>> 4) % 3] as FractureId, paletteId,
     ornament: catalog.ornaments[surfaceId], rotation: (h >>> 8 & 3) as 0 | 1 | 2 | 3,
     seed: h, underrockId: 1 + (h >>> 12) % 3 });

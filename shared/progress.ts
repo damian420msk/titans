@@ -21,18 +21,19 @@ export const COSMETICS: Cosmetic[] = [
   // which titan model you play (free); the colour is only the shop swatch, the tint kinds below recolour the model
   { id: 'titan_blue', kind: 'titan', name: 'Бирюзовый', cost: 0, color: '#2BB8AA' },
   { id: 'titan_red', kind: 'titan', name: 'Красный', cost: 0, color: '#E8634E' },
-  { id: 'tiles_sand', kind: 'tiles', name: 'Песчаник', cost: 0, color: null },
-  { id: 'tiles_granite', kind: 'tiles', name: 'Гранит', cost: 250, color: '#b9bfd0' },
-  { id: 'tiles_moss', kind: 'tiles', name: 'Мох', cost: 250, color: '#b9dca0' },
-  { id: 'tiles_dusk', kind: 'tiles', name: 'Закат', cost: 300, color: '#e0b0c8' },
+  // plate kits (look only); order = price order, see shared/platformKits.ts
+  { id: 'tiles_starter', kind: 'tiles', name: 'Стартовая арена', cost: 0, color: null },
+  { id: 'tiles_terracotta', kind: 'tiles', name: 'Терракотовый бастион', cost: 250, color: '#d9826a' },
+  { id: 'tiles_jade', kind: 'tiles', name: 'Нефритовая арена', cost: 450, color: '#9fb8a0' },
+  { id: 'tiles_basalt', kind: 'tiles', name: 'Базальтовая крепость', cost: 700, color: '#4a4d55' },
   { id: 'stone_grey', kind: 'stone', name: 'Серый', cost: 0, color: null },
   { id: 'stone_ice', kind: 'stone', name: 'Лёд', cost: 150, color: '#9fe6ff' },
   { id: 'stone_lava', kind: 'stone', name: 'Лава', cost: 200, color: '#ff8a4a' },
   { id: 'stone_gold', kind: 'stone', name: 'Золотой', cost: 300, color: '#ffd24a' },
 ];
-/** Titan tints were removed from the shop (the red titan replaced them): what players paid for them is returned once, when the profile is loaded. */
-export const RETIRED_COSMETICS: Record<string, number> = { skin_ember: 200, skin_gold: 350, skin_violet: 300, skin_jade: 300, skin_frost: 400 };
-export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { titan: 'titan_blue', tiles: 'tiles_sand', stone: 'stone_grey' };
+/** Retired cosmetics (titan tints, plate tints): what players paid is returned once, when the profile is loaded. */
+export const RETIRED_COSMETICS: Record<string, number> = { skin_ember: 200, skin_gold: 350, skin_violet: 300, skin_jade: 300, skin_frost: 400, tiles_granite: 250, tiles_moss: 250, tiles_dusk: 300 };
+export const DEFAULT_EQUIP: Record<CosmeticKind, string> = { titan: 'titan_blue', tiles: 'tiles_starter', stone: 'stone_grey' };
 
 export type Profile = {
   id: string; nick: string; rating: number; wins: number; losses: number; games: number; coins: number;

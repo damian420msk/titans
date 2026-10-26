@@ -5,7 +5,7 @@ import { Battle } from '../shared/battle.ts';
 
 test('new profile: 1000 rating, starter coins, free cosmetics equipped', () => {
   const p = newProfile('x'); assert.equal(p.rating, 1000); assert.equal(p.coins, 100);
-  assert.deepEqual(p.eq, { titan: 'titan_blue', tiles: 'tiles_sand', stone: 'stone_grey' });
+  assert.deepEqual(p.eq, { titan: 'titan_blue', tiles: 'tiles_starter', stone: 'stone_grey' });
 });
 test('upgrades cost coins, stack to their cap and change the battle mods', () => {
   const p = newProfile('x'); p.coins = 9000;
@@ -17,9 +17,9 @@ test('upgrades cost coins, stack to their cap and change the battle mods', () =>
 });
 test('cannot overspend, buying a cosmetic equips it, equip needs ownership', () => {
   const p = newProfile('x'); p.coins = 100;
-  assert.equal(buyCosmetic(p, 'tiles_granite').ok, false); assert.equal(p.coins, 100);
-  p.coins = 400; assert.equal(buyCosmetic(p, 'tiles_granite').ok, true); assert.equal(p.eq.tiles, 'tiles_granite'); assert.equal(p.coins, 150);
-  assert.equal(buyCosmetic(p, 'tiles_granite').ok, false); assert.equal(equip(p, 'tiles_sand').ok, true); assert.equal(equip(p, 'tiles_dusk').ok, false); assert.equal(equip(p, 'nope').ok, false);
+  assert.equal(buyCosmetic(p, 'tiles_terracotta').ok, false); assert.equal(p.coins, 100);
+  p.coins = 400; assert.equal(buyCosmetic(p, 'tiles_terracotta').ok, true); assert.equal(p.eq.tiles, 'tiles_terracotta'); assert.equal(p.coins, 150);
+  assert.equal(buyCosmetic(p, 'tiles_terracotta').ok, false); assert.equal(equip(p, 'tiles_starter').ok, true); assert.equal(equip(p, 'tiles_basalt').ok, false); assert.equal(equip(p, 'nope').ok, false);
 });
 test('Elo: equal players move by about half K, upsets pay more, the sum is zero for equal K', () => {
   assert.deepEqual(elo(1000, 1000, 1), [14, -14]); const [up] = elo(1000, 1400, 1), [fav] = elo(1400, 1000, 1); assert.ok(up > fav * 3);
@@ -34,8 +34,8 @@ test('daily bonus once per day, rewards by difficulty, leagues', () => {
 });
 test('sanitizeProfile repairs garbage and never grants unowned items', () => {
   const p = sanitizeProfile({ nick: 5, rating: 'x', coins: -50, up: { bag: 99, legs: 1.6 }, own: ['tiles_moss', 'bogus', 7], eq: { tiles: 'stone_ice', stone: 'stone_grey' } }, 'id1');
-  assert.equal(p.id, 'id1'); assert.equal(p.nick, 'Игрок'); assert.equal(p.rating, 1000); assert.equal(p.coins, 0); assert.equal(p.up.bag, 2); assert.equal(p.up.legs, 2);
-  assert.ok(p.own.includes('tiles_moss') && !p.own.includes('bogus')); assert.equal(p.eq.tiles, 'tiles_sand');
+  assert.equal(p.id, 'id1'); assert.equal(p.nick, 'Игрок'); assert.equal(p.rating, 1000); assert.equal(p.coins, 250, 'moss was retired: 250 back'); assert.equal(p.up.bag, 2); assert.equal(p.up.legs, 2);
+  assert.ok(!p.own.includes('tiles_moss') && !p.own.includes('bogus')); assert.equal(p.eq.tiles, 'tiles_starter');
   assert.equal(COSMETICS.filter(c => c.cost === 0).length, 4); assert.equal(p.eq.titan, 'titan_blue');
 });
 
@@ -110,7 +110,7 @@ test('gift calendar: seven days, a missed day or a finished week restarts the ru
 test('titan choice is free, validated and old profiles get the default', async () => {
   const t = await import('../shared/titans.ts');
   const p = newProfile('t'); assert.ok(p.own.includes('titan_red') && p.own.includes('titan_blue')); assert.equal(equip(p, 'titan_red').ok, true); assert.equal(p.eq.titan, 'titan_red');
-  const old = sanitizeProfile({ eq: { tiles: 'tiles_sand', stone: 'stone_grey' } }, 'o'); assert.equal(old.eq.titan, 'titan_blue');
+  const old = sanitizeProfile({ eq: { tiles: 'tiles_starter', stone: 'stone_grey' } }, 'o'); assert.equal(old.eq.titan, 'titan_blue');
   assert.equal(sanitizeProfile({ eq: { titan: 'titan_red' } }, 'x').eq.titan, 'titan_red');
   assert.equal(sanitizeProfile({ eq: { titan: 'tiles_moss' }, own: ['tiles_moss'] }, 'x').eq.titan, 'titan_blue');
   assert.equal(t.titanOf('titan_red'), 'red'); assert.equal(t.titanOf(undefined), 'blue'); assert.equal(t.titanOf('junk'), 'blue');
@@ -119,8 +119,17 @@ test('titan choice is free, validated and old profiles get the default', async (
   assert.equal(t.foeTitan('blue', 'blue'), 'red'); assert.equal(t.foeTitan('red', 'red'), 'blue'); assert.equal(t.foeTitan('blue', 'red'), 'red');
 });
 
-test('retired titan tints are refunded once when an old profile is loaded and are gone afterwards', () => {
+test('retired titan and plate tints are refunded once when an old profile is loaded and are gone afterwards', () => {
   const old = sanitizeProfile({ coins: 10, own: ['skin_classic', 'skin_gold', 'skin_frost', 'tiles_moss'], eq: { skin: 'skin_gold', tiles: 'tiles_moss' } }, 'r');
-  assert.equal(old.coins, 10 + 350 + 400); assert.ok(!old.own.some(x => x.startsWith('skin_'))); assert.equal(old.eq.tiles, 'tiles_moss');
+  assert.equal(old.coins, 10 + 350 + 400 + 250); assert.ok(!old.own.some(x => x.startsWith('skin_') || x === 'tiles_moss')); assert.equal(old.eq.tiles, 'tiles_starter');
   assert.equal(sanitizeProfile(JSON.parse(JSON.stringify(old)), 'r').coins, old.coins, 'a saved profile is not refunded again');
+});
+
+test('plate kits: free starter, then terracotta < jade < basalt; an old plate tint owner gets the money back and the starter kit', () => {
+  const kits = COSMETICS.filter(c => c.kind === 'tiles'); assert.deepEqual(kits.map(c => c.id), ['tiles_starter', 'tiles_terracotta', 'tiles_jade', 'tiles_basalt']);
+  assert.equal(kits[0]!.cost, 0); assert.ok(kits[1]!.cost > 0 && kits[1]!.cost < kits[2]!.cost && kits[2]!.cost < kits[3]!.cost);
+  const p = newProfile('k'); p.coins = 5000; for (const k of kits.slice(1)) assert.equal(buyCosmetic(p, k.id).ok, true);
+  assert.equal(p.eq.tiles, 'tiles_basalt'); assert.equal(p.coins, 5000 - 250 - 450 - 700); assert.equal(equip(p, 'tiles_jade').ok, true); assert.equal(p.eq.tiles, 'tiles_jade');
+  const old = sanitizeProfile({ coins: 0, own: ['tiles_sand', 'tiles_granite', 'tiles_dusk'], eq: { tiles: 'tiles_dusk' } }, 'o');
+  assert.equal(old.coins, 250 + 300); assert.equal(old.eq.tiles, 'tiles_starter'); assert.deepEqual(old.own.filter(x => x.startsWith('tiles_')), ['tiles_starter']);
 });

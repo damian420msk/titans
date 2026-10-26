@@ -14,7 +14,7 @@
 - `shared/world.ts` сетка и координаты (сторона 0 игрок, сторона 1 враг, повёрнута на 180°). `shared/battle.ts` правила. `shared/bot.ts` бот (easy/normal/hard).
 - `shared/net.ts` протокол и снимки состояния (+ зеркало для гостя). `server/lobby.ts` комнаты и матчи (без сети, тестируется), `server/index.ts` HTTP /health + WebSocket (`npm run server`, порт 8787). `client/play/online.ts` сокет клиента, `menu.ts` экраны меню.
 - `client/play/world.ts` сцена, острова из GLB, титаны, снаряды, эффекты, камера. `controls.ts` ввод. `main.ts` цикл и HUD. `hud.css` стили.
-- `public/art/`: `blocks-abc-v03` плиты, `titans-v03` титаны Meshy (rigged, webp), `bg-v01` спрайты неба/облаков/островов (пока не подключены).
+- `public/art/`: `platform-skins-v01` четыре комплекта плит (starter, terracotta, jade, basalt; в каждом тайлы, трещины, обломки, подложки, борта, углы; выбор через `shared/platformKits.ts`), `blocks-abc-v03` старые плиты (только для tools/concept), `titans-v03` титаны Meshy (rigged, webp), `bg-v01` спрайты неба/облаков/островов (пока не подключены).
 - `tools/concept/` сцена для концепт-скриншотов (`/tools/concept/concept.html?scene=mid`).
 - `docs/archive/` документы эпохи Codex, только для справки.
 - `.mcp.json` проектные MCP (Playwright, Babylon NME/NPE/GUI). Установка локальных (Meshy, Blender): `docs/MCP_SETUP.md`.
