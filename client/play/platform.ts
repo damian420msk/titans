@@ -5,6 +5,10 @@ import { Vector3, Quaternion } from '@babylonjs/core/Maths/math.vector';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 import { AssetContainer } from '@babylonjs/core/assetContainer';
 import type { Material } from '@babylonjs/core/Materials/material';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+import { Color3 } from '@babylonjs/core/Maths/math.color';
+import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { cellStyle, cellBoundary, tileState, tileAsset, platformCatalog,
   type PlatformCellStyle, type TileState, type GridCell } from '../../shared/platformStyle';
 import { DEFAULT_KIT, kitInfo, kitAssetNames, type KitId } from '../../shared/platformKits';
@@ -12,7 +16,7 @@ import type { Side, Point } from '../../shared/world';
 import { assetUrl } from './assets';
 
 type CellVisual = { side: Side; kit: KitId; owner: string; root: TransformNode; style: PlatformCellStyle; slab: TransformNode | null;
-  shown: TileState; boundaryCount: number; anchorNames: string[] };
+  shown: TileState; boundaryCount: number; anchorNames: string[]; glow: AbstractMesh | null };
 type Piece = { mesh: AbstractMesh; base: Vector3; rotation: Quaternion; velocity: Vector3; spin: Vector3 };
 type FractureEffect = { owner: string; root: TransformNode; pieces: Piece[]; elapsed: number };
 
@@ -35,6 +39,8 @@ export class PlatformRenderer {
   private grid!: readonly GridCell[];
   private centre!: (c: GridCell, side: Side) => Point;
   private cellSize = 2.8;
+  /** Gold light inside a cracked slab: the cracks are real cuts through it, so a glowing sheet inside shows only through them (STYLE_BRIEF «Повреждения»). */
+  private crackGlow: Mesh | null = null;
 
   private constructor(scene: Scene) { this.scene = scene; }
 
@@ -142,7 +148,7 @@ export class PlatformRenderer {
           anchor.metadata = { ownerCell: owner, role: 'future-corner-decoration', collision: false };
           anchorNames.push(anchor.name);
         }
-        this.cells[side].set(key, { side, kit, owner, root, style, slab, shown: 'intact', boundaryCount: boundary.edges.length, anchorNames });
+        this.cells[side].set(key, { side, kit, owner, root, style, slab, shown: 'intact', boundaryCount: boundary.edges.length, anchorNames, glow: null });
         for(const node of root.getDescendants(false))if(node instanceof TransformNode)node.freezeWorldMatrix();
       }
     }
@@ -154,6 +160,7 @@ export class PlatformRenderer {
       if (next === cell.shown) continue;
       this.cancelEffect(cell.owner);
       cell.slab?.dispose(false, false); cell.slab = null;
+      cell.glow?.dispose(); cell.glow = null;
       if (next === 'hole') {
         // Root owns slab, underrock, edge pieces and decoration sockets together.
         cell.root.setEnabled(false);
@@ -162,6 +169,7 @@ export class PlatformRenderer {
         cell.root.setEnabled(true);
         cell.slab = this.spawn(tileAsset(cell.style, next), cell.root, `platform-slab:${cell.owner}`, cell.kit);
         cell.slab.rotation.y = cell.style.rotation * Math.PI / 2 + side * Math.PI;
+        if (next === 'cracked') { const g = this.glowTemplate().createInstance(`platform-crack-glow:${cell.owner}`); g.parent = cell.root; g.position.y = -.03; g.isPickable = false; cell.glow = g; }
         for(const node of [cell.slab,...cell.slab.getDescendants(false)])if(node instanceof TransformNode)node.freezeWorldMatrix();
       }
       cell.shown = next;
@@ -177,6 +185,16 @@ export class PlatformRenderer {
         piece.mesh.scaling.setAll(t < .55 ? 1 : Math.max(0, (.85-t)/.3));
       }
     }
+  }
+
+  private glowTemplate() {
+    if (!this.crackGlow) {
+      // a sheet 3 cm under the top (deeper, the crack walls hide it), a little smaller than the slab so it never shows past the chamfered rim
+      const m = MeshBuilder.CreateGround('platform-crack-glow', { width: this.cellSize - .14, height: this.cellSize - .14 }, this.scene);
+      const mat = new StandardMaterial('crackGlow', this.scene); mat.disableLighting = true; mat.emissiveColor = Color3.FromHexString('#FFB938'); mat.diffuseColor = Color3.Black();
+      m.material = mat; m.isPickable = false; m.isVisible = false; this.crackGlow = m; // the template itself is never drawn, only its instances
+    }
+    return this.crackGlow;
   }
 
   private fracture(cell: CellVisual, island: TransformNode) {

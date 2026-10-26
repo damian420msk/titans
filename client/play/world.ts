@@ -314,7 +314,7 @@ export class World {
     for (let i = 0; i < 26; i++) { const d = MeshBuilder.CreateSphere('aimdot', { diameter: .18, segments: 5 }, this.scene); d.material = this.mats.aim_normal; d.setEnabled(false); this.dots.push(d); }
     // glow only on light-emitting materials
     this.glow.customEmissiveColorSelector = (mesh, _sub, material, result) => {
-      const emits = material === this.mats.sky || material === this.mats.skyCore || material === this.mats.trim0 || material === this.mats.trim1 || (material && (material.name.startsWith('aim_') || material.name.startsWith('wave') || material.name === 'warnE'));
+      const emits = material === this.mats.sky || material === this.mats.skyCore || material === this.mats.trim0 || material === this.mats.trim1 || (material && (material.name.startsWith('aim_') || material.name.startsWith('wave') || material.name === 'warnE' || material.name === 'crackGlow'));
       const crystal = material && material.name.startsWith('rock_'); // sky crystals: a soft halo
       const fire = material && material.name.includes('Flame') && 'emissiveColor' in material; // brazier fire on the island ledges (decor.ts)
       if (fire) { const c = (material as unknown as { emissiveColor: Color3 }).emissiveColor; result.set(c.r * .8, c.g * .8, c.b * .8, 1); }
