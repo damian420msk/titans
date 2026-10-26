@@ -137,7 +137,10 @@ test('titan choice is free, validated and old profiles get the default', async (
   assert.equal(t.titanOf('titan_atlas'), 'atlas'); assert.equal(t.titanOf(undefined), 'novice'); assert.equal(t.titanOf('titan_red'), 'novice');
   // the bot takes any other titan of the roster; a human with the same pick is shown as another one
   const seen = new Set<string>(); const r = mulberry32(3); for (let i = 0; i < 50; i++) { const b = t.botTitan('novice', r); assert.notEqual(b, 'novice'); seen.add(b); }
-  assert.deepEqual([...seen].sort(), ['atlas', 'oceanus']);
+  assert.deepEqual([...seen].sort(), ['atlas', 'kronos', 'oceanus', 'prometheus']);
+  // every titan has its card in the shop, priced by rarity
+  assert.deepEqual(COSMETICS.filter(c => c.kind === 'titan').map(c => [c.id, c.cost]), [['titan_novice', 0], ['titan_atlas', 200], ['titan_oceanus', 200], ['titan_prometheus', 600], ['titan_kronos', 1000]]);
+  assert.deepEqual(t.TITAN_IDS.map(id => `titan_${id}`), COSMETICS.filter(c => c.kind === 'titan').map(c => c.id));
   assert.equal(t.foeTitan('atlas', 'atlas'), 'novice'); assert.equal(t.foeTitan('novice', 'oceanus'), 'oceanus');
 });
 

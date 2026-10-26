@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Titans · карточки магазина</title>
+<style>
+html,body{margin:0;background:#222;font-family:system-ui,sans-serif}
+/* one card = 360×450 (the shop's 4:5); the backdrop is CSS, the titan is drawn over it on a transparent canvas */
+#card{position:relative;width:360px;height:450px;overflow:hidden;background:radial-gradient(circle at 50% 42%,var(--glow) 0,var(--mid) 42%,var(--dark) 100%)}
+#card:before{content:"";position:absolute;left:50%;bottom:34px;width:250px;height:58px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(rgba(20,10,50,.55),rgba(20,10,50,0) 70%)}
+#card canvas{position:absolute;inset:0;width:100%;height:100%}
+</style></head>
+<body><div id="card"><canvas id="c" width="720" height="900"></canvas></div><script type="module" src="./cards.ts"></script></body></html>

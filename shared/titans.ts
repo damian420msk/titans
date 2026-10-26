@@ -1,11 +1,13 @@
 // Which titan models exist and who stands against whom. Presentation only: the battle rules never read this.
 // Roster v1 (docs/art/titan-rift-v1/ROSTER.md): all titans share one 24-joint skeleton and one set of clips, so any of them plays any match.
-export type TitanId = 'novice' | 'atlas' | 'oceanus';
-export const TITAN_IDS: TitanId[] = ['novice', 'atlas', 'oceanus'];
+export type TitanId = 'novice' | 'atlas' | 'oceanus' | 'prometheus' | 'kronos';
+export const TITAN_IDS: TitanId[] = ['novice', 'atlas', 'oceanus', 'prometheus', 'kronos'];
 export const TITANS: Record<TitanId, { name: string; file: string }> = {
   novice: { name: 'Новичок', file: 'art/titans-rift-v1/novice.glb' },
   atlas: { name: 'Атлас', file: 'art/titans-rift-v1/atlas.glb' },
   oceanus: { name: 'Океан', file: 'art/titans-rift-v1/oceanus.glb' },
+  prometheus: { name: 'Прометей', file: 'art/titans-rift-v1/prometheus.glb' },
+  kronos: { name: 'Кронос', file: 'art/titans-rift-v1/kronos.glb' },
 };
 /** Shop item id → model ('titan_atlas' → 'atlas'); anything unknown (also the retired titan_blue / titan_red) falls back to the starter. */
 export const titanOf = (cosmeticId: string | undefined): TitanId => TITAN_IDS.find(id => `titan_${id}` === cosmeticId) ?? TITAN_IDS[0]!;

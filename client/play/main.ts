@@ -113,7 +113,7 @@ async function boot() {
   });
   let retries = 0, quickWanted = false, inviteDone = false, inviteWait = false;
   if (myProfile) menu.setProfile(myProfile);
-  world.preloadPlates(kitOfTiles(myProfile?.eq.tiles), botKit);
+  world.preloadPlates(kitOfTiles(myProfile?.eq.tiles), botKit); void world.preloadTitan(titanOf(myProfile?.eq.titan)).catch(() => undefined);
   net.onState = st => {
     menu.setNet(st, net.slow);
     if (st === 'on' && inviteLink && !inviteDone) { inviteDone = true; inviteWait = true; hello(); menu.notice('Заходим на сервер друга…'); net.send({ t: 'join', id: inviteLink.id, pass: inviteLink.pw }); history.replaceState(null, '', location.pathname); }
@@ -132,7 +132,7 @@ async function boot() {
         break;
       case 'err': inviteWait = false; if (!$('pwd').hidden && m.code === 'wrong_pass') menu.pwdError(m.text); else menu.notice(m.text); break;
       case 'profile': {
-        myProfile = m.p; store.set('profile', JSON.stringify(m.p)); menu.setProfile(m.p); world.preloadPlates(kitOfTiles(m.p.eq.tiles), botKit);
+        myProfile = m.p; store.set('profile', JSON.stringify(m.p)); menu.setProfile(m.p); world.preloadPlates(kitOfTiles(m.p.eq.tiles), botKit); void world.preloadTitan(titanOf(m.p.eq.titan)).catch(() => undefined);
         if (pendingTrained) { net.send({ t: 'trained' }); pendingTrained = false; }
         if (pendingResult) { net.send({ t: 'result', ...pendingResult }); pendingResult = null; }
         break;

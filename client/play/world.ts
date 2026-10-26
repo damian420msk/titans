@@ -59,7 +59,8 @@ export class World {
   private casters: Mesh[] = [];
   private platform!: PlatformRenderer;
   private titans: [TitanView, TitanView] = [] as unknown as [TitanView, TitanView];
-  private views = {} as Record<TitanId, TitanView>;
+  private views: Partial<Record<TitanId, TitanView>> = {};
+  private loading = new Map<TitanId, Promise<TitanView>>();
   private shotMeshes = new Map<number, Mesh>();
   private warns = new Map<string, Mesh>();
   private particles: Particle[] = [];
@@ -218,10 +219,18 @@ export class World {
     for (const [x, z, s, tx, tz] of [[-.55, -.3, .8, -.25, .35], [.55, -.25, .85, -.2, -.38], [-.35, .5, .75, .35, .2], [.45, .45, .7, .3, -.3], [0, -.65, .6, -.45, 0], [-.75, .2, .5, .1, .55], [.8, .1, .5, 0, -.6]] as const) crystal(x, z, s, tx, tz);
   }
 
-  /** Loads every titan model once (the file is in metres, about 3.2 m tall). A match always shows two different models, so each owns its materials and the tint is per side. */
+  /** Titan models (in metres, about 3.2 m tall), each loaded once. A match always shows two different models, so each owns its materials and the tint is per side.
+   *  Start waits for the first two only; the rest of the roster comes in the background (the equipped one first, see preloadTitan). */
   private async buildTitans() {
-    for (const id of TITAN_IDS) this.views[id] = await this.loadTitan(id);
+    await Promise.all([this.preloadTitan(TITAN_IDS[0]!), this.preloadTitan(TITAN_IDS[1]!)]);
     this.assignTitans(TITAN_IDS[0]!, TITAN_IDS[1]!);
+    void (async () => { for (const id of TITAN_IDS) await this.preloadTitan(id).catch(() => undefined); })();
+  }
+  /** Load a titan model if it is not there yet (the player's equipped one is asked for as soon as the profile is known). */
+  preloadTitan(id: TitanId): Promise<TitanView> {
+    let p = this.loading.get(id);
+    if (!p) { p = this.loadTitan(id).then(v => { this.views[id] = v; v.holder.setEnabled(this.titans.includes(v)); return v; }); this.loading.set(id, p); }
+    return p;
   }
 
   private async loadTitan(id: TitanId): Promise<TitanView> {
@@ -240,7 +249,12 @@ export class World {
     const nodes = new Map<string, TransformNode>(); for (const n of c.transformNodes) nodes.set(n.name, n);
     const rig = new TitanRig(nodes, clips);
     const hand = nodes.get('RightHand'), socket = new TransformNode('stoneSocket_' + id, this.scene);
-    if (hand) { socket.parent = hand; socket.position.set(-.028, .13, .112); } else socket.parent = holder;
+    if (hand) {
+      // the stone sits in the palm: 0.2 m past the wrist along the forearm→hand line, in the hand's own units (Meshy rigs are in centimetres)
+      socket.parent = hand; hand.computeWorldMatrix(true);
+      const along = Vector3.TransformNormal(hand.position, Matrix.FromQuaternionToRef(Quaternion.Inverse(hand.rotationQuaternion ?? Quaternion.Identity()), new Matrix())).normalize();
+      socket.position.copyFrom(along.scale(.2 / (hand.absoluteScaling.x || 1)));
+    } else socket.parent = holder;
     const stone = this.stoneCube(.7, this.mats.stone_normal0, 'held'); stone.parent = socket; stone.setEnabled(false);
     // a ring in the team colour under the feet tells the sides apart even when both look alike (the cosmetics tint does not touch it)
     const ring = MeshBuilder.CreateTorus('ring_' + id, { diameter: 2.9, thickness: .17, tessellation: 40 }, this.scene), rm = new StandardMaterial('ringMat_' + id, this.scene);
@@ -250,7 +264,9 @@ export class World {
 
   /** Which model stands on which side for the coming match (side 0 is always the local player). Call before resetMatch/setLook. */
   assignTitans(model0: TitanId, model1: TitanId) {
-    if (model0 === model1) model1 = otherTitan(model0);
+    // a model still downloading is replaced by a loaded one for this match (only in the first seconds after start)
+    const ready = (id: TitanId, not?: TitanId) => this.views[id] && id !== not ? id : (void this.preloadTitan(id), TITAN_IDS.find(x => this.views[x] && x !== not)!);
+    model0 = ready(model0); if (model0 === model1) model1 = otherTitan(model0); model1 = ready(model1, model0);
     const pair: [TitanView, TitanView] = [this.views[model0]!, this.views[model1]!];
     pair.forEach((t, side) => {
       t.yaw = side === 0 ? 0 : Math.PI; t.stone.material = this.mats['stone_normal' + side]!;
@@ -261,7 +277,7 @@ export class World {
     });
     this.titans = pair;
     // the roster has more models than a match needs: only the two that play are shown
-    for (const v of Object.values(this.views)) v.holder.setEnabled(pair.includes(v));
+    for (const v of Object.values(this.views)) v!.holder.setEnabled(pair.includes(v!));
   }
 
   private stoneMat(kind: Kind, side: Side) { return kind === 'normal' ? this.mats['stone_normal' + side] : this.mats['stone_' + kind]; }
