@@ -25,7 +25,8 @@ def materials():
     return {
         'Marble': mat('Marble', '#EFE6D8', .55), 'MarbleShade': mat('MarbleShade', '#D8CBB8', .7),
         'Gold': mat('Gold', '#E3B04B', .35, .85), 'TeamCloth': mat('TeamCloth', '#FFFFFF', .85),
-        'Stone': mat('Stone', '#8F8578', .9), 'Flame': mat('Flame', '#FF6A1A', .9, 0, '#FF5A12'), 'FlameCore': mat('FlameCore', '#FFD25A', .9, 0, '#FFC23A'), 'Leaf': mat('Leaf', '#7FA35A', .85), 'LeafDark': mat('LeafDark', '#5E8644', .85),
+        'Stone': mat('Stone', '#8F8578', .9), 'StoneDark': mat('StoneDark', '#6F665C', .95), 'Moss': mat('Moss', '#7FA35A', .9),
+        'Water': mat('Water', '#BFEFFF', .2), 'Flame': mat('Flame', '#FF6A1A', .9, 0, '#FF5A12'), 'FlameCore': mat('FlameCore', '#FFD25A', .9, 0, '#FFC23A'), 'Leaf': mat('Leaf', '#7FA35A', .85), 'LeafDark': mat('LeafDark', '#5E8644', .85),
     }
 
 def reset():
@@ -173,4 +174,65 @@ def plinth():
     parts.append(rock_)
     export('plinth', parts)
 
-column(); column(True); brazier(); vase(); banner(); bush(); rubble(); plinth()
+# Arena size from rules_v01.json: 9 × 11 cells of 2.8 m; the island centre is the origin, Blender +Y = the island's back (game −z for side 0)
+HW, HD = 9 * 2.8 / 2, 11 * 2.8 / 2
+
+def cliff():
+    """The rock that hangs under the island: a wedge-shaped rim along the edge, hollow in the middle (holes still show the clouds
+    and a falling titan drops through), with a moss lip and a ragged bottom of stalactites."""
+    M = reset(); bm = bmesh.new(); rnd = random.Random(21); N = 72; R = 2.2
+    # perimeter of a rounded rectangle, with its outward normal
+    def perim(t):
+        L = [2 * (HW - R), 2 * (HD - R)]; total = 2 * (L[0] + L[1]) + 2 * math.pi * R; d = t * total
+        segs = [('s', (-(HW - R), -HD), (1, 0), L[0]), ('a', (HW - R, -(HD - R)), -math.pi / 2, math.pi / 2 * R),
+                ('s', (HW, -(HD - R)), (0, 1), L[1]), ('a', (HW - R, HD - R), 0, math.pi / 2 * R),
+                ('s', (HW - R, HD), (-1, 0), L[0]), ('a', (-(HW - R), HD - R), math.pi / 2, math.pi / 2 * R),
+                ('s', (-HW, HD - R), (0, -1), L[1]), ('a', (-(HW - R), -(HD - R)), math.pi, math.pi / 2 * R)]
+        for kind, a, b, ln in segs:
+            if d <= ln or kind == segs[-1][0] and ln == segs[-1][3] and d - ln < 1e-6:
+                if kind == 's': p = Vector((a[0] + b[0] * d, a[1] + b[1] * d)); n = Vector((b[1], -b[0]))
+                else: ang = b + d / R; n = Vector((math.cos(ang), math.sin(ang))); p = Vector(a) + n * R
+                return p, n
+            d -= ln
+        return perim(0)
+    # cross-section (inward u, height y) as fractions of the local depth D
+    prof = [(-.12, -.40, 0), (-.05, -.9, 0), (.25, -.22, 1), (.6, -.48, 1), (1.0, -.78, 1), (1.15, -1.0, 1), (1.6, -.62, 1), (2.0, -.25, 1), (2.1, -.40, 0)]
+    rings = []
+    for i in range(N):
+        t = i / N; p, n = perim(t)
+        D = 7 + 2.5 * math.sin(t * math.pi * 6 + 1) + 1.6 * math.sin(t * math.pi * 14) + rnd.random() * 1.8
+        ring = []
+        for u, y, scale in prof:
+            yy = y if scale == 0 else y * D
+            if scale == 0 and y == -.9: yy = -.9  # the moss lip stays near the top
+            j = (rnd.random() - .5) * .35 * (1 if scale else 0)
+            q = p - n * (u + j); ring.append(bm.verts.new((q.x, q.y, yy + (rnd.random() - .5) * .3 * scale)))
+        rings.append(ring)
+    faces = []
+    for i in range(N):
+        a, b = rings[i], rings[(i + 1) % N]
+        for k in range(len(prof) - 1):
+            f = bm.faces.new((a[k], b[k], b[k + 1], a[k + 1])); faces.append((f, k))
+    me = bpy.data.meshes.new('cliff'); bm.to_mesh(me); bm.free(); o = link(bpy.data.objects.new('cliff', me))
+    for m in (M['Moss'], M['Stone'], M['StoneDark']): o.data.materials.append(m)
+    for poly in o.data.polygons:
+        k = faces[poly.index][1]; poly.material_index = 0 if k == 0 else (2 if k in (3, 4) else 1); poly.use_smooth = False
+    export('cliff', [o])
+
+def waterfall():
+    """A ribbon of falling water from the lip down into the clouds; v runs along the fall so the game scrolls it."""
+    M = reset(); bm = bmesh.new(); W, n = 2.0, 16; rows = []
+    for j in range(n + 1):
+        v = j / n; drop = 18 * v; out = .35 + 1.4 * v * v  # pours out over the lip, then falls almost straight
+        w = W * (1 + .5 * v)
+        rows.append([bm.verts.new((x * w / 2, -out, -.3 - drop)) for x in (-1, -.33, .33, 1)])
+    for j in range(n):
+        for i in range(3): bm.faces.new((rows[j][i], rows[j][i + 1], rows[j + 1][i + 1], rows[j + 1][i]))
+    me = bpy.data.meshes.new('waterfall'); bm.to_mesh(me); bm.free(); o = link(bpy.data.objects.new('waterfall', me)); o.data.materials.append(M['Water'])
+    uv = o.data.uv_layers.new(name='UVMap')
+    for poly in o.data.polygons:
+        for li in poly.loop_indices:
+            co = o.data.vertices[o.data.loops[li].vertex_index].co; uv.data[li].uv = ((co.x / (W * 1.5) + .5), (-co.z - .3) / 6)
+    export('waterfall', [o])
+
+column(); column(True); brazier(); vase(); banner(); bush(); rubble(); plinth(); cliff(); waterfall()

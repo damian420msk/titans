@@ -3,6 +3,9 @@
 import { Scene } from '@babylonjs/core/scene';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
+import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
+import { Texture } from '@babylonjs/core/Materials/Textures/texture';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
 import { LoadAssetContainerAsync } from '@babylonjs/core/Loading/sceneLoader';
 import type { AssetContainer } from '@babylonjs/core/assetContainer';
 import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
@@ -12,7 +15,7 @@ import type { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import type { Side } from '../../shared/world';
 import { assetUrl } from './assets';
 
-const PROPS = ['column', 'column_broken', 'brazier', 'vase', 'banner', 'bush', 'rubble', 'plinth'] as const;
+const PROPS = ['column', 'column_broken', 'brazier', 'vase', 'banner', 'bush', 'rubble', 'plinth', 'cliff', 'waterfall'] as const;
 type Prop = typeof PROPS[number];
 /** One island's layout in its own frame: x across (− left, + right, seen from behind the owner), z from the front edge (0) to the back (1).
  *  `out` = how far past the arena edge the ledge stands, metres. Mirrored for side 1 so both islands read the same way. */
@@ -27,6 +30,7 @@ const LAYOUT: { prop: Prop; x: number; z: number; out: number; yaw: number }[] =
 
 export class IslandDecor {
   private flames: { mesh: AbstractMesh; phase: number }[] = [];
+  private water: Texture | null = null;
 
   /** halfWidth, front, depth: the arena rectangle of side 0 (x ∈ ±halfWidth, z from −front to −front−depth); side 1 is its mirror. */
   static async create(scene: Scene, halfWidth: number, front: number, depth: number, team: readonly string[]) {
@@ -35,8 +39,19 @@ export class IslandDecor {
     await Promise.all(PROPS.map(async p => lib.set(p, await LoadAssetContainerAsync(assetUrl(`art/decor-v01/${p}.glb`), scene, { pluginExtension: '.glb' }))));
     // one cloth material per side (the team colour); everything else shares the file materials
     const cloth = [0, 1].map(side => { const m = (lib.get('banner')!.materials.find(x => x.name === 'TeamCloth') as PBRMaterial).clone(`TeamCloth${side}`); m.albedoColor = Color3.FromHexString(team[side]!).toLinearSpace(); return m; });
+    const waterMat = d.waterMaterial(scene);
     for (const side of [0, 1] as Side[]) {
       const sign = side === 0 ? 1 : -1, root = new TransformNode(`decor-island-${side}`, scene);
+      // the rock rim under the island (hollow: holes still look down into the clouds) and two waterfalls pouring off it
+      const place = (prop: Prop, x: number, z: number, yaw: number) => {
+        const node = lib.get(prop)!.instantiateModelsToScene(n => `decor:${side}:${prop}:${n}`, false, { doNotInstantiate: true }).rootNodes[0] as TransformNode;
+        node.parent = root; node.position.set(sign * x, 0, sign * z); node.rotationQuaternion = null; node.rotation.y = yaw + (side ? Math.PI : 0);
+        for (const m of node.getChildMeshes(false)) { m.isPickable = false; m.receiveShadows = true; if (prop === 'waterfall') m.material = waterMat; }
+        return node;
+      };
+      place('cliff', 0, -(front + depth / 2), 0);
+      place('waterfall', halfWidth * .45, -front, 0);
+      place('waterfall', -halfWidth, -(front + depth * .58), -Math.PI / 2);
       const still = new Map<string, { material: Material; list: Mesh[] }>(); // static parts, merged per material below: about 7 draw calls per island instead of ~80
       for (const it of LAYOUT) {
         // the ledge sits just past the side edge (x) at a point along the island's length (z)
@@ -72,8 +87,19 @@ export class IslandDecor {
     return d;
   }
 
-  /** Fire in the braziers: a cheap scale flicker, no particles. */
+  /** Falling water: soft white streaks on light blue, scrolled down in update(). */
+  private waterMaterial(scene: Scene) {
+    const t = new DynamicTexture('waterfall-streaks', { width: 64, height: 256 }, scene, true), g = t.getContext() as CanvasRenderingContext2D;
+    g.fillStyle = 'rgba(150,220,255,0.55)'; g.fillRect(0, 0, 64, 256);
+    for (let i = 0; i < 26; i++) { const x = (i * 37) % 64, y = (i * 83) % 256, h = 40 + (i * 29) % 90; g.fillStyle = `rgba(255,255,255,${.35 + (i % 3) * .2})`; g.fillRect(x, y, 3 + (i % 4), h); g.fillRect(x, y - 256, 3 + (i % 4), h); }
+    t.update(); t.hasAlpha = true; t.wrapU = t.wrapV = Texture.WRAP_ADDRESSMODE;
+    const m = new StandardMaterial('waterfall', scene); m.diffuseTexture = t; m.useAlphaFromDiffuseTexture = true; m.emissiveColor = new Color3(.55, .7, .8);
+    m.specularColor = Color3.Black(); m.backFaceCulling = false; m.alpha = .9; this.water = t; return m;
+  }
+
+  /** Fire in the braziers: a cheap scale flicker, no particles. Water: the streaks slide down. */
   update(time: number) {
+    if (this.water) this.water.vOffset = -time * .9;
     for (const f of this.flames) { const k = 1 + Math.sin(time * 9 + f.phase) * .08 + Math.sin(time * 23 + f.phase * 2) * .05; f.mesh.scaling.set(1 / k, k, 1 / k); }
   }
 }

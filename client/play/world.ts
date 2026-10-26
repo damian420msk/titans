@@ -99,7 +99,7 @@ export class World {
   private constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: true, preserveDrawingBuffer: false }, false);
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = new Color4(.54, .42, .8, 1); // the violet of the painted sky: any frame before the backdrop loads still looks like sky
+    this.scene.clearColor = new Color4(.93, .78, .72, 1); // the peach of the painted sunset sky: any frame before the backdrop loads still looks like sky
     this.camera = new FreeCamera('cam', new Vector3(0, 6, -40), this.scene);
     this.camera.minZ = .1; this.camera.maxZ = 700; this.camera.inputs.clear();
   }
@@ -155,9 +155,9 @@ export class World {
     s.getMeshByName('gradient sky')!.setEnabled(false); // the painted backdrop covers the whole view
     this.buildBackdrop();
     // a few thin cloud wisps under the islands for depth, tinted to the painted cloud sea (the old bright banks hid the picture)
-    const cloud = s.getMaterialByName('soft cloud banks') as StandardMaterial; cloud.alpha = .55; cloud.emissiveColor = new Color3(.82, .62, .95);
+    const cloud = s.getMaterialByName('soft cloud banks') as StandardMaterial; cloud.alpha = .55; cloud.emissiveColor = new Color3(1, .84, .76); // warm, like the sunset cloud sea of bg-v02
     for (const m of s.meshes) if (m.name === 'cloud below arenas') m.setEnabled(false);
-    s.fogMode = Scene.FOGMODE_LINEAR; s.fogStart = 70; s.fogEnd = 320; s.fogColor = new Color3(.86, .7, .9);
+    s.fogMode = Scene.FOGMODE_LINEAR; s.fogStart = 70; s.fogEnd = 320; s.fogColor = new Color3(.98, .84, .8);
     for (let i = 0; i < 14; i++) { const a = i * 2.39996, r = 8 + (i % 10) * 9 + (i * 7 % 13); const m = MeshBuilder.CreatePlane('cloudsea', { width: 26 + (i % 4) * 8, height: 13 + (i % 3) * 4 }, s); m.position.set(Math.sin(a) * r, -9 - (i % 5) * 3.2, Math.cos(a) * r); m.billboardMode = Mesh.BILLBOARDMODE_ALL; m.material = cloud; m.isPickable = false; this.clouds.push(m); }
     this.buildFarIslands();
     for (const m of s.meshes) if (m.name.startsWith('far rock') || m.name.startsWith('mountain template')) m.setEnabled(false);
@@ -174,7 +174,7 @@ export class World {
       tex.hasAlpha = true;
       const mat = new StandardMaterial(`farIsle_${name}`, this.scene);
       mat.diffuseTexture = tex; mat.emissiveTexture = tex; mat.useAlphaFromDiffuseTexture = true; mat.disableLighting = true; mat.backFaceCulling = false;
-      mat.emissiveColor = new Color3(.92, .86, .98); mat.alpha = .96; mat.fogEnabled = false;
+      mat.emissiveColor = new Color3(1, .9, .84); mat.alpha = .96; mat.fogEnabled = false;
       const plane = MeshBuilder.CreatePlane(`farisle${i}`, { width: h, height: h }, this.scene);
       plane.scaling.x = .72; tex.onLoadObservable.addOnce(() => { const sz = tex.getBaseSize(); if (sz.height) plane.scaling.x = sz.width / sz.height; });
       plane.position.set(x, y, z); plane.billboardMode = Mesh.BILLBOARDMODE_Y; plane.material = mat; plane.isPickable = false; plane.alphaIndex = 5;
@@ -185,7 +185,7 @@ export class World {
   /** The same painted sky as the menu, as a flat backdrop fixed to the camera (the camera never turns, so it reads like the menu picture).
    *  One quad, no lighting, no fog; sized every frame to cover the view. */
   private buildBackdrop() {
-    const tex = new Texture(assetUrl('art/bg-v01/sky_0e83cbfe.png'), this.scene, true, true, Texture.BILINEAR_SAMPLINGMODE);
+    const tex = new Texture(assetUrl('art/bg-v02/sky_sunset.webp'), this.scene, true, true, Texture.BILINEAR_SAMPLINGMODE);
     const mat = new StandardMaterial('backdrop', this.scene); mat.disableLighting = true; mat.emissiveTexture = tex; mat.diffuseColor = Color3.Black(); mat.fogEnabled = false; mat.disableDepthWrite = true;
     const p = MeshBuilder.CreatePlane('backdrop', { width: 1, height: 1 }, this.scene); p.material = mat; p.parent = this.camera; p.isPickable = false; p.applyFog = false;
     this.backdrop = p;

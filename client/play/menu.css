@@ -1,10 +1,10 @@
-/* Main menu, lobby, rating, settings. Sky backdrop from public/art/bg-v01. */
-#menu{position:fixed;inset:0;z-index:5;color:#fff;overflow:hidden;background:#6a54b8 url('/art/bg-v01/sky_0e83cbfe.png') center bottom/cover no-repeat}
+/* Main menu, lobby, rating, settings. Sky backdrop: public/art/bg-v02 (sunset); clouds and islands: bg-v01. */
+#menu{position:fixed;inset:0;z-index:5;color:#fff;overflow:hidden;background:#6a54b8 url('/art/bg-v02/sky_sunset.webp') center bottom/cover no-repeat}
 #menu[hidden]{display:none}
 #menu::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 55%,rgba(30,16,70,0) 40%,rgba(30,16,70,.45));pointer-events:none}
 .sky-bg{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .sky-bg img{position:absolute;will-change:transform}
-.cl{opacity:.85}
+.cl{opacity:.85;filter:sepia(.45) saturate(1.3) hue-rotate(-18deg) brightness(1.06)} /* the old violet puffs, warmed to the sunset sky (bg-v02) */
 .c1{top:3%;left:-8%;width:26vmax;animation:drift 90s linear infinite}
 .c2{top:31%;left:-30%;width:20vmax;opacity:.6;animation:drift 130s linear -40s infinite}
 .c3{top:57%;left:-20%;width:16vmax;opacity:.5;animation:drift 160s linear -90s infinite}
