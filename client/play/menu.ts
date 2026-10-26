@@ -244,7 +244,7 @@ export function initMenu(h: MenuHooks) {
     const w = prof?.wins ?? 0, l = prof?.losses ?? 0; $('rc-wl').textContent = `${w} поб · ${l} пор${w + l ? ` · ${Math.round(w / (w + l) * 100)}%` : ''}`;
     $('recent-list').innerHTML = prof?.recent?.length ? prof.recent.map(x => `<div class="rrow ${x.won === true ? 'w' : x.won === false ? 'l' : 'd'}"><b>${x.won === true ? 'Победа' : x.won === false ? 'Поражение' : 'Ничья'}</b><span>${x.online ? '' : '🤖 '}${esc(x.nick)}</span><em>${x.delta ? (x.delta > 0 ? '+' : '') + x.delta : '·'}</em></div>`).join('') : '<div class="empty">Здесь появятся твои последние бои</div>';
   }
-  // quick search: 20 → 0; a found opponent freezes the number. Nobody found: offer a bot (starts by itself after BOT_OFFER_S) or a server to invite a friend; the queue stays on meanwhile
+  // quick search: QUICK_SEARCH_S → 0 quietly, then BOT_OFFER_S more with the offer; a found opponent freezes the number. Nobody found: offer a bot (starts by itself after BOT_OFFER_S) or a server to invite a friend; the queue stays on meanwhile
   let qT = 0, qLeft = 0, qGone = 0;
   const qPaint = () => { $('quick-count').textContent = String(qLeft); };
   const qStop = () => { window.clearInterval(qT); qT = 0; window.clearTimeout(qGone); };
@@ -256,7 +256,7 @@ export function initMenu(h: MenuHooks) {
       qLeft--; qPaint(); if (qLeft > 0) return;
       if (offer) { qStop(); h.onQuickTimeout(); return; }
       offer = true; qLeft = BOT_OFFER_S; qPaint(); $('quick-alt').hidden = false;
-      $('quick-title').textContent = 'Живого соперника пока нет'; $('quick-note').textContent = `Через ${BOT_OFFER_S} с начнём бой с ИИ.`;
+      $('quick-title').textContent = 'Ищем дальше…'; $('quick-note').textContent = `Можно позвать друга или сразу сыграть с ИИ. Через ${BOT_OFFER_S} с начнём бой с ИИ сами.`;
     }, 1000);
   }
   const quickFound = (foe?: string) => { $('quick-ring').classList.add('found'); $('quick-alt').hidden = true; $('quick-title').textContent = 'Соперник найден!'; if (foe) $('quick-note').textContent = `Играем с ${foe}`; };

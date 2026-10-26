@@ -34,6 +34,8 @@ test('the rules are symmetric: a mirrored battle evolves as the mirror image', (
   let throws = 0;
   for (const seed of [1, 2, 3]) {
     const s = snapshot(playBots(18 + seed * 4, seed)), A = new Battle(), B = new Battle();
+    // the bots may be mid-jump, sprinting or out of stones at this moment: start the script from a state where both can throw
+    for (const a of s.a) { a.sr = 0; a.rn = 0; a.c = 0; a.s = Math.max(a.s, 2); if (!a.f) { a.ja = 0; a.y = 0; a.vy = 0; } }
     applySnap(A, s); applySnap(B, mirrorSnap(s));
     const script = (b: Battle, swap: boolean) => {
       const sd = (i: 0 | 1) => (swap ? 1 - i : i) as 0 | 1, sg = swap ? -1 : 1;

@@ -55,6 +55,8 @@ const forceHq = new URLSearchParams(location.search).has('hq');
 let online = false, lastMove = { x: 9, z: 9, t: 0 }, lastTarget = '';
 const srvEvents: GameEvent[] = [];
 let pendingSnap: { s: Snap; at: number } | null = null;
+/** quick-match bot strength fitted to the player (null: the chosen level) */
+let botSkill: number | null = null;
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
 let repairWasHeld = false, heartsKey = '';
 /** A bot fight in progress is remembered: closing the tab mid-fight counts as a loss on the next visit. */
@@ -78,9 +80,9 @@ async function boot() {
   const hello = () => net.send({ t: 'hello', nick: menu.nick(), token });
   const needNet = () => { if (net.state === 'off') net.connect(); if (net.state !== 'on') { menu.notice('Подключаемся к серверу… (бесплатный сервер просыпается до минуты)'); return false; } return true; };
   menu = initMenu({
-    sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); level = l; disguise = null; if (matchesPlayed > 0) await ya.interstitial(); training = null; paintTrain(); startMatch(); },
+    sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); level = l; botSkill = null; disguise = null; if (matchesPlayed > 0) await ya.interstitial(); training = null; paintTrain(); startMatch(); },
     onTrain: () => {
-      goFullscreen(); level = 'easy'; disguise = null; startMatch(); markFight(false);
+      goFullscreen(); level = 'easy'; botSkill = null; disguise = null; startMatch(); markFight(false);
       battle.practice = PRACTICE; // the training titan cannot be knocked off, falls cost no life, no time limit
       training = new Training(menu.trainDone() ? [] : savedSteps(), battle.actors[0].pos); trainDoneShown = false;
       for (const c of [{ x: 2, z: 6 }, { x: 6, z: 5 }]) battle.floors[0].set(cellKey(c), 1); // two cracked tiles of our own to repair
@@ -88,7 +90,7 @@ async function boot() {
     },
     onScreen: sc => { if (sc === 'online') { if (net.state === 'off') net.connect(); else net.send({ t: 'list' }); } },
     onCreate: (name, pass, ranked) => { createdPass = pass; hello(); net.send({ t: 'create', name, pass, ranked }); },
-    onQuickTimeout: () => { quickWanted = false; net.send({ t: 'quick', on: false }); const pk = pickBot(myProfile?.rating ?? 1000, Math.random); level = pk.level; disguise = DISGUISE_BOT ? pk.nick : null; goFullscreen(); startMatch(); },
+    onQuickTimeout: () => { quickWanted = false; net.send({ t: 'quick', on: false }); const pk = pickBot(myProfile?.rating ?? 1000, Math.random, (myProfile?.recent ?? []).filter(r => !r.online).map(r => r.won === true)); level = pk.level; botSkill = pk.skill; disguise = DISGUISE_BOT ? pk.nick : null; goFullscreen(); startMatch(); },
     onQuick: on => { if (on) { goFullscreen(); if (!needNet()) { quickWanted = true; return; } hello(); net.send({ t: 'quick', on: true }); } else { quickWanted = false; net.send({ t: 'quick', on: false }); } },
     onBuy: (kind, id) => { if (needNet()) net.send({ t: 'buy', kind, id }); },
     onEquip: id => { if (needNet()) net.send({ t: 'equip', id }); },
@@ -150,7 +152,7 @@ async function boot() {
     world.setPlates(kitOfTiles(info ? info.look[0]?.tiles : myProfile?.eq.tiles), info ? kitOfTiles(info.look[1]?.tiles) : botKit);
     if (!info) { botKit = PLATFORM_KITS[Math.floor(Math.random() * PLATFORM_KITS.length)]!.id; world.preloadPlates(kitOfTiles(myProfile?.eq.tiles), botKit); }
     { const mineModel = titanOf(info ? info.look[0]?.titan : myProfile?.eq.titan); world.assignTitans(mineModel, info ? foeTitan(mineModel, titanOf(info.look[1]?.titan)) : botTitan(mineModel, mulberry32(seed * 104729 + 17))); }
-    world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
+    world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, botSkill ?? level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = `<div class="slot">${icon('stone')}</div>`.repeat(battle.mods[0].capacity); paintNotches();
     $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
     markFight(!online);
