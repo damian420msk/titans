@@ -41,7 +41,7 @@ const token = (() => {
   return t;
 })();
 let myProfile: MyProfile | null = (() => { try { const r = JSON.parse(store.get('profile') ?? 'null'); if (r && typeof r.rating === 'number') { const { id: _id, ...p } = sanitizeProfile(r, 'local'); return { ...p, dailyReady: false } as MyProfile; } } catch { /* ignore */ } return null; })();
-let pendingResult: { level: Difficulty; won: boolean; foe?: string; dur?: number } | null = null, disguise: string | null = null;
+let pendingResult: { level: Difficulty; won: boolean; foe?: string; dur?: number; quit?: boolean } | null = null, disguise: string | null = null;
 let training: Training | null = null, pendingTrained = false, trainDoneShown = false;
 /** Kit of the next bot's island: rolled ahead so it can be preloaded while the menu is open. */
 let botKit: KitId = PLATFORM_KITS[Math.floor(Math.random() * PLATFORM_KITS.length)]!.id;
@@ -57,6 +57,9 @@ const srvEvents: GameEvent[] = [];
 let pendingSnap: { s: Snap; at: number } | null = null;
 let level: Difficulty = 'normal', battle = new Battle(), bot = new Bot(battle, 1, level), mode: 'menu' | 'playing' | 'over' = 'menu';
 let repairWasHeld = false, heartsKey = '';
+/** A bot fight in progress is remembered: closing the tab mid-fight counts as a loss on the next visit. */
+const markFight = (on: boolean) => store.set('fight', on ? JSON.stringify({ level, foe: disguise ?? undefined }) : '');
+{ try { const f = JSON.parse(store.get('fight') || 'null'); if (f && ['easy', 'normal', 'hard'].includes(f.level)) pendingResult = { level: f.level, won: false, foe: typeof f.foe === 'string' ? f.foe : undefined, quit: true }; } catch { /* junk */ } store.set('fight', ''); }
 let seenAimHint = (() => { try { return localStorage.getItem('titans.aimhint') === '1'; } catch { return false; } })();
 let roomView: RoomView | null = null;
 let lastSprint = 0;
@@ -77,7 +80,7 @@ async function boot() {
   menu = initMenu({
     sfx, touch: touchDevice, onStartBot: async l => { goFullscreen(); level = l; disguise = null; if (matchesPlayed > 0) await ya.interstitial(); training = null; paintTrain(); startMatch(); },
     onTrain: () => {
-      goFullscreen(); level = 'easy'; disguise = null; startMatch();
+      goFullscreen(); level = 'easy'; disguise = null; startMatch(); markFight(false);
       battle.practice = PRACTICE; // the training titan cannot be knocked off, falls cost no life, no time limit
       training = new Training(menu.trainDone() ? [] : savedSteps(), battle.actors[0].pos); trainDoneShown = false;
       for (const c of [{ x: 2, z: 6 }, { x: 6, z: 5 }]) battle.floors[0].set(cellKey(c), 1); // two cracked tiles of our own to repair
@@ -150,6 +153,7 @@ async function boot() {
     world.resetMatch(); controls.jumpPressed = false; const mine = modsFor(myProfile ?? newProfile('x')); endGain = ''; battle = new Battle(info ? info.mods : [mine]); world.setLook(0, info ? info.look[0] : (myProfile?.eq ?? DEFAULT_EQUIP)); world.setLook(1, info ? info.look[1] : DEFAULT_EQUIP); bot = new Bot(battle, 1, level, mulberry32(seed++ * 7919)); charging = false; acc = 0; controls.reset();
     slots.innerHTML = `<div class="slot">${icon('stone')}</div>`.repeat(battle.mods[0].capacity); paintNotches();
     $('emote-btn').hidden = !online; $('emotes').hidden = true; $('bubble0').hidden = $('bubble1').hidden = true;
+    markFight(!online);
     if (online) disguise = null; const shown = online ? foe! : (disguise ?? NAMES[level]); $('foe-name').textContent = shown; $('foe-face').textContent = online || disguise ? shown.slice(0, 1).toUpperCase() : 'ИИ'; menu.hide(); $('end').hidden = true; $('hud').hidden = false; mode = 'playing'; (window as any).titans.battle = battle;
   };
   window.addEventListener('pointerdown', () => sfx.unlock(), { once: true }); window.addEventListener('keydown', () => sfx.unlock(), { once: true });
@@ -222,9 +226,14 @@ async function boot() {
   document.querySelectorAll<HTMLElement>('#emotes [data-e]').forEach(b => { b.innerHTML = icon(EMOTE_ICONS[+b.dataset.e!] ?? 'smile'); });
   const slots = $('slots'); 
 
-  const setPause = (on: boolean) => { if (on && mode !== 'playing') return; userPause = on && !online; $('pause').hidden = !on; $('pause-menu').textContent = online ? 'Сдаться и выйти' : 'Выйти в меню'; if (on) { controls.reset(); charging = false; battle.cancelCharge(0); battle.cancelRepair(0); } };
+  const setPause = (on: boolean) => { if (on && mode !== 'playing') return; userPause = on && !online; $('pause').hidden = !on; const forfeit = online || !training; $('pause-menu').textContent = forfeit ? 'Сдаться и выйти' : 'Выйти в меню'; $('pause-note').hidden = !forfeit; if (on) { controls.reset(); charging = false; battle.cancelCharge(0); battle.cancelRepair(0); } };
   $('pause-btn').onclick = () => setPause(true); $('resume').onclick = () => setPause(false);
-  $('pause-menu').onclick = () => { setPause(false); toMenu(); };
+  $('pause-menu').onclick = () => {
+    setPause(false);
+    // leaving a bot fight is a loss (online the server already counts 'leave' as one)
+    if (!online && !training && mode === 'playing') { pendingResult = { level, won: false, foe: disguise ?? undefined, quit: true }; markFight(false); if (net.state === 'on') { hello(); net.send({ t: 'result', ...pendingResult }); pendingResult = null; } else net.connect(); }
+    toMenu();
+  };
   window.addEventListener('blur', () => { if (!online) setPause(true); });
   const fsBtn = $('fs-btn');
   fsBtn.hidden = !touchDevice && !document.fullscreenEnabled;
@@ -362,6 +371,7 @@ async function boot() {
     $('end-text').textContent = why === 'left' ? 'Соперник вышел из боя. Победа твоя.' : why === 'conn' ? 'Связь с сервером потеряна.' : winner === 0 ? 'Враг рухнул вниз. Небесные камни твои.' : winner === 1 ? 'Тебя сбросили с острова. Попробуй ещё раз.' : 'Время вышло, силы равны.';
     $('again').textContent = online ? (lastQuick ? 'ИСКАТЬ ЕЩЁ' : 'НА СЕРВЕР') : disguise ? 'ИСКАТЬ ЕЩЁ' : 'ЕЩЁ РАЗ';
     $('end-gain').innerHTML = online ? endGain.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!)).replace('🪙', ico('coin')) : ''; $('end-foe').textContent = ''; $('rematch').hidden = $('end-say').hidden = true; if (online && !why) setTimeout(updateRematch, 0);
+    if (!online) markFight(false);
     if (!online && why !== 'conn') {
       if (winner === 0) menu.botWin();
       pendingResult = { level, won: winner === 0, foe: disguise ?? undefined, dur: Math.round(battle.time) };

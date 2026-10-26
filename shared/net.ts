@@ -19,7 +19,7 @@ export type C2S =
   | { t: 'claim' }
   | { t: 'trained' }
   | { t: 'top' }
-  | { t: 'result'; level: Difficulty; won: boolean; foe?: string; dur?: number }
+  | { t: 'result'; level: Difficulty; won: boolean; foe?: string; dur?: number; quit?: boolean }
   | { t: 'quick'; on: boolean }
   | { t: 'list' }
   | { t: 'create'; name: string; pass: string; ranked?: boolean }

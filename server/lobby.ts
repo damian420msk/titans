@@ -98,7 +98,7 @@ export class Lobby {
       case 'claim': return this.claim(c);
       case 'trained': return this.trained(c);
       case 'top': return this.sendTop(c);
-      case 'result': return this.botResult(c, m.level, !!m.won, m.foe, m.dur);
+      case 'result': return this.botResult(c, m.level, !!m.won, m.foe, m.dur, m.quit === true);
       case 'bonus': return this.bonus(c);
       case 'emote': {
         const room = c.room, id = Number(m.id);
@@ -144,9 +144,15 @@ export class Lobby {
   private doEquip(c: Client, id: string) { const p = c.profile; if (!p) return; const r = equip(p, id); if (r.ok) this.persist(p); this.sendProfile(c); if (!r.ok) this.shop(c, false, r.error); }
   private claim(c: Client) { const p = c.profile; if (!p) return; const g = claimDaily(p, dayIndex(this.now())); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Подарок дня: +${g} монет` : 'Подарок уже получен сегодня'); }
   private trained(c: Client) { const p = c.profile; if (!p) return; const g = claimTrained(p); if (g) this.persist(p); this.sendProfile(c); this.shop(c, g > 0, g ? `Обучение пройдено: +${g} монет` : 'Награда за обучение уже получена'); }
-  private botResult(c: Client, level: unknown, won: boolean, foe?: unknown, dur?: unknown) {
+  private botResult(c: Client, level: unknown, won: boolean, foe?: unknown, dur?: unknown, quit = false) {
     const p = c.profile; if (!p || !['easy', 'normal', 'hard'].includes(level as string)) return;
     const lv = level as Difficulty, key = c.pid ?? c.id, day = dayIndex(this.now());
+    if (quit) { // left the fight (button or closed tab): a loss without coins or quest progress, never skipped by the anti-spam gap
+      const dr = botRatingDelta(p, lv, false); p.rating += dr; p.games++; p.losses++;
+      pushRecent(p, { nick: typeof foe === 'string' && checkNick(clean(foe, 14)).ok ? clean(foe, 14) : BOT_NAMES[lv], won: false, delta: dr, online: false });
+      this.onBot?.({ nick: p.nick, level: lv, won: false, dur: null, coins: 0 }); this.persist(p); this.sendProfile(c); c.lastGain = 0;
+      return this.shop(c, true, `Бой покинут: поражение · ${dr} рейтинг`);
+    }
     // the gap is kept per player, not per socket: a reconnect or a second tab does not reset it
     if (this.now() - Math.max(c.lastResult, this.lastBot.get(key) ?? 0) < BOT_RESULT_GAP_MS) return this.shop(c, false, 'Награда за слишком быстрый бой не засчитана');
     c.lastResult = this.now(); this.lastBot.set(key, this.now());

@@ -199,3 +199,11 @@ test('the bot-fight gap is kept per player: a reconnect or a second tab does not
   lobby.disconnect(a); const a3 = player(lobby, 'Аня'); lobby.handle(a3, { t: 'result', level: 'hard', won: true }); assert.equal(prof(a3).coins, c1, 'reconnect');
   t += 26000; lobby.handle(a3, { t: 'result', level: 'hard', won: true }); assert.ok(prof(a3).coins > c1);
 });
+
+test('leaving a bot fight is a loss: rating goes down, no coins, no quest progress, and the anti-spam gap does not hide it', () => {
+  let t = Date.UTC(2026, 9, 27, 12); const lobby = new Lobby(new MemoryStore(), () => t), a = player(lobby, 'Аня');
+  lobby.handle(a, { t: 'result', level: 'normal', won: true }); const after = prof(a);
+  lobby.handle(a, { t: 'result', level: 'normal', won: false, quit: true }); const q = prof(a);
+  assert.ok(q.rating < after.rating, 'rating lost right away'); assert.equal(q.coins, after.coins); assert.equal(q.quest.played, after.quest.played);
+  assert.equal(q.losses, after.losses + 1); assert.match((a.last('shop') as any).text, /поражение/);
+});
