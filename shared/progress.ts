@@ -18,10 +18,11 @@ export const UPGRADES: Upgrade[] = [
 ];
 
 export const COSMETICS: Cosmetic[] = [
-  // which titan you play (roster v1, docs/art/titan-rift-v1/ROSTER.md); price = rarity: starter free, common 200, rare 600, legendary 1000; the colour is only the shop swatch
+  // which titan you play (roster v1, docs/art/titan-rift-v1/ROSTER.md); price = rarity: starter free, common 200, rare 400–600, legendary 1000; the colour is only the shop swatch
   { id: 'titan_novice', kind: 'titan', name: 'Новичок', cost: 0, color: '#C0714F' },
   { id: 'titan_atlas', kind: 'titan', name: 'Атлас', cost: 200, color: '#8E8A86' },
   { id: 'titan_oceanus', kind: 'titan', name: 'Океан', cost: 200, color: '#3FC1C9' },
+  { id: 'titan_hyperion', kind: 'titan', name: 'Гиперион', cost: 400, color: '#F2B544' },
   { id: 'titan_prometheus', kind: 'titan', name: 'Прометей', cost: 600, color: '#E8602C' },
   { id: 'titan_kronos', kind: 'titan', name: 'Кронос', cost: 1000, color: '#3A4FA8' },
   // plate kits (look only); order = price order, see shared/platformKits.ts

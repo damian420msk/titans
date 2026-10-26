@@ -1,11 +1,12 @@
 // Which titan models exist and who stands against whom. Presentation only: the battle rules never read this.
 // Roster v1 (docs/art/titan-rift-v1/ROSTER.md): all titans share one 24-joint skeleton and one set of clips, so any of them plays any match.
-export type TitanId = 'novice' | 'atlas' | 'oceanus' | 'prometheus' | 'kronos';
-export const TITAN_IDS: TitanId[] = ['novice', 'atlas', 'oceanus', 'prometheus', 'kronos'];
+export type TitanId = 'novice' | 'atlas' | 'oceanus' | 'hyperion' | 'prometheus' | 'kronos';
+export const TITAN_IDS: TitanId[] = ['novice', 'atlas', 'oceanus', 'hyperion', 'prometheus', 'kronos'];
 export const TITANS: Record<TitanId, { name: string; file: string }> = {
   novice: { name: 'Новичок', file: 'art/titans-rift-v1/novice.glb' },
   atlas: { name: 'Атлас', file: 'art/titans-rift-v1/atlas.glb' },
   oceanus: { name: 'Океан', file: 'art/titans-rift-v1/oceanus.glb' },
+  hyperion: { name: 'Гиперион', file: 'art/titans-rift-v1/hyperion.glb' },
   prometheus: { name: 'Прометей', file: 'art/titans-rift-v1/prometheus.glb' },
   kronos: { name: 'Кронос', file: 'art/titans-rift-v1/kronos.glb' },
 };
