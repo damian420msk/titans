@@ -20,6 +20,8 @@ import type { Material } from '@babylonjs/core/Materials/material';
 import { COSMETICS, type CosmeticKind } from '../../shared/progress';
 import { TITANS, TITAN_IDS, otherTitan, type TitanId } from '../../shared/titans';
 import '@babylonjs/core/Culling/ray';
+import '@babylonjs/core/Rendering/outlineRenderer';
+import type { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
 import '@babylonjs/loaders/glTF/2.0';
 import { createEnvironment } from '../environment';
 import { TitanRig, readClips, CLIP } from './rig';
@@ -35,8 +37,11 @@ const KIND_COLOR: Record<Kind, string> = { normal: '#FFF3B0', spin: '#FFB050', h
 const TEAM = ['#2BB8AA', '#E8634E'];
 /** Size of the game stone in the titan's hand relative to the 0.7 m cube (the model's hand is small). */
 const STONE_HAND = .5;
-const STONE_COLOR: Record<Kind, string> = { normal: '#C9C3B6', spin: '#E3A862', heavy: '#8E80C4' };
-type TitanView = { id: TitanId; mats: Material[]; holder: TransformNode; body: TransformNode; rig: TitanRig; stone: Mesh; ring: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
+/** Sky crystals (GDD: «светящийся голубой кристалл»); the plain one can be recoloured by the stone cosmetic. */
+const STONE_COLOR: Record<Kind, string> = { normal: '#A9E4FF', spin: '#FFB45E', heavy: '#B394FF' };
+/** The foe is drawn a little larger than the player: it stands ~35 m away and is the one figure the duel is about. Presentation only. */
+const FOE_SCALE = 1.22;
+type TitanView = { id: TitanId; mats: Material[]; meshes: AbstractMesh[]; holder: TransformNode; body: TransformNode; rig: TitanRig; stone: Mesh; ring: Mesh; yaw: number; lean: number; lie: number; moving: boolean;
   cheer: number; flail: number; cheerTarget: boolean; squash: number };
 /** Local rotation offset from Euler angles in degrees (x, y, z). */
 const rot = (x: number, y: number, z: number) => Quaternion.RotationYawPitchRoll(y * Math.PI / 180, x * Math.PI / 180, z * Math.PI / 180);
@@ -58,6 +63,9 @@ export class World {
   private shotMeshes = new Map<number, Mesh>();
   private warns = new Map<string, Mesh>();
   private particles: Particle[] = [];
+  private waves: { mesh: Mesh; mat: StandardMaterial; t: number; max: number; r: number }[] = [];
+  private backdrop!: Mesh;
+  private foeMark!: Mesh;
   private aimPool: { fill: Mesh; edges: Mesh[] }[] = [];
   private dots: Mesh[] = [];
   private mats: Record<string, StandardMaterial> = {};
@@ -88,9 +96,9 @@ export class World {
   private constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: true, preserveDrawingBuffer: false }, false);
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = new Color4(.72, .71, .84, 1);
+    this.scene.clearColor = new Color4(.54, .42, .8, 1); // the violet of the painted sky: any frame before the backdrop loads still looks like sky
     this.camera = new FreeCamera('cam', new Vector3(0, 6, -40), this.scene);
-    this.camera.minZ = .1; this.camera.maxZ = 600; this.camera.inputs.clear();
+    this.camera.minZ = .1; this.camera.maxZ = 700; this.camera.inputs.clear();
   }
 
   static async create(canvas: HTMLCanvasElement) {
@@ -118,9 +126,9 @@ export class World {
     for (const k of Object.keys(KIND_COLOR) as Kind[]) {
       m['aim_' + k] = this.mat('aim_' + k, KIND_COLOR[k], .8);
       m['fill_' + k] = this.mat('fill_' + k, KIND_COLOR[k], .9); m['fill_' + k].alpha = .28;
-      m['stone_' + k] = this.mat('rock_' + k, STONE_COLOR[k], .12);
+      m['stone_' + k] = this.mat('rock_' + k, STONE_COLOR[k], .45, .7);
     }
-    for (const sd of [0, 1]) m['stone_normal' + sd] = this.mat('rock_normal' + sd, STONE_COLOR.normal, .12);
+    for (const sd of [0, 1]) m['stone_normal' + sd] = this.mat('rock_normal' + sd, STONE_COLOR.normal, .45, .7);
     m.warnEnemy = this.mat('warnE', '#FF7A45', .9); m.warnEnemy.alpha = .42;
     m.warnMine = this.mat('warnM', '#BDF3FF', .8); m.warnMine.alpha = .25;
     m.dust = this.mat('dust', '#E7DCCB', .2);
@@ -128,8 +136,10 @@ export class World {
   }
   private buildLightsAndSky() {
     const s = this.scene;
-    const fill = new HemisphericLight('sky', new Vector3(.2, 1, .3), s); fill.intensity = .7; fill.diffuse = new Color3(.8, .86, 1); fill.groundColor = new Color3(.4, .38, .46);
-    const sun = this.sun = new DirectionalLight('sun', new Vector3(-.45, -1, .35), s); sun.position.set(30, 60, -30); sun.diffuse = new Color3(1, .9, .76); sun.intensity = 1.7;
+    // warm sunset light to match the painted sky of the menu: lilac fill from above, violet bounce from the clouds, peach sun
+    const fill = new HemisphericLight('sky', new Vector3(.2, 1, .3), s); fill.intensity = .78; fill.diffuse = new Color3(.88, .82, 1); fill.groundColor = new Color3(.5, .36, .58);
+    const sun = this.sun = new DirectionalLight('sun', new Vector3(-.45, -1, .35), s); sun.position.set(30, 60, -30); sun.diffuse = new Color3(1, .86, .7); sun.intensity = 1.65;
+    s.imageProcessingConfiguration.contrast = 1.14; s.imageProcessingConfiguration.exposure = 1.06;
     sun.autoUpdateExtends = false; sun.orthoLeft = -50; sun.orthoRight = 50; sun.orthoTop = 50; sun.orthoBottom = -50; sun.shadowMinZ = 1; sun.shadowMaxZ = 140;
     const touch = matchMedia('(pointer: coarse)').matches;
     this.shadows = new ShadowGenerator(touch ? 1024 : 2048, sun); this.shadows.usePercentageCloserFiltering = true; this.shadows.bias = .0004; this.shadows.normalBias = .03; this.shadows.setDarkness(.3);
@@ -139,8 +149,13 @@ export class World {
     const top = Color3.FromHexString('#6D6FD8'), mid = Color3.FromHexString('#B49BE6'), hor = Color3.FromHexString('#FFC9C4');
     for (let i = 0; i < v.length; i += 3) { const t = (v[i + 1] + 245) / 490; const c = t > .55 ? Color3.Lerp(mid, top, (t - .55) / .45) : Color3.Lerp(hor, mid, Math.max(0, (t - .4) / .15)); col.push(c.r, c.g, c.b, 1); }
     sky.setVerticesData('color', col);
-    const cloud = s.getMaterialByName('soft cloud banks') as StandardMaterial; cloud.alpha = .9;
-    for (let i = 0; i < 70; i++) { const a = i * 2.39996, r = 8 + (i % 10) * 9 + (i * 7 % 13); const m = MeshBuilder.CreatePlane('cloudsea', { width: 26 + (i % 4) * 8, height: 13 + (i % 3) * 4 }, s); m.position.set(Math.sin(a) * r, -9 - (i % 5) * 3.2, Math.cos(a) * r); m.billboardMode = Mesh.BILLBOARDMODE_ALL; m.material = cloud; m.isPickable = false; this.clouds.push(m); }
+    s.getMeshByName('gradient sky')!.setEnabled(false); // the painted backdrop covers the whole view
+    this.buildBackdrop();
+    // a few thin cloud wisps under the islands for depth, tinted to the painted cloud sea (the old bright banks hid the picture)
+    const cloud = s.getMaterialByName('soft cloud banks') as StandardMaterial; cloud.alpha = .55; cloud.emissiveColor = new Color3(.82, .62, .95);
+    for (const m of s.meshes) if (m.name === 'cloud below arenas') m.setEnabled(false);
+    s.fogMode = Scene.FOGMODE_LINEAR; s.fogStart = 70; s.fogEnd = 320; s.fogColor = new Color3(.86, .7, .9);
+    for (let i = 0; i < 14; i++) { const a = i * 2.39996, r = 8 + (i % 10) * 9 + (i * 7 % 13); const m = MeshBuilder.CreatePlane('cloudsea', { width: 26 + (i % 4) * 8, height: 13 + (i % 3) * 4 }, s); m.position.set(Math.sin(a) * r, -9 - (i % 5) * 3.2, Math.cos(a) * r); m.billboardMode = Mesh.BILLBOARDMODE_ALL; m.material = cloud; m.isPickable = false; this.clouds.push(m); }
     this.buildFarIslands();
     for (const m of s.meshes) if (m.name.startsWith('far rock') || m.name.startsWith('mountain template')) m.setEnabled(false);
   }
@@ -164,6 +179,19 @@ export class World {
     });
   }
   private glow!: GlowLayer;
+  /** The same painted sky as the menu, as a flat backdrop fixed to the camera (the camera never turns, so it reads like the menu picture).
+   *  One quad, no lighting, no fog; sized every frame to cover the view. */
+  private buildBackdrop() {
+    const tex = new Texture(assetUrl('art/bg-v01/sky_0e83cbfe.png'), this.scene, true, true, Texture.BILINEAR_SAMPLINGMODE);
+    const mat = new StandardMaterial('backdrop', this.scene); mat.disableLighting = true; mat.emissiveTexture = tex; mat.diffuseColor = Color3.Black(); mat.fogEnabled = false; mat.disableDepthWrite = true;
+    const p = MeshBuilder.CreatePlane('backdrop', { width: 1, height: 1 }, this.scene); p.material = mat; p.parent = this.camera; p.isPickable = false; p.applyFog = false;
+    this.backdrop = p;
+  }
+  private fitBackdrop() {
+    const d = 560, h = 2 * d * Math.tan(this.camera.fov / 2), w = h * this.engine.getAspectRatio(this.camera);
+    const cover = Math.max(w / 2, h) * 1.04; // the picture is 2:1
+    this.backdrop.position.set(0, cover * .06, d); this.backdrop.scaling.set(cover * 2, cover, 1);
+  }
   private cast<T extends Mesh>(m: T) { this.casters.push(m); m.receiveShadows = true; return m; }
 
   private async buildIslands() {
@@ -178,16 +206,16 @@ export class World {
     }
   }
 
-  /** A chunky bevelled stone cube: three slightly shorter boxes intersected give chamfered edges. */
+  /** A sky crystal: a stretched octahedron, flat shaded (the projectile, the stone in the hand and the arsenal pile). */
   private stoneCube(size: number, material: StandardMaterial, name = 'stone') {
-    const k = .84, parts = [[1, k, k], [k, 1, k], [k, k, 1]].map(([w, h, d], i) => { const b = MeshBuilder.CreateBox(`${name}${i}`, { width: w * size, height: h * size, depth: d * size }, this.scene); return b; });
-    const m = Mesh.MergeMeshes(parts, true, true)!; m.name = name; m.convertToFlatShadedMesh(); m.material = material; return m;
+    const m = MeshBuilder.CreatePolyhedron(name, { type: 1, size: size * .62 }, this.scene); m.scaling.y = 1.55; m.bakeCurrentTransformIntoVertices();
+    m.convertToFlatShadedMesh(); m.material = material; return m;
   }
+  /** The arsenal: a cluster of crystals growing out of the stone base, tallest in the middle. */
   private stonePile(a: Point, side: Side) {
-    const cube = (x: number, y: number, z: number, yaw: number) => { const c = this.cast(this.stoneCube(.72, this.mats['stone_normal' + side], 'pile')); c.position.set(a.x + x, y, a.z + z); c.rotation.y = yaw; };
-    for (const [x, z, r] of [[-.4, -.4, .1], [.4, -.4, -.08], [-.4, .4, -.12], [.4, .4, .07]]) cube(x, .86, z, r);
-    for (const [x, r] of [[-.36, .06], [.36, -.1]]) cube(x, 1.58, 0, r);
-    cube(0, 2.3, 0, .2);
+    const crystal = (x: number, z: number, s: number, tx: number, tz: number) => { const c = this.cast(this.stoneCube(s, this.mats['stone_normal' + side], 'pile')); c.position.set(a.x + x, .5 + s * .55, a.z + z); c.rotation.set(tx, (x + z) * 2, tz); };
+    crystal(0, 0, 1.25, 0, 0);
+    for (const [x, z, s, tx, tz] of [[-.55, -.3, .8, -.25, .35], [.55, -.25, .85, -.2, -.38], [-.35, .5, .75, .35, .2], [.45, .45, .7, .3, -.3], [0, -.65, .6, -.45, 0], [-.75, .2, .5, .1, .55], [.8, .1, .5, 0, -.6]] as const) crystal(x, z, s, tx, tz);
   }
 
   /** Loads every titan model once (the file is in metres, about 3.2 m tall). A match always shows two different models, so each owns its materials and the tint is per side. */
@@ -204,7 +232,8 @@ export class World {
     const root = c.meshes[0]; root.parent = body;
     // the props that ship inside the file (a test rock in the hand) are dropped: the game owns the stone in the hand
     for (const m of [...c.meshes]) if (m.name.startsWith('HandStone')) { m.dispose(); }
-    for (const m of c.meshes) if (m.getTotalVertices() && !m.isDisposed()) { this.cast(m as Mesh); m.alwaysSelectAsActiveMesh = true; }
+    const meshes: AbstractMesh[] = [];
+    for (const m of c.meshes) if (m.getTotalVertices() && !m.isDisposed()) { this.cast(m as Mesh); m.alwaysSelectAsActiveMesh = true; meshes.push(m); }
     const clips = readClips(c.animationGroups);
     for (const g of c.animationGroups) { g.stop(); g.dispose(); }
     for (const n of Object.values(CLIP)) if (!clips.has(n)) console.warn('titan clip missing:', id, n);
@@ -216,7 +245,7 @@ export class World {
     // a ring in the team colour under the feet tells the sides apart even when both look alike (the cosmetics tint does not touch it)
     const ring = MeshBuilder.CreateTorus('ring_' + id, { diameter: 2.9, thickness: .17, tessellation: 40 }, this.scene), rm = new StandardMaterial('ringMat_' + id, this.scene);
     rm.disableLighting = true; rm.alpha = .9; ring.material = rm; ring.parent = holder; ring.position.y = .07; ring.scaling.y = .35; ring.isPickable = false;
-    return { id, mats: c.materials.filter(m => !m.name.startsWith('HandStone')), holder, body, rig, stone, ring, yaw: 0, lean: 0, lie: 0, moving: false, cheer: 0, flail: 0, cheerTarget: false, squash: 0 };
+    return { id, mats: c.materials.filter(m => !m.name.startsWith('HandStone')), meshes, holder, body, rig, stone, ring, yaw: 0, lean: 0, lie: 0, moving: false, cheer: 0, flail: 0, cheerTarget: false, squash: 0 };
   }
 
   /** Which model stands on which side for the coming match (side 0 is always the local player). Call before resetMatch/setLook. */
@@ -226,6 +255,9 @@ export class World {
     pair.forEach((t, side) => {
       t.yaw = side === 0 ? 0 : Math.PI; t.stone.material = this.mats['stone_normal' + side]!;
       (t.ring.material as StandardMaterial).emissiveColor = Color3.FromHexString(TEAM[side]!);
+      // the foe: larger and outlined in its team colour, so it reads at a glance even on a phone
+      t.holder.scaling.setAll(side === 1 ? FOE_SCALE : 1);
+      for (const m of t.meshes) { m.renderOutline = side === 1; m.outlineColor = Color3.FromHexString(TEAM[1]!); m.outlineWidth = .022; }
     });
     this.titans = pair;
     for (const t of pair) t.holder.setEnabled(true);
@@ -254,11 +286,16 @@ export class World {
       for (const [w, d, dx, dz] of [[S, .12, 0, S / 2], [S, .12, 0, -S / 2], [.12, S, S / 2, 0], [.12, S, -S / 2, 0]] as const) { const e = MeshBuilder.CreateBox('aimedge', { width: w, height: .06, depth: d }, this.scene); e.parent = fill; e.position.set(dx, .01, dz); edges.push(e); }
       this.aimPool.push({ fill, edges });
     }
+    // a bobbing arrow over the foe's head
+    this.foeMark = MeshBuilder.CreateCylinder('foemark', { diameterTop: .95, diameterBottom: 0, height: .8, tessellation: 4 }, this.scene); this.foeMark.material = this.mats.trim1; this.foeMark.isPickable = false;
+    // impact shock rings: a small pool, each with its own material so it can fade on its own
+    for (let i = 0; i < 6; i++) { const mesh = MeshBuilder.CreateTorus('wave', { diameter: 1, thickness: .2, tessellation: 28 }, this.scene), mat = new StandardMaterial('wave' + i, this.scene); mat.disableLighting = true; mesh.material = mat; mesh.isPickable = false; mesh.setEnabled(false); this.waves.push({ mesh, mat, t: 1, max: 1, r: 3 }); }
     for (let i = 0; i < 26; i++) { const d = MeshBuilder.CreateSphere('aimdot', { diameter: .18, segments: 5 }, this.scene); d.material = this.mats.aim_normal; d.setEnabled(false); this.dots.push(d); }
     // glow only on light-emitting materials
     this.glow.customEmissiveColorSelector = (mesh, _sub, material, result) => {
-      const emits = material === this.mats.sky || material === this.mats.skyCore || material === this.mats.trim0 || material === this.mats.trim1 || (material && (material.name.startsWith('aim_') || material.name === 'warnE'));
-      if (emits && material instanceof StandardMaterial) result.set(material.emissiveColor.r, material.emissiveColor.g, material.emissiveColor.b, 1); else result.set(0, 0, 0, 0);
+      const emits = material === this.mats.sky || material === this.mats.skyCore || material === this.mats.trim0 || material === this.mats.trim1 || (material && (material.name.startsWith('aim_') || material.name.startsWith('wave') || material.name === 'warnE'));
+      const crystal = material && material.name.startsWith('rock_'); // sky crystals: a soft halo
+      if ((emits || crystal) && material instanceof StandardMaterial) { const k = crystal ? .7 : 1; result.set(material.emissiveColor.r * k, material.emissiveColor.g * k, material.emissiveColor.b * k, 1); } else result.set(0, 0, 0, 0);
       void mesh;
     };
     this.shadows.getShadowMap()!.renderList = this.casters;
@@ -301,6 +338,9 @@ export class World {
     this.updateShots(b, dt);
     this.updateAim(b, input);
     this.updateParticles(dt);
+    this.updateWaves(dt);
+    this.fitBackdrop();
+    this.updateFoeMark(b);
     this.shadows.getShadowMap()!.renderList = this.casters;
   }
 
@@ -444,6 +484,7 @@ export class World {
     for (const e of events) {
       if (e.type === 'impact') {
         const c = cellCentre(e.cell, e.side), n = e.kind === 'heavy' ? 14 : 8, destroyed = e.hpAfter === 0 && e.hpBefore > 0;
+        this.wave(c, e.kind, destroyed);
         if (e.hpBefore === Infinity) { for (let i = 0; i < 5; i++) this.burst(c, .3, this.mats.stoneDark); continue; }
         for (let i = 0; i < n + (destroyed ? 8 : 0); i++) this.burst(c, destroyed ? 1 : .6, this.mats.rock);
         for (let i = 0; i < 4; i++) this.burst(c, .5, this.mats.dust);
@@ -486,6 +527,24 @@ export class World {
       if (p.life <= 0) { p.mesh.dispose(); this.particles.splice(i, 1); continue; }
       p.v.y -= p.gravity * dt; p.mesh.position.addInPlace(p.v.scale(dt)); p.mesh.scaling.scaleInPlace(Math.max(.9, 1 - dt * 2.5));
     }
+  }
+  /** A ring of light that runs out from the hit cell: bigger for a heavy throw and when the plate breaks. */
+  private wave(c: Point, kind: Kind, big: boolean) {
+    const w = this.waves.reduce((a, b) => (b.t / b.max > a.t / a.max ? b : a));
+    w.t = 0; w.max = big ? .45 : .32; w.r = (kind === 'heavy' ? 4.2 : 3) * (big ? 1.25 : 1);
+    w.mesh.position.set(c.x, .12, c.z); w.mesh.setEnabled(true); w.mat.emissiveColor = Color3.FromHexString(KIND_COLOR[kind]);
+  }
+  private updateWaves(dt: number) {
+    for (const w of this.waves) {
+      if (w.t >= w.max) { w.mesh.setEnabled(false); continue; }
+      w.t += dt; const u = Math.min(1, w.t / w.max), r = w.r * (.25 + .75 * Math.sqrt(u));
+      w.mesh.scaling.set(r, .5, r); w.mat.alpha = 1 - u * u;
+    }
+  }
+  private updateFoeMark(b: Battle) {
+    const a = b.actors[1], t = this.titans[1]; if (!t) return;
+    this.foeMark.setEnabled(!a.falling && b.phase === 'playing');
+    const p = t.holder.position; this.foeMark.position.set(p.x, p.y + 4.6 * FOE_SCALE + Math.sin(this.time * 3) * .18, p.z); this.foeMark.rotation.y = this.time * 1.5;
   }
   /** Used by tests / diagnostics. */
   meshCount() { return this.scene.meshes.length; }

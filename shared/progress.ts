@@ -26,7 +26,7 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'tiles_terracotta', kind: 'tiles', name: 'Терракотовый бастион', cost: 250, color: '#d9826a' },
   { id: 'tiles_jade', kind: 'tiles', name: 'Нефритовая арена', cost: 450, color: '#9fb8a0' },
   { id: 'tiles_basalt', kind: 'tiles', name: 'Базальтовая крепость', cost: 700, color: '#4a4d55' },
-  { id: 'stone_grey', kind: 'stone', name: 'Серый', cost: 0, color: null },
+  { id: 'stone_grey', kind: 'stone', name: 'Небесный', cost: 0, color: null }, // id kept for old profiles; the default sky crystal
   { id: 'stone_ice', kind: 'stone', name: 'Лёд', cost: 150, color: '#9fe6ff' },
   { id: 'stone_lava', kind: 'stone', name: 'Лава', cost: 200, color: '#ff8a4a' },
   { id: 'stone_gold', kind: 'stone', name: 'Золотой', cost: 300, color: '#ffd24a' },

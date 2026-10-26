@@ -256,7 +256,7 @@ export function initMenu(h: MenuHooks) {
       qLeft--; qPaint(); if (qLeft > 0) return;
       if (offer) { qStop(); h.onQuickTimeout(); return; }
       offer = true; qLeft = BOT_OFFER_S; qPaint(); $('quick-alt').hidden = false;
-      $('quick-title').textContent = 'Живого соперника пока нет'; $('quick-note').textContent = `Через ${BOT_OFFER_S} с начнётся бой с ИИ. Или создай сервер и позови друга.`;
+      $('quick-title').textContent = 'Живого соперника пока нет'; $('quick-note').textContent = `Через ${BOT_OFFER_S} с начнём бой с ИИ.`;
     }, 1000);
   }
   const quickFound = (foe?: string) => { $('quick-ring').classList.add('found'); $('quick-alt').hidden = true; $('quick-title').textContent = 'Соперник найден!'; if (foe) $('quick-note').textContent = `Играем с ${foe}`; };
