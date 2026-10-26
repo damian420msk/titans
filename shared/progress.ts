@@ -49,12 +49,13 @@ export const RECENT_KEEP = 8;
 export function pushRecent(p: Profile, r: Recent) { p.recent = [r, ...(p.recent ?? [])].slice(0, RECENT_KEEP); }
 
 /** What one fight counts for the daily tasks. Bot fights: the client reports it (like the result itself); online: the server counts it from the battle events. */
-export type FightStats = { won: boolean; ranked: boolean; hard: boolean; lost: number; heavy: number; knock: number; repair: number; holes: number; dodge: number; falls: number };
-export const noStats = (won: boolean, ranked = false, hard = false): FightStats => ({ won, ranked, hard, lost: 0, heavy: 0, knock: 0, repair: 0, holes: 0, dodge: 0, falls: 0 });
+export type FightStats = { won: boolean; ranked: boolean; hard: boolean; lost: number; heavy: number; spin: number; jumps: number; knock: number; repair: number; holes: number; dodge: number; falls: number };
+export const noStats = (won: boolean, ranked = false, hard = false): FightStats => ({ won, ranked, hard, lost: 0, heavy: 0, spin: 0, jumps: 0, knock: 0, repair: 0, holes: 0, dodge: 0, falls: 0 });
 /** Counts one side's deeds in a stream of battle events (same code on the client for bot fights and on the server for online ones). */
 export function countEvents(st: FightStats, events: readonly GameEvent[], me: 0 | 1) {
   for (const e of events) {
-    if (e.type === 'throw' && e.side === me && e.kind === 'heavy') st.heavy++;
+    if (e.type === 'throw' && e.side === me) { if (e.kind === 'heavy') st.heavy++; else if (e.kind === 'spin') st.spin++; }
+    else if (e.type === 'jump' && e.side === me) st.jumps++;
     else if (e.type === 'hit' && e.side !== me) st.knock++;
     else if (e.type === 'repaired' && e.side === me) st.repair++;
     else if (e.type === 'impact' && e.side !== me && e.hpBefore > 0 && e.hpAfter === 0) st.holes++;
@@ -65,43 +66,58 @@ export function countEvents(st: FightStats, events: readonly GameEvent[], me: 0 
 /** Untrusted stats from a client: integers, capped to what one 3-minute fight can hold. */
 export function cleanStats(raw: unknown, won: boolean, hard: boolean): FightStats {
   const r = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}, n = (k: string, hi: number) => num(r[k], 0, 0, hi);
-  return { won, ranked: false, hard, lost: n('lost', 3), heavy: n('heavy', 40), knock: n('knock', 40), repair: n('repair', 40), holes: n('holes', 99), dodge: n('dodge', 40), falls: n('falls', 3) };
+  return { won, ranked: false, hard, lost: n('lost', 3), heavy: n('heavy', 40), spin: n('spin', 60), jumps: n('jumps', 200), knock: n('knock', 40), repair: n('repair', 40), holes: n('holes', 99), dodge: n('dodge', 40), falls: n('falls', 3) };
 }
 
-/** Daily tasks: three a day, one from each tier (easy, skill, hard), picked by the day and the player (so friends do not all get the same ones).
- *  Progress resets at midnight (Moscow); coins are paid the moment a task completes. */
-export type QuestId = 'play3' | 'play6' | 'win2' | 'repair4' | 'heavy5' | 'knock6' | 'holes10' | 'dodge3' | 'falls4' | 'strong1' | 'perfect1' | 'win4';
+/** Daily tasks: five a day (two easy, two on skill, one hard) from a pool of 15. Every player has his own shuffled cyclic order of each tier and
+ *  moves QUESTS_PER_TIER steps along it per day: two days in a row never share a task (each tier holds at least twice its daily count),
+ *  and every task of a tier comes round before any of them repeats. Progress resets at midnight (Moscow); coins are paid the moment a task completes. */
+export type QuestId = 'play3' | 'play6' | 'win2' | 'repair4' | 'jump10' | 'heavy5' | 'spin6' | 'knock6' | 'holes10' | 'dodge3' | 'falls4' | 'strong1' | 'perfect1' | 'win4' | 'holes25';
 type QuestDef = { id: QuestId; text: string; goal: number; reward: number; icon: string; count: (s: FightStats) => number };
 export const QUEST_POOL: QuestDef[][] = [
   [
-    { id: 'play3', text: 'Сыграй 3 боя', goal: 3, reward: 40, icon: 'target', count: () => 1 },
-    { id: 'play6', text: 'Сыграй 6 боёв', goal: 6, reward: 55, icon: 'target', count: () => 1 },
-    { id: 'win2', text: 'Выиграй 2 боя', goal: 2, reward: 50, icon: 'trophy', count: s => +s.won },
-    { id: 'repair4', text: 'Почини 4 плиты', goal: 4, reward: 40, icon: 'tools', count: s => s.repair },
+    { id: 'play3', text: 'Сыграй 3 боя', goal: 3, reward: 30, icon: 'target', count: () => 1 },
+    { id: 'play6', text: 'Сыграй 6 боёв', goal: 6, reward: 40, icon: 'target', count: () => 1 },
+    { id: 'win2', text: 'Выиграй 2 боя', goal: 2, reward: 35, icon: 'trophy', count: s => +s.won },
+    { id: 'repair4', text: 'Почини 4 плиты', goal: 4, reward: 30, icon: 'tools', count: s => s.repair },
+    { id: 'jump10', text: 'Прыгни 10 раз', goal: 10, reward: 25, icon: 'feather', count: s => s.jumps },
   ],
   [
-    { id: 'heavy5', text: 'Сделай 5 мощных бросков', goal: 5, reward: 55, icon: 'bolt', count: s => s.heavy },
-    { id: 'knock6', text: 'Сбей соперника с ног 6 раз', goal: 6, reward: 55, icon: 'boot', count: s => s.knock },
-    { id: 'holes10', text: 'Пробей 10 дыр в острове соперника', goal: 10, reward: 55, icon: 'pick', count: s => s.holes },
-    { id: 'dodge3', text: 'Увернись в прыжке 3 раза', goal: 3, reward: 60, icon: 'feather', count: s => s.dodge },
-    { id: 'falls4', text: 'Сбрось соперника в облака 4 раза', goal: 4, reward: 60, icon: 'wind', count: s => s.falls },
+    { id: 'heavy5', text: 'Сделай 5 мощных бросков', goal: 5, reward: 40, icon: 'bolt', count: s => s.heavy },
+    { id: 'spin6', text: 'Сделай 6 кручёных бросков', goal: 6, reward: 40, icon: 'bolt', count: s => s.spin },
+    { id: 'knock6', text: 'Сбей соперника с ног 6 раз', goal: 6, reward: 40, icon: 'boot', count: s => s.knock },
+    { id: 'holes10', text: 'Пробей 10 дыр в острове соперника', goal: 10, reward: 40, icon: 'pick', count: s => s.holes },
+    { id: 'dodge3', text: 'Увернись в прыжке 3 раза', goal: 3, reward: 45, icon: 'feather', count: s => s.dodge },
+    { id: 'falls4', text: 'Сбрось соперника в облака 4 раза', goal: 4, reward: 45, icon: 'wind', count: s => s.falls },
   ],
   [
     // a live opponent is rare while few play, so a hard bot counts too
-    { id: 'strong1', text: 'Победи сложного бота или живого игрока', goal: 1, reward: 80, icon: 'robot', count: s => +(s.won && (s.ranked || s.hard)) },
-    { id: 'perfect1', text: 'Победи, не потеряв ни одной жизни', goal: 1, reward: 90, icon: 'heart', count: s => +(s.won && s.lost === 0) },
-    { id: 'win4', text: 'Выиграй 4 боя', goal: 4, reward: 85, icon: 'trophy', count: s => +s.won },
+    { id: 'strong1', text: 'Победи сложного бота или живого игрока', goal: 1, reward: 70, icon: 'robot', count: s => +(s.won && (s.ranked || s.hard)) },
+    { id: 'perfect1', text: 'Победи, не потеряв ни одной жизни', goal: 1, reward: 80, icon: 'heart', count: s => +(s.won && s.lost === 0 && s.falls >= 3) }, // a real win: the foe went down three times (a win by the foe leaving does not count)
+    { id: 'win4', text: 'Выиграй 4 боя', goal: 4, reward: 70, icon: 'trophy', count: s => +s.won },
+    { id: 'holes25', text: 'Пробей 25 дыр за день', goal: 25, reward: 70, icon: 'pick', count: s => s.holes },
   ],
 ];
+/** How many tasks of each tier a day brings (easy, skill, hard). */
+export const QUESTS_PER_TIER = [2, 2, 1] as const;
+export const QUESTS_A_DAY = QUESTS_PER_TIER.reduce((a: number, b: number) => a + b, 0);
 const QUEST_DEFS = new Map(QUEST_POOL.flat().map(d => [d.id, d]));
 export const questDef = (id: string) => QUEST_DEFS.get(id as QuestId);
-export type Quest = { day: number; ids: [QuestId, QuestId, QuestId]; prog: [number, number, number]; paid: [boolean, boolean, boolean] };
+export type Quest = { day: number; ids: QuestId[]; prog: number[]; paid: boolean[] };
 const mix = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
-/** Today's three tasks for this player. */
-export function pickQuests(day: number, id: string): [QuestId, QuestId, QuestId] {
-  return QUEST_POOL.map((tier, i) => tier[mix(`${day}|${id}|${i}`) % tier.length]!.id) as [QuestId, QuestId, QuestId];
+/** The player's own order of a tier: a shuffle seeded by the player id. */
+function tierOrder(tier: QuestDef[], id: string, t: number): QuestId[] {
+  const order = tier.map(d => d.id);
+  for (let i = order.length - 1; i > 0; i--) { const j = mix(`${id}|${t}|${i}`) % (i + 1); [order[i], order[j]] = [order[j]!, order[i]!]; }
+  return order;
 }
-export const freshQuest = (day: number, id = ''): Quest => ({ day, ids: pickQuests(day, id), prog: [0, 0, 0], paid: [false, false, false] });
+/** Today's tasks for this player: easy, easy, skill, skill, hard. */
+export function pickQuests(day: number, id: string): QuestId[] {
+  const d = Math.max(0, day), out: QuestId[] = [];
+  QUEST_POOL.forEach((tier, t) => { const order = tierOrder(tier, id, t), k = QUESTS_PER_TIER[t]!; for (let j = 0; j < k; j++) out.push(order[(d * k + j) % order.length]!); });
+  return out;
+}
+export const freshQuest = (day: number, id = ''): Quest => ({ day, ids: pickQuests(day, id), prog: Array(QUESTS_A_DAY).fill(0), paid: Array(QUESTS_A_DAY).fill(false) });
 export function recordQuest(p: Profile, day: number, st: FightStats): number {
   if (p.quest.day !== day) p.quest = freshQuest(day, p.id);
   const q = p.quest; let coins = 0;
@@ -127,8 +143,8 @@ export function sanitizeProfile(raw: any, id: string): Profile {
   const known = new Set(COSMETICS.map(c => c.id));
   p.own = [...new Set([...p.own, ...(Array.isArray(r.own) ? r.own.filter((x: unknown) => typeof x === 'string' && known.has(x)) : [])])];
   for (const k of ['titan', 'tiles', 'stone'] as CosmeticKind[]) { const e = r.eq?.[k]; p.eq[k] = typeof e === 'string' && p.own.includes(e) && COSMETICS.find(c => c.id === e)?.kind === k ? e : DEFAULT_EQUIP[k]; }
-  // today's tasks survive a reload; an old-format record (the fixed three tasks before 2026-10-26) starts the day afresh
-  const q = r.quest; if (q && typeof q === 'object' && Array.isArray(q.ids) && q.ids.length === 3 && q.ids.every((x: unknown) => typeof x === 'string' && questDef(x))) p.quest = { day: num(q.day, -1, -1), ids: [...q.ids] as Quest['ids'], prog: [0, 1, 2].map(i => num(q.prog?.[i], 0, 0, 99)) as Quest['prog'], paid: [0, 1, 2].map(i => q.paid?.[i] === true) as Quest['paid'] };
+  // today's tasks survive a reload; an old-format record (3 tasks a day, before 2026-10-27) starts the day afresh
+  const q = r.quest; if (q && typeof q === 'object' && Array.isArray(q.ids) && q.ids.length === QUESTS_A_DAY && q.ids.every((x: unknown) => typeof x === 'string' && questDef(x))) p.quest = { day: num(q.day, -1, -1), ids: [...q.ids] as QuestId[], prog: q.ids.map((_: unknown, i: number) => num(q.prog?.[i], 0, 0, 99)), paid: q.ids.map((_: unknown, i: number) => q.paid?.[i] === true) };
   p.trained = r.trained === true;
   if (r.bot && typeof r.bot === 'object') p.bot = { day: num(r.bot.day, -1, -1), coins: num(r.bot.coins, 0) };
   if (Array.isArray(r.recent)) p.recent = r.recent.slice(0, RECENT_KEEP).filter((x: any) => x && typeof x.nick === 'string').map((x: any): Recent => ({ nick: x.nick.slice(0, 14), won: x.won === true ? true : x.won === false ? false : null, delta: num(x.delta, 0, -999, 999), online: x.online === true }));

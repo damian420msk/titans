@@ -53,7 +53,7 @@ test('ranked room: the winner gains rating and coins, the loser drops; both prof
 });
 test('unranked room: only coins change; farming the same opponent stops giving rating', () => {
   const lobby = new Lobby(), a = player(lobby, 'Аня'), b = player(lobby, 'Боря');
-  startRanked(lobby, a, b, false); lobby.handle(b, { t: 'leave' }); assert.equal(a.last('end')!.gain!.ranked, false); assert.equal(prof(a).rating, 1000); assert.equal(prof(a).coins, 130); assert.equal(prof(a).games, 0);
+  startRanked(lobby, a, b, false); lobby.handle(b, { t: 'leave' }); assert.equal(a.last('end')!.gain!.ranked, false); assert.equal(prof(a).rating, 1000); assert.equal(fightCoins(prof(a)), 130); assert.equal(prof(a).games, 0);
   lobby.disconnect(a); lobby.disconnect(b); let gained = 0;
   for (let i = 0; i < 8; i++) {
     const x = player(lobby, 'Аня'), y = player(lobby, 'Боря'); startRanked(lobby, x, y); lobby.handle(y, { t: 'leave' }); if (x.last('end')!.gain!.ranked) gained++;

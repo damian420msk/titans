@@ -172,7 +172,7 @@ export function initMenu(h: MenuHooks) {
     paintLocks(); $('shop-coins').textContent = String(p?.coins ?? 0);
     $('gift-btn').classList.toggle('alert', !!p?.dailyReady); $('gift-btn').querySelector('.dot')!.toggleAttribute('hidden', !p?.dailyReady);
     if (!$('gift').hidden) renderGift(); else maybeAutoGift();
-    $('quests-count').textContent = `${p ? p.quest.paid.filter(Boolean).length : 0}/3`;
+    $('quests-count').textContent = `${p ? p.quest.paid.filter(Boolean).length : 0}/${p?.quest.ids.length ?? 5}`;
     $('rate-pts').textContent = String(r); $('rate-wins').textContent = String(p?.wins ?? 0);
   };
   function renderQuests() {

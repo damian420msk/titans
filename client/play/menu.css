@@ -392,3 +392,6 @@ input::placeholder{color:rgba(255,255,255,.6)}
 .online-grid .room b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .online-grid .room button{padding:6px 12px;font-size:13px}
 @media (max-height:420px){.online-side .big.hero{padding:12px 12px;font-size:18px}.online-side .big{padding:8px 12px;font-size:15px}.online-grid{gap:10px}}
+/* five daily tasks: two columns on landscape screens, so all five are seen without scrolling */
+@media (min-width:700px){#quests-list{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}#quests-list .item.quest:last-child:nth-child(odd){grid-column:1 / -1}}
+@media (max-height:420px){#quests-list .item.quest{padding:4px 10px;gap:8px;grid-template-columns:34px 1fr auto}#quests-list .item.quest .ic{font-size:26px}#quests-list .item.quest b{font-size:13px}#quests-list .bar{margin:2px 0}}
