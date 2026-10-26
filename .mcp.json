@@ -15,6 +15,11 @@
     "babylon-gui": {
       "command": "npx",
       "args": ["-y", "@babylonjs/mcp-servers", "gui"]
+    },
+    "meshy": {
+      "command": "npx",
+      "args": ["-y", "@meshy-ai/meshy-mcp-server"],
+      "env": { "MESHY_API_KEY": "${MESHY_API_KEY}" }
     }
   }
 }
